@@ -1,0 +1,116 @@
+name: ${COMPOSE_PROJECT_NAME:-universe-staging}
+
+x-nextjs-runtime: &nextjs-runtime
+  init: true
+  env_file:
+    - ./env/staging/nextjs.env.example
+  restart: unless-stopped
+  stop_signal: SIGTERM
+  stop_grace_period: 30s
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=64m
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  healthcheck:
+    test:
+      [
+        "CMD",
+        "node",
+        "-e",
+        "require('http').get('http://127.0.0.1:3000',res=>process.exit(res.statusCode<500?0:1)).on('error',()=>process.exit(1))",
+      ]
+    interval: 30s
+    timeout: 5s
+    retries: 5
+    start_period: 30s
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+  networks:
+    - internal
+    - edge
+
+services:
+  nextjs:
+    <<: *nextjs-runtime
+    image: ${NEXTJS_IMAGE:-universe/nextjs}:${NEXTJS_IMAGE_TAG:-staging}
+    build:
+      context: ${NEXTJS_CONTEXT:-../app}
+      dockerfile: ${NEXTJS_DOCKERFILE:-../app/Dockerfile}
+      target: runner
+    expose:
+      - "3000"
+    secrets:
+      - next_server_actions_encryption_key
+    entrypoint:
+      - /bin/sh
+      - -c
+      - export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$$(cat /run/secrets/next_server_actions_encryption_key)" && exec node server.js
+
+  proxy:
+    image: caddy:2.10-alpine
+    init: true
+    depends_on:
+      nextjs:
+        condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 15s
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+      - /var/run:rw,noexec,nosuid,nodev,size=16m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    ports:
+      - "${NEXTJS_PROXY_HTTP_PORT:-8080}:80"
+    volumes:
+      - type: bind
+        source: ./proxy/Caddyfile.staging
+        target: /etc/caddy/Caddyfile
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: volume
+        source: caddy_staging_data
+        target: /data
+      - type: volume
+        source: caddy_staging_config
+        target: /config
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:80"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - edge
+      - internal
+
+networks:
+  edge:
+    driver: bridge
+  internal:
+    driver: bridge
+    internal: true
+
+volumes:
+  caddy_staging_data:
+  caddy_staging_config:
+
+secrets:
+  next_server_actions_encryption_key:
+    file: ./secrets/staging/next_server_actions_encryption_key.txt

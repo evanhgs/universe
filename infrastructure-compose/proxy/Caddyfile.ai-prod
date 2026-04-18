@@ -1,0 +1,8 @@
+{
+  email {$AI_SERVICES_CADDY_EMAIL}
+}
+
+{$AI_SERVICES_CADDY_HOSTNAME} {
+  encode zstd gzip
+  reverse_proxy ai-services:8000
+}

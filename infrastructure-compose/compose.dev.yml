@@ -1,0 +1,59 @@
+name: ${COMPOSE_PROJECT_NAME:-universe-dev}
+
+services:
+  nextjs:
+    build:
+      context: ${NEXTJS_CONTEXT:-../app}
+      dockerfile: ${NEXTJS_DOCKERFILE:-../app/Dockerfile}
+      target: dev
+    init: true
+    working_dir: /app
+    ports:
+      - "${NEXTJS_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: "1"
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      WATCHPACK_POLLING: "true"
+    restart: unless-stopped
+    stop_grace_period: 15s
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://127.0.0.1:3000',res=>process.exit(res.statusCode<500?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    develop:
+      watch:
+        - path: ${NEXTJS_CONTEXT:-../app}/src
+          action: sync
+          target: /app/src
+          initial_sync: true
+          ignore:
+            - node_modules/
+            - .next/
+        - path: ${NEXTJS_CONTEXT:-../app}/public
+          action: sync
+          target: /app/public
+          initial_sync: true
+        - path: ${NEXTJS_CONTEXT:-../app}/package.json
+          action: rebuild
+        - path: ${NEXTJS_CONTEXT:-../app}/package-lock.json
+          action: rebuild
+        - path: ${NEXTJS_CONTEXT:-../app}/next.config.ts
+          action: rebuild
+        - path: ${NEXTJS_CONTEXT:-../app}/tsconfig.json
+          action: rebuild
+    networks:
+      - edge
+
+networks:
+  edge:
+    driver: bridge

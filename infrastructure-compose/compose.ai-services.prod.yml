@@ -1,0 +1,110 @@
+name: ${COMPOSE_PROJECT_NAME:-universe-ai-prod}
+
+x-ai-services-runtime: &ai-services-runtime
+  init: true
+  env_file:
+    - ./env/prod/ai-services.env.example
+  restart: unless-stopped
+  stop_signal: SIGTERM
+  stop_grace_period: 30s
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=64m
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  healthcheck:
+    test:
+      [
+        "CMD",
+        "python",
+        "-c",
+        "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health').status < 500 else 1)",
+      ]
+    interval: 30s
+    timeout: 5s
+    retries: 5
+    start_period: 20s
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+  networks:
+    - internal
+    - edge
+
+services:
+  ai-services:
+    <<: *ai-services-runtime
+    image: ${AI_SERVICES_IMAGE:-universe/ai-services}:${AI_SERVICES_IMAGE_TAG:-prod}
+    build:
+      context: ${AI_SERVICES_CONTEXT:-../ai-services}
+      dockerfile: ${AI_SERVICES_DOCKERFILE:-../ai-services/Dockerfile}
+      target: runner
+    expose:
+      - "8000"
+
+  proxy:
+    image: caddy:2.10-alpine
+    init: true
+    depends_on:
+      ai-services:
+        condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 15s
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+      - /var/run:rw,noexec,nosuid,nodev,size=16m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    ports:
+      - "${AI_SERVICES_PROXY_HTTP_PORT:-8011}:80"
+      - "${AI_SERVICES_PROXY_HTTPS_PORT:-8444}:443"
+    environment:
+      AI_SERVICES_CADDY_HOSTNAME: ${AI_SERVICES_CADDY_HOSTNAME}
+      AI_SERVICES_CADDY_EMAIL: ${AI_SERVICES_CADDY_EMAIL}
+    volumes:
+      - type: bind
+        source: ./proxy/Caddyfile.ai-prod
+        target: /etc/caddy/Caddyfile
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: volume
+        source: caddy_ai_prod_data
+        target: /data
+      - type: volume
+        source: caddy_ai_prod_config
+        target: /config
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:80"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - edge
+      - internal
+
+networks:
+  edge:
+    driver: bridge
+  internal:
+    driver: bridge
+    internal: true
+
+volumes:
+  caddy_ai_prod_data:
+  caddy_ai_prod_config:

@@ -1,0 +1,8 @@
+{
+  email {$CADDY_EMAIL}
+}
+
+{$CADDY_HOSTNAME} {
+  encode zstd gzip
+  reverse_proxy nextjs:3000
+}
