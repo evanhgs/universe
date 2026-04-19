@@ -1,6 +1,7 @@
-# syntax=docker/dockerfile:1
 ARG PYTHON_VERSION=3.14-slim
 ARG UV_VERSION=0.8.22
+
+FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uvbin
 
 FROM python:${PYTHON_VERSION} AS base
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -11,7 +12,7 @@ ENV UV_PYTHON_DOWNLOADS=0
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv
 ENV PATH=/app/.venv/bin:/usr/local/bin:/bin:$PATH
 WORKDIR /app
-COPY --from=ghcr.io/astral-sh/uv:${UV_VERSION} /uv /uvx /bin/
+COPY --from=uvbin /uv /uvx /bin/
 
 FROM base AS deps
 COPY pyproject.toml uv.lock ./

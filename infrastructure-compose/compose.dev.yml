@@ -9,13 +9,13 @@ services:
     init: true
     working_dir: /app
     ports:
-      - "${NEXTJS_PORT:-3000}:3000"
+      - "${NEXTJS_PORT:-3000}:${NEXTJS_PORT:-3000}"
     environment:
-      NODE_ENV: development
-      NEXT_TELEMETRY_DISABLED: "1"
-      HOSTNAME: 0.0.0.0
-      PORT: "3000"
-      WATCHPACK_POLLING: "true"
+      NODE_ENV: ${NEXTJS_NODE_ENV:-development}
+      NEXT_TELEMETRY_DISABLED: "${NEXTJS_TELEMETRY_DISABLED:-1}"
+      HOSTNAME: ${NEXTJS_HOSTNAME:-0.0.0.0}
+      PORT: "${NEXTJS_PORT:-3000}"
+      WATCHPACK_POLLING: "${NEXTJS_WATCHPACK_POLLING:-true}"
     restart: unless-stopped
     stop_grace_period: 15s
     healthcheck:
@@ -24,7 +24,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "require('http').get('http://127.0.0.1:3000',res=>process.exit(res.statusCode<500?0:1)).on('error',()=>process.exit(1))",
+          "require('http').get('http://127.0.0.1:${NEXTJS_PORT:-3000}',res=>process.exit(res.statusCode<500?0:1)).on('error',()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 5s
@@ -50,6 +50,55 @@ services:
         - path: ${NEXTJS_CONTEXT:-../app}/next.config.ts
           action: rebuild
         - path: ${NEXTJS_CONTEXT:-../app}/tsconfig.json
+          action: rebuild
+    networks:
+      - edge
+      
+  ai-services:
+    build:
+      context: ${AI_SERVICES_CONTEXT:-../ai-services}
+      dockerfile: ${AI_SERVICES_DOCKERFILE:-../ai-services/Dockerfile}
+      target: dev
+    init: true
+    working_dir: /app
+    ports:
+      - "${AI_SERVICES_PORT:-8000}:${AI_SERVICES_PORT:-8000}"
+    environment:
+      PYTHONDONTWRITEBYTECODE: "${AI_SERVICES_PYTHONDONTWRITEBYTECODE:-1}"
+      PYTHONUNBUFFERED: "${AI_SERVICES_PYTHONUNBUFFERED:-1}"
+    restart: unless-stopped
+    stop_grace_period: 15s
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:${AI_SERVICES_PORT:-8000}/health').status < 500 else 1)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    develop:
+      watch:
+        - path: ${AI_SERVICES_CONTEXT:-../ai-services}
+          action: sync
+          target: /app
+          initial_sync: true
+          ignore:
+            - .venv/
+            - __pycache__/
+            - .pytest_cache/
+            - .ruff_cache/
+            - dist/
+            - build/
+            - "*.egg-info/"
+            - uv.lock
+            - pyproject.toml
+        - path: ${AI_SERVICES_CONTEXT:-../ai-services}/pyproject.toml
+          action: rebuild
+        - path: ${AI_SERVICES_CONTEXT:-../ai-services}/uv.lock
           action: rebuild
     networks:
       - edge

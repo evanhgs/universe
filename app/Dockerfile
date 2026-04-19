@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 ARG NODE_VERSION=24.12.0-alpine
 
 FROM node:${NODE_VERSION} AS base
@@ -6,6 +5,7 @@ FROM node:${NODE_VERSION} AS base
 FROM base AS dev
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
+RUN chown node:node /app
 COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* .npmrc* ./
 RUN \
   if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
