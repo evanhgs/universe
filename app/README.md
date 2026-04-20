@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Environment
 
-## Getting Started
+The app does not own its own `.env` file.
 
-First, run the development server:
+The source of truth is `../infra/env`, and the intended workflow is to run the app through Docker Compose so the `nextjs` service receives `DATABASE_URL`, `APP_ENV`, `NODE_ENV`, and the rest of the stack configuration from `infra`.
+
+`prisma.config.ts` is intentionally minimal:
+
+- `prisma generate` must work during Docker image builds even before runtime env injection
+- database commands such as `migrate`, `db pull`, and `studio` must be executed in an environment where `DATABASE_URL` is already injected
+
+## Local workflow
+
+From the repository root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+make dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Useful commands:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+make dev-down
+make dev-logs
+make dev-ps
+make next-sh
+make prisma-generate
+make prisma-migrate
+make prisma-studio
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Once the stack is up, the app is available on [http://localhost:3000](http://localhost:3000).
 
-## Learn More
+## Prisma
 
-To learn more about Next.js, take a look at the following resources:
+Prisma is expected to run inside the `nextjs` container in development. That keeps one single source of truth for environment variables and avoids a second local `.env` layer inside `app`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Examples:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+make prisma-generate
+make prisma-migrate
+make prisma-studio
+```

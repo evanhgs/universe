@@ -3,12 +3,16 @@ import { Pool } from "pg";
 
 import { PrismaClient } from "../generated/prisma/client";
 
-import { databaseUrl } from "./database-url";
-
 const globalForPrisma = globalThis as typeof globalThis & {
   prisma?: PrismaClient;
   prismaPool?: Pool;
 };
+
+const databaseUrl = process.env.DATABASE_URL;
+
+if (!databaseUrl) {
+  throw new Error("Missing DATABASE_URL in the runtime environment.");
+}
 
 const pool =
   globalForPrisma.prismaPool ??

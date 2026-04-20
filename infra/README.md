@@ -31,19 +31,49 @@ If you later move this folder into a separate Git repository, update the `NEXTJS
 Development:
 
 ```bash
-docker compose -f infrastructure-compose/compose.dev.yml --env-file infrastructure-compose/env/stack.dev.env.example up --build --watch
+make dev
 ```
 
 Staging:
 
 ```bash
-docker compose -f infrastructure-compose/compose.staging.yml --env-file infrastructure-compose/env/stack.staging.env.example up --build -d
+make staging
 ```
 
 Production:
 
 ```bash
-docker compose -f infrastructure-compose/compose.prod.yml --env-file infrastructure-compose/env/stack.prod.env.example up --build -d
+make prod
+```
+
+Equivalent raw commands remain:
+
+```bash
+docker compose -f infra/compose.dev.yml --env-file infra/env/stack.dev.env.example up --build --watch
+docker compose -f infra/compose.staging.yml --env-file infra/env/stack.staging.env.example up --build -d
+docker compose -f infra/compose.prod.yml --env-file infra/env/stack.prod.env.example up --build -d
+```
+
+## Prisma workflow
+
+The application env source of truth lives in `infra/env`.
+
+That means Prisma commands should be run inside the `nextjs` container, not from the host shell, so they use the same `DATABASE_URL` and stack env as the app itself.
+
+From the repository root:
+
+```bash
+make prisma-generate
+make prisma-migrate
+make prisma-studio
+```
+
+Or directly:
+
+```bash
+docker compose -f infra/compose.dev.yml --env-file infra/env/stack.dev.env.example exec nextjs npx prisma generate
+docker compose -f infra/compose.dev.yml --env-file infra/env/stack.dev.env.example exec nextjs npx prisma migrate dev
+docker compose -f infra/compose.dev.yml --env-file infra/env/stack.dev.env.example exec nextjs npx prisma studio --hostname 0.0.0.0 --port 5555
 ```
 
 ## Recommended secret setup

@@ -1,7 +1,5 @@
 import { defineConfig } from "prisma/config";
 
-import { databaseUrl } from "./src/lib/database-url";
-
 const prismaConfig = {
   schema: "prisma/schema.prisma",
   migrations: {
@@ -9,7 +7,9 @@ const prismaConfig = {
     // seed: "tsx prisma/seed.ts" TODO: create a seed file
   },
   datasource: {
-    url: databaseUrl,
+    // `generate` runs during image builds where DATABASE_URL is not injected yet.
+    // Commands that actually talk to the database still require DATABASE_URL.
+    url: process.env.DATABASE_URL ?? "",
   },
 };
 
