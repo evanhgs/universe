@@ -14,6 +14,7 @@ RUN \
   else echo "Lockfile not found." && exit 1; \
   fi
 COPY --chown=node:node . .
+RUN npx prisma generate
 USER node
 ENV NODE_ENV=development
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -37,6 +38,7 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+RUN npx prisma generate
 RUN npm run build
 
 FROM base AS runner

@@ -66,6 +66,7 @@ services:
   nextjs:
     <<: *nextjs-runtime
     environment:
+      APP_ENV: ${APP_ENV:-staging}
       NODE_ENV: ${NEXTJS_NODE_ENV:-production}
       NEXT_TELEMETRY_DISABLED: "${NEXTJS_TELEMETRY_DISABLED:-1}"
       HOSTNAME: ${NEXTJS_HOSTNAME:-0.0.0.0}

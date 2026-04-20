@@ -35,6 +35,7 @@ services:
     ports:
       - "${NEXTJS_PORT:-3000}:${NEXTJS_PORT:-3000}"
     environment:
+      APP_ENV: ${APP_ENV:-development}
       NODE_ENV: ${NEXTJS_NODE_ENV:-development}
       NEXT_TELEMETRY_DISABLED: "${NEXTJS_TELEMETRY_DISABLED:-1}"
       HOSTNAME: ${NEXTJS_HOSTNAME:-0.0.0.0}
