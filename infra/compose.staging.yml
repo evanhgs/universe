@@ -34,6 +34,35 @@ x-nextjs-runtime: &nextjs-runtime
     - edge
 
 services:
+  postgres:
+    image: postgres:18-alpine
+    init: true
+    restart: unless-stopped
+    stop_signal: SIGTERM
+    stop_grace_period: 30s
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-universe_staging}
+      POSTGRES_USER: ${POSTGRES_USER:-universe}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-universe_staging_password}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - type: volume
+        source: postgres_staging_data
+        target: /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - internal
+
   nextjs:
     <<: *nextjs-runtime
     environment:
@@ -41,11 +70,15 @@ services:
       NEXT_TELEMETRY_DISABLED: "${NEXTJS_TELEMETRY_DISABLED:-1}"
       HOSTNAME: ${NEXTJS_HOSTNAME:-0.0.0.0}
       PORT: "${NEXTJS_PORT:-3000}"
+      DATABASE_URL: ${DATABASE_URL}
     image: ${NEXTJS_IMAGE:-universe/nextjs}:${NEXTJS_IMAGE_TAG:-staging}
     build:
       context: ${NEXTJS_CONTEXT:-../app}
       dockerfile: ${NEXTJS_DOCKERFILE:-../app/Dockerfile}
       target: runner
+    depends_on:
+      postgres:
+        condition: service_healthy
     expose:
       - "${NEXTJS_PORT:-3000}"
     secrets:
@@ -202,6 +235,7 @@ networks:
     internal: true
 
 volumes:
+  postgres_staging_data:
   caddy_staging_data:
   caddy_staging_config:
   caddy_ai_staging_data:

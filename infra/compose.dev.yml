@@ -1,6 +1,30 @@
 name: ${COMPOSE_PROJECT_NAME:-universe-dev}
 
 services:
+  postgres:
+    image: postgres:18-alpine
+    init: true
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-universe_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-universe}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-universe_dev_password}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - type: volume
+        source: postgres_dev_data
+        target: /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - edge
+
   nextjs:
     build:
       context: ${NEXTJS_CONTEXT:-../app}
@@ -16,6 +40,10 @@ services:
       HOSTNAME: ${NEXTJS_HOSTNAME:-0.0.0.0}
       PORT: "${NEXTJS_PORT:-3000}"
       WATCHPACK_POLLING: "${NEXTJS_WATCHPACK_POLLING:-true}"
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     stop_grace_period: 15s
     healthcheck:
@@ -48,6 +76,8 @@ services:
         - path: ${NEXTJS_CONTEXT:-../app}/package-lock.json
           action: rebuild
         - path: ${NEXTJS_CONTEXT:-../app}/next.config.ts
+          action: rebuild
+        - path: ${NEXTJS_CONTEXT:-../app}/prisma
           action: rebuild
         - path: ${NEXTJS_CONTEXT:-../app}/tsconfig.json
           action: rebuild
@@ -106,3 +136,6 @@ services:
 networks:
   edge:
     driver: bridge
+
+volumes:
+  postgres_dev_data:
