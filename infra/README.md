@@ -60,7 +60,7 @@ Versioned `*.example` files are templates only. Copy them to the matching `*.env
 
 The application env source of truth lives in `infra/env`.
 
-That means Prisma commands should be run inside the `nextjs` container, not from the host shell, so they use the same `DATABASE_URL` and stack env as the app itself.
+That means database-aware Prisma commands should be run inside the `nextjs` container, so they use the same `DATABASE_URL` and stack env as the app itself.
 
 From the repository root:
 
@@ -70,10 +70,11 @@ make prisma-migrate
 make prisma-studio
 ```
 
+`make prisma-generate` is the exception: it runs from `app/` on the host so the generated client is written back into the repository at `app/generated/prisma`.
+
 Or directly:
 
 ```bash
-docker compose -f infra/compose.dev.yml --env-file infra/env/stack.dev.env exec nextjs npx prisma generate
 docker compose -f infra/compose.dev.yml --env-file infra/env/stack.dev.env exec nextjs npx prisma migrate dev
 docker compose -f infra/compose.dev.yml --env-file infra/env/stack.dev.env exec nextjs npx prisma studio --hostname 0.0.0.0 --port 5555
 ```

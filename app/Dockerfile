@@ -6,7 +6,8 @@ FROM base AS dev
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 RUN chown node:node /app
-COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* .npmrc* ./
+COPY --chown=node:node package.json yarn.lock* package-lock.json* pnpm-lock.yaml* .npmrc* ./
+USER node
 RUN \
   if [ -f yarn.lock ]; then yarn --frozen-lockfile --ignore-scripts; \
   elif [ -f package-lock.json ]; then npm ci --ignore-scripts; \
@@ -15,7 +16,6 @@ RUN \
   fi
 COPY --chown=node:node . .
 RUN npx prisma generate
-USER node
 ENV NODE_ENV=development
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000

@@ -1,14 +1,21 @@
 import type { NextConfig } from "next";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
+const clerkDevHost = "https://*.clerk.accounts.dev";
+const clerkImagesHost = "https://img.clerk.com";
+const clerkChallengesHost = "https://challenges.cloudflare.com";
 
 const contentSecurityPolicy = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline' ${clerkDevHost} ${clerkChallengesHost}${
+    isDevelopment ? " 'unsafe-eval'" : ""
+  }`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  `img-src 'self' data: blob: ${clerkImagesHost}`,
   "font-src 'self' data:",
-  "connect-src 'self'",
+  `connect-src 'self' ${clerkDevHost}`,
+  "worker-src 'self' blob:",
+  `frame-src 'self' ${clerkChallengesHost}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

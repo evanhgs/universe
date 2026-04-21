@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
@@ -10,4 +5,804 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+/// -------------------------
+/// ENUMS
+/// -------------------------
+
+enum UserStatus {
+  ACTIVE
+  PENDING_VERIFICATION
+  SUSPENDED
+  DELETED
+}
+
+enum RoleCode {
+  BUYER
+  SELLER
+  ENGINEER
+  ADMIN
+  MODERATOR
+}
+
+enum BeatStatus {
+  DRAFT
+  PROCESSING
+  PUBLISHED
+  HIDDEN
+  ARCHIVED
+  DELETED
+}
+
+enum Visibility {
+  PUBLIC
+  UNLISTED
+  PRIVATE
+}
+
+enum AssetType {
+  AUDIO_SOURCE
+  AUDIO_PREVIEW
+  AUDIO_LICENSED_ARCHIVE
+  IMAGE_THUMBNAIL
+  IMAGE_BANNER
+  IMAGE_AVATAR
+  DOCUMENT_CONTRACT
+  DOCUMENT_KYC
+  OTHER
+}
+
+enum StorageProvider {
+  S3
+  CLOUDFLARE_R2
+  AWS_S3
+  OTHER
+}
+
+enum ProcessingStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum LicenseScope {
+  BASIC
+  PREMIUM
+  UNLIMITED
+  EXCLUSIVE
+  CUSTOM
+}
+
+enum OrderStatus {
+  DRAFT
+  PENDING_PAYMENT
+  PAID
+  PARTIALLY_REFUNDED
+  REFUNDED
+  FAILED
+  CANCELLED
+}
+
+enum OrderItemType {
+  BEAT_LICENSE
+  SUBSCRIPTION
+  SERVICE
+}
+
+enum PaymentProvider {
+  STRIPE
+  PAYPAL
+  MANUAL
+}
+
+enum PaymentStatus {
+  REQUIRES_ACTION
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum LedgerEntryType {
+  GROSS_SALE
+  PLATFORM_COMMISSION
+  SELLER_EARNING
+  REFUND
+  CHARGEBACK
+  ADJUSTMENT
+  TAX
+}
+
+enum EntitlementStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+enum ConversationType {
+  DIRECT
+  ORDER_SUPPORT
+  BEAT_INQUIRY
+  SYSTEM
+}
+
+enum MessageType {
+  TEXT
+  SYSTEM
+  FILE
+}
+
+enum ModerationStatus {
+  CLEAN
+  FLAGGED
+  BLOCKED
+}
+
+enum SubscriptionInterval {
+  MONTHLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  INACTIVE
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+enum ReviewTargetType {
+  SELLER
+  BUYER
+  ENGINEER
+  BEAT
+}
+
+enum ContractStatus {
+  DRAFT
+  GENERATED
+  SENT
+  SIGNED
+  VOID
+}
+
+enum SignatureStatus {
+  PENDING
+  SIGNED
+  DECLINED
+}
+
+enum KycStatus {
+  NOT_STARTED
+  PENDING
+  UNDER_REVIEW
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+/// -------------------------
+/// CORE IDENTITY
+/// -------------------------
+
+model User {
+  id                 String              @id @default(cuid())
+  email              String              @unique
+  username           String?             @unique
+  passwordHash       String?
+  phoneE164          String?
+  firstName          String?
+  lastName           String?
+  emailVerifiedAt    DateTime?
+  phoneVerifiedAt    DateTime?
+  status             UserStatus          @default(PENDING_VERIFICATION)
+  twoFactorEnabled   Boolean             @default(false)
+  lastLoginAt        DateTime?
+  deletedAt          DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  profile            UserProfile?
+  roles              UserRoleAssignment[]
+  beats              Beat[]              @relation("BeatOwner")
+  orders             Order[]             @relation("BuyerOrders")
+  payments           Payment[]           @relation("BuyerPayments")
+  mediaAssets        MediaAsset[]
+  beatOfferings      BeatLicenseOffering[]
+  soldOrderItems     OrderItem[]
+  entitlements       PurchaseEntitlement[]
+  likedBeats         BeatLike[]
+  conversations      ConversationParticipant[]
+  sentMessages       Message[]           @relation("MessageSender")
+  subscriptions      UserSubscription[]
+  reviewsWritten     Review[]            @relation("ReviewAuthor")
+  reviewsReceived    Review[]            @relation("ReviewTargetUser")
+  followers          Follow[]            @relation("FollowedUser")
+  following          Follow[]            @relation("FollowerUser")
+  kycRecords         KycVerification[]
+  createdContracts   GeneratedContract[] @relation("ContractBuyer")
+  soldContracts      GeneratedContract[] @relation("ContractSeller")
+}
+
+model UserProfile {
+  id                    String   @id @default(cuid())
+  userId                 String   @unique
+  displayName            String
+  slug                   String   @unique
+  bio                    String?
+  countryCode            String?
+  city                   String?
+  addressLine1           String?
+  addressLine2           String?
+  postalCode             String?
+  avatarAssetId          String?
+  bannerAssetId          String?
+  isPublic               Boolean  @default(true)
+  sellerRatingAvg        Decimal? @db.Decimal(3,2)
+  sellerRatingCount      Int      @default(0)
+  buyerRatingAvg         Decimal? @db.Decimal(3,2)
+  buyerRatingCount       Int      @default(0)
+  followerCount          Int      @default(0)
+  beatCount              Int      @default(0)
+  saleCount              Int      @default(0)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  avatarAsset            MediaAsset? @relation("AvatarAsset", fields: [avatarAssetId], references: [id], onDelete: SetNull)
+  bannerAsset            MediaAsset? @relation("BannerAsset", fields: [bannerAssetId], references: [id], onDelete: SetNull)
+}
+
+model UserRoleAssignment {
+  id         String   @id @default(cuid())
+  userId      String
+  role        RoleCode
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+  @@index([role])
+}
+
+/// -------------------------
+/// MEDIA / STORAGE
+/// -------------------------
+
+model MediaAsset {
+  id                String           @id @default(cuid())
+  ownerId           String?
+  provider          StorageProvider
+  bucket            String
+  objectKey         String           @unique
+  originalFilename  String?
+  mimeType          String?
+  extension         String?
+  sizeBytes         BigInt?
+  checksumSha256    String?
+  assetType         AssetType
+  processingStatus  ProcessingStatus @default(PENDING)
+  isPublic          Boolean          @default(false)
+  metadataJson      Json?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  owner             User?            @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  avatarProfiles    UserProfile[]    @relation("AvatarAsset")
+  bannerProfiles    UserProfile[]    @relation("BannerAsset")
+  linkedBeats       BeatAssetLink[]
+}
+
+model BeatAssetLink {
+  id               String   @id @default(cuid())
+  beatId           String
+  assetId          String
+  role             AssetType
+  licenseOfferingId String?
+  sortOrder        Int      @default(0)
+  createdAt        DateTime @default(now())
+
+  beat             Beat              @relation(fields: [beatId], references: [id], onDelete: Cascade)
+  asset            MediaAsset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  licenseOffering  BeatLicenseOffering? @relation(fields: [licenseOfferingId], references: [id], onDelete: Cascade)
+
+  @@index([beatId, role])
+  @@index([licenseOfferingId])
+}
+
+/// -------------------------
+/// CATALOG / BEATS
+/// -------------------------
+
+model Beat {
+  id                   String    @id @default(cuid())
+  ownerId              String
+  slug                 String    @unique
+  title                String
+  description          String?
+  bpm                  Int?
+  musicalKey           String?
+  durationSec          Int?
+  basePriceAmount      Decimal?  @db.Decimal(10,2)
+  currency             String    @default("EUR")
+  primaryGenre         String?
+  primaryMood          String?
+  tags                 String[]
+  status               BeatStatus @default(DRAFT)
+  visibility           Visibility @default(PUBLIC)
+  moderationStatus     ModerationStatus @default(CLEAN)
+  isFree               Boolean   @default(false)
+  brandingRequired     Boolean   @default(false)
+  firstPublishedAt     DateTime?
+  publishedAt          DateTime?
+  archivedAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  owner                User                 @relation("BeatOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  assets               BeatAssetLink[]
+  licenseOfferings     BeatLicenseOffering[]
+  orderItems           OrderItem[]
+  entitlements         PurchaseEntitlement[]
+  views                BeatViewEvent[]
+  likes                BeatLike[]
+  scoreSnapshots       BeatScoreSnapshot[]
+  rightsRegistrations  BeatRightsRegistration[]
+  contracts            GeneratedContract[]
+
+  @@index([ownerId, status, publishedAt])
+  @@index([status, visibility, publishedAt])
+  @@index([primaryGenre, publishedAt])
+}
+
+model LicenseTemplate {
+  id                      String       @id @default(cuid())
+  code                    String       @unique
+  name                    String
+  scope                   LicenseScope
+  description             String?
+  allowStreaming          Boolean      @default(true)
+  allowCommercialUse      Boolean      @default(false)
+  allowBroadcast          Boolean      @default(false)
+  allowDistribution       Boolean      @default(false)
+  allowExclusiveTransfer  Boolean      @default(false)
+  allowStemsDownload      Boolean      @default(false)
+  maxStreams              Int?
+  maxSales                Int?
+  maxMusicVideos          Int?
+  maxRadioStations        Int?
+  contractTemplateId      String?
+  isSystem                Boolean      @default(false)
+  isActive                Boolean      @default(true)
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
+
+  offerings               BeatLicenseOffering[]
+  contractTemplate        ContractTemplate? @relation(fields: [contractTemplateId], references: [id], onDelete: SetNull)
+}
+
+model BeatLicenseOffering {
+  id                      String       @id @default(cuid())
+  beatId                   String
+  licenseTemplateId        String
+  sellerId                 String
+  title                    String?
+  description              String?
+  priceAmount              Decimal      @db.Decimal(10,2)
+  currency                 String       @default("EUR")
+  isActive                 Boolean      @default(true)
+  isDefault                Boolean      @default(false)
+  stock                    Int?
+  customTermsJson          Json?
+  deliveryNotes            String?
+  createdAt                DateTime     @default(now())
+  updatedAt                DateTime     @updatedAt
+
+  beat                     Beat         @relation(fields: [beatId], references: [id], onDelete: Cascade)
+  seller                   User         @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  licenseTemplate          LicenseTemplate @relation(fields: [licenseTemplateId], references: [id], onDelete: Restrict)
+  orderItems               OrderItem[]
+  entitlements             PurchaseEntitlement[]
+  assetLinks               BeatAssetLink[]
+
+  @@unique([beatId, licenseTemplateId])
+  @@index([sellerId, isActive])
+  @@index([beatId, isActive, priceAmount])
+}
+
+/// -------------------------
+/// COMMERCE
+/// -------------------------
+
+model Order {
+  id                      String       @id @default(cuid())
+  buyerId                 String
+  status                  OrderStatus   @default(DRAFT)
+  currency                String        @default("EUR")
+  subtotalAmount          Decimal       @db.Decimal(10,2)
+  discountAmount          Decimal       @default(0) @db.Decimal(10,2)
+  commissionAmount        Decimal       @default(0) @db.Decimal(10,2)
+  taxAmount               Decimal       @default(0) @db.Decimal(10,2)
+  totalAmount             Decimal       @db.Decimal(10,2)
+  paidAt                  DateTime?
+  canceledAt              DateTime?
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+
+  buyer                   User          @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Restrict)
+  items                   OrderItem[]
+  payments                Payment[]
+  ledgerEntries           PayoutLedgerEntry[]
+  entitlements            PurchaseEntitlement[]
+
+  @@index([buyerId, status, createdAt])
+  @@index([status, createdAt])
+}
+
+model OrderItem {
+  id                      String          @id @default(cuid())
+  orderId                 String
+  type                    OrderItemType   @default(BEAT_LICENSE)
+  beatId                  String?
+  beatLicenseOfferingId   String?
+  sellerId                String?
+  titleSnapshot           String
+  licenseNameSnapshot     String?
+  unitAmount              Decimal         @db.Decimal(10,2)
+  quantity                Int             @default(1)
+  lineTotalAmount         Decimal         @db.Decimal(10,2)
+  rightsSnapshotJson      Json?
+  createdAt               DateTime        @default(now())
+
+  order                   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  beat                    Beat?           @relation(fields: [beatId], references: [id], onDelete: SetNull)
+  beatLicenseOffering     BeatLicenseOffering? @relation(fields: [beatLicenseOfferingId], references: [id], onDelete: SetNull)
+  seller                  User?           @relation(fields: [sellerId], references: [id], onDelete: SetNull)
+  entitlement             PurchaseEntitlement?
+
+  @@index([orderId])
+  @@index([beatId])
+  @@index([sellerId])
+}
+
+model Payment {
+  id                      String          @id @default(cuid())
+  orderId                 String
+  buyerId                 String
+  provider                PaymentProvider
+  providerPaymentIntentId String?         @unique
+  providerChargeId        String?         @unique
+  providerSessionId       String?         @unique
+  status                  PaymentStatus   @default(PENDING)
+  amount                  Decimal         @db.Decimal(10,2)
+  currency                String          @default("EUR")
+  failureCode             String?
+  failureMessage          String?
+  providerPayloadJson     Json?
+  paidAt                  DateTime?
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+
+  order                    Order          @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  buyer                    User           @relation("BuyerPayments", fields: [buyerId], references: [id], onDelete: Restrict)
+  ledgerEntries            PayoutLedgerEntry[]
+
+  @@index([orderId, status])
+  @@index([buyerId, createdAt])
+  @@index([provider, status])
+}
+
+model PayoutLedgerEntry {
+  id                      String           @id @default(cuid())
+  orderId                 String?
+  orderItemId             String?
+  sellerId                String?
+  paymentId               String?
+  type                    LedgerEntryType
+  amount                  Decimal          @db.Decimal(10,2)
+  currency                String           @default("EUR")
+  description             String?
+  occurredAt              DateTime         @default(now())
+  metadataJson            Json?
+
+  order                   Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  payment                 Payment?         @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([sellerId, occurredAt])
+  @@index([type, occurredAt])
+}
+
+model PurchaseEntitlement {
+  id                      String             @id @default(cuid())
+  orderId                 String
+  orderItemId             String             @unique
+  buyerId                 String
+  sellerId                String?
+  beatId                  String?
+  beatLicenseOfferingId   String?
+  status                  EntitlementStatus  @default(ACTIVE)
+  downloadLimit           Int?
+  downloadCount           Int                @default(0)
+  accessGrantedAt         DateTime?
+  revokedAt               DateTime?
+  expiresAt               DateTime?
+  rightsSnapshotJson      Json
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  order                   Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem               OrderItem          @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  buyer                   User               @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  beat                    Beat?              @relation(fields: [beatId], references: [id], onDelete: SetNull)
+  beatLicenseOffering     BeatLicenseOffering? @relation(fields: [beatLicenseOfferingId], references: [id], onDelete: SetNull)
+
+  @@index([buyerId, status])
+  @@index([beatId, status])
+}
+
+/// -------------------------
+/// CHAT
+/// -------------------------
+
+model Conversation {
+  id                      String             @id @default(cuid())
+  type                    ConversationType   @default(DIRECT)
+  createdById             String?
+  orderId                 String?
+  beatId                  String?
+  lastMessageAt           DateTime?
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  participants            ConversationParticipant[]
+  messages                Message[]
+
+  @@index([lastMessageAt])
+}
+
+model ConversationParticipant {
+  id                      String   @id @default(cuid())
+  conversationId          String
+  userId                  String
+  joinedAt                DateTime @default(now())
+  lastReadAt              DateTime?
+  isMuted                 Boolean  @default(false)
+
+  conversation            Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user                    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId, lastReadAt])
+}
+
+model Message {
+  id                      String          @id @default(cuid())
+  conversationId          String
+  senderId                String?
+  type                    MessageType     @default(TEXT)
+  body                    String?
+  originalLanguage        String?
+  moderationStatus        ModerationStatus @default(CLEAN)
+  metadataJson            Json?
+  createdAt               DateTime        @default(now())
+  editedAt                DateTime?
+
+  conversation            Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender                  User?           @relation("MessageSender", fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+  @@index([senderId, createdAt])
+}
+
+/// -------------------------
+/// V2 READY
+/// -------------------------
+
+model BeatViewEvent {
+  id              String   @id @default(cuid())
+  beatId          String
+  viewerId        String?
+  sessionId       String?
+  source          String?
+  viewedAt        DateTime @default(now())
+  watchMs         Int?
+
+  beat            Beat     @relation(fields: [beatId], references: [id], onDelete: Cascade)
+
+  @@index([beatId, viewedAt])
+  @@index([viewerId, viewedAt])
+}
+
+model BeatLike {
+  id              String   @id @default(cuid())
+  beatId          String
+  userId          String
+  createdAt       DateTime @default(now())
+
+  beat            Beat     @relation(fields: [beatId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([beatId, userId])
+}
+
+model Follow {
+  id              String   @id @default(cuid())
+  followerId      String
+  followedId      String
+  createdAt       DateTime @default(now())
+
+  follower        User     @relation("FollowerUser", fields: [followerId], references: [id], onDelete: Cascade)
+  followed        User     @relation("FollowedUser", fields: [followedId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followedId])
+  @@index([followedId, createdAt])
+}
+
+model Review {
+  id                      String          @id @default(cuid())
+  authorId                String
+  targetUserId            String?
+  beatId                  String?
+  orderId                 String?
+  targetType              ReviewTargetType
+  rating                  Int
+  communicationRating     Int?
+  speedRating             Int?
+  qualityRating           Int?
+  comment                 String?
+  createdAt               DateTime        @default(now())
+
+  author                  User            @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  targetUser              User?           @relation("ReviewTargetUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@index([targetUserId, createdAt])
+  @@index([beatId, createdAt])
+}
+
+model SubscriptionPlan {
+  id                      String               @id @default(cuid())
+  code                    String               @unique
+  name                    String
+  interval                SubscriptionInterval
+  priceAmount             Decimal              @db.Decimal(10,2)
+  currency                String               @default("EUR")
+  reducedCommissionRateBp Int
+  isActive                Boolean              @default(true)
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+
+  subscriptions           UserSubscription[]
+}
+
+model UserSubscription {
+  id                      String              @id @default(cuid())
+  userId                  String
+  planId                  String
+  provider                PaymentProvider     @default(STRIPE)
+  providerSubscriptionId  String?             @unique
+  status                  SubscriptionStatus  @default(INACTIVE)
+  startedAt               DateTime?
+  currentPeriodStart      DateTime?
+  currentPeriodEnd        DateTime?
+  canceledAt              DateTime?
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+
+  user                    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan                    SubscriptionPlan    @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@index([userId, status])
+}
+
+model BeatScoreSnapshot {
+  id                      String   @id @default(cuid())
+  beatId                  String
+  score                   Decimal  @db.Decimal(8,4)
+  scoreVersion            String
+  inputsJson              Json
+  computedAt              DateTime @default(now())
+
+  beat                    Beat     @relation(fields: [beatId], references: [id], onDelete: Cascade)
+
+  @@index([beatId, computedAt])
+}
+
+/// -------------------------
+/// V3 READY
+/// -------------------------
+
+model ContractTemplate {
+  id                      String   @id @default(cuid())
+  code                    String   @unique
+  name                    String
+  bodyTemplate            String
+  version                 Int
+  isActive                Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  licenseTemplates        LicenseTemplate[]
+  generatedContracts      GeneratedContract[]
+}
+
+model GeneratedContract {
+  id                      String          @id @default(cuid())
+  contractTemplateId      String?
+  orderId                 String?
+  beatId                  String?
+  buyerId                 String?
+  sellerId                String?
+  status                  ContractStatus  @default(DRAFT)
+  renderedBody            String?
+  pdfAssetId              String?
+  generatedAt             DateTime?
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+
+  contractTemplate        ContractTemplate? @relation(fields: [contractTemplateId], references: [id], onDelete: SetNull)
+  beat                    Beat?             @relation(fields: [beatId], references: [id], onDelete: SetNull)
+  buyer                   User?             @relation("ContractBuyer", fields: [buyerId], references: [id], onDelete: SetNull)
+  seller                  User?             @relation("ContractSeller", fields: [sellerId], references: [id], onDelete: SetNull)
+  signatures              ContractSignature[]
+}
+
+model ContractSignature {
+  id                      String           @id @default(cuid())
+  generatedContractId     String
+  signerUserId            String?
+  signerEmail             String?
+  status                  SignatureStatus  @default(PENDING)
+  signedAt                DateTime?
+  ipAddress               String?
+  metadataJson            Json?
+  createdAt               DateTime         @default(now())
+
+  generatedContract       GeneratedContract @relation(fields: [generatedContractId], references: [id], onDelete: Cascade)
+}
+
+model KycVerification {
+  id                      String      @id @default(cuid())
+  userId                  String
+  status                  KycStatus   @default(NOT_STARTED)
+  providerRef             String?
+  submittedAt             DateTime?
+  reviewedAt              DateTime?
+  expiresAt               DateTime?
+  notes                   String?
+  metadataJson            Json?
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  user                    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+model RightsOrganization {
+  id                      String   @id @default(cuid())
+  code                    String   @unique
+  name                    String
+  countryCode             String?
+  createdAt               DateTime @default(now())
+
+  registrations           BeatRightsRegistration[]
+}
+
+model BeatRightsRegistration {
+  id                      String   @id @default(cuid())
+  beatId                  String
+  organizationId          String
+  registrationNumber      String?
+  metadataJson            Json?
+  createdAt               DateTime @default(now())
+
+  beat                    Beat     @relation(fields: [beatId], references: [id], onDelete: Cascade)
+  organization            RightsOrganization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([beatId, organizationId])
 }

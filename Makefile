@@ -1,6 +1,7 @@
 DEV_ENV_FILE ?= infra/env/stack.dev.env
 STAGING_ENV_FILE ?= infra/env/stack.staging.env
 PROD_ENV_FILE ?= infra/env/stack.prod.env
+APP_DIR ?= app
 
 DEV_COMPOSE := docker compose -f infra/compose.dev.yml --env-file $(DEV_ENV_FILE)
 STAGING_COMPOSE := docker compose -f infra/compose.staging.yml --env-file $(STAGING_ENV_FILE)
@@ -68,8 +69,7 @@ next-sh:
 	$(DEV_COMPOSE) exec nextjs sh
 
 prisma-generate:
-	$(call require_env_file,$(DEV_ENV_FILE))
-	$(DEV_COMPOSE) exec nextjs npx prisma generate
+	cd $(APP_DIR) && npx prisma generate
 
 prisma-migrate:
 	$(call require_env_file,$(DEV_ENV_FILE))
