@@ -4,11 +4,13 @@ Objectif : permettre **inscription → publication → achat → paiement → ac
 
 ## **1\. Comptes & accès**
 
-* Inscription utilisateur  
-* Connexion utilisateur  
-* Déconnexion  
-* Réinitialisation mot de passe  
-* Vérification email  
+### Integration service externe Clerk
+
+* Inscription utilisateur (géré par le service)
+* Connexion utilisateur (géré par le service)
+* Déconnexion  (géré par le service)
+* Réinitialisation mot de passe  (géré par le service)
+* Vérification email  (géré par le service)
 * Gestion du profil (infos basiques)  
 * Gestion des rôles (acheteur / vendeur)
 
@@ -80,19 +82,6 @@ Objectif : permettre **inscription → publication → achat → paiement → ac
 * Email vérification compte  
 * Email confirmation achat  
 * Email confirmation vente
-
----
-
-## **Flowcharts à faire en priorité**
-
-https://excalidraw.com/\#room=6c481d8355254b0ae568,kjLdaxXqZGflkffAkHIgrQ
-
-* Authentification (login/signup)  
-* Publication d’une instru  
-* Achat d’une instru  
-* Paiement  
-* Chat utilisateur  
-* Accès contenu après achat
 
 ---
 
