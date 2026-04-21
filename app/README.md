@@ -51,6 +51,7 @@ Once the stack is up, the app is available on [http://localhost:3000](http://loc
 Prisma is expected to run inside the `nextjs` container in development. That keeps one single source of truth for environment variables and avoids a second local `.env` layer inside `app`.
 
 Import `getPrisma()` from `src/lib/prisma.ts` inside server-only code paths. The module now uses `server-only` and lazy initialization so build-time imports do not crash when `DATABASE_URL` is absent.
+The generated Prisma client lives in `generated/prisma` at the app root, not under `src/`.
 
 Examples:
 
