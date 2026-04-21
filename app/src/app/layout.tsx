@@ -21,7 +21,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <ClerkProvider>
+        <ClerkProvider dynamic>
           <header className="flex items-center justify-between border-b border-black/10 px-6 py-4">
             <div className="text-sm font-semibold tracking-[0.2em] text-black/70 uppercase">
               Universe

@@ -1,29 +1,6 @@
 import type { NextConfig } from "next";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
-const clerkDevHost = "https://*.clerk.accounts.dev";
-const clerkImagesHost = "https://img.clerk.com";
-const clerkChallengesHost = "https://challenges.cloudflare.com";
-
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' ${clerkDevHost} ${clerkChallengesHost}${
-    isDevelopment ? " 'unsafe-eval'" : ""
-  }`,
-  "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: blob: ${clerkImagesHost}`,
-  "font-src 'self' data:",
-  `connect-src 'self' ${clerkDevHost}`,
-  "worker-src 'self' blob:",
-  `frame-src 'self' ${clerkChallengesHost}`,
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  !isDevelopment ? "upgrade-insecure-requests" : "",
-]
-  .filter(Boolean)
-  .join("; ");
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -35,12 +12,20 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: [
           {
-            key: "Content-Security-Policy",
-            value: contentSecurityPolicy,
-          },
-          {
             key: "Permissions-Policy",
             value: "camera=(), geolocation=(), microphone=()",
+          },
+          {
+            key: "Cross-Origin-Opener-Policy",
+            value: "same-origin",
+          },
+          {
+            key: "Cross-Origin-Resource-Policy",
+            value: "same-origin",
+          },
+          {
+            key: "Origin-Agent-Cluster",
+            value: "?1",
           },
           {
             key: "Referrer-Policy",
@@ -53,6 +38,12 @@ const nextConfig: NextConfig = {
           {
             key: "X-Frame-Options",
             value: "DENY",
+          },
+          {
+            key: "Strict-Transport-Security",
+            value: isDevelopment
+              ? "max-age=0"
+              : "max-age=63072000; includeSubDomains; preload",
           },
         ],
       },

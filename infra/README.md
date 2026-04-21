@@ -93,6 +93,22 @@ Create a real secret file before using staging or production:
 
 Templates are present for env files and secret filenames, but real runtime values should live only in ignored `*.env` and `secrets/**/*.txt` files.
 
+## Clerk and forwarded headers
+
+The Next.js service now expects these runtime variables from `infra/env/stack.*.env`:
+
+- `APP_URL`: public origin of the Next.js app
+- `AI_SERVICES_URL`: public origin of the backend API when browser calls are cross-origin
+- `CLERK_AUTHORIZED_PARTIES`: comma-separated origin allowlist used by Clerk middleware
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`: Clerk publishable key exposed to the browser
+- `CLERK_SECRET_KEY`: Clerk server secret used by Next.js on the server side
+
+The reverse proxy is configured to preserve `Host`, `X-Forwarded-Host`, `X-Forwarded-Proto`, and `X-Forwarded-Port` so Clerk and Next.js can reconstruct the original request origin correctly behind Caddy.
+
+Clerk CSP is enforced in Next.js middleware instead of a static `next.config.ts` header. This keeps Clerk's required domains and per-request nonce generation aligned with the App Router.
+
+In practice, this means `app/.env.local` is no longer required for Clerk when the app is started through Compose. Keep the real keys in ignored runtime files such as `infra/env/stack.dev.env`, not in the versioned `*.example` files.
+
 ## Why the stack is structured this way
 
 - Development uses one Compose file and one env file for both services.
