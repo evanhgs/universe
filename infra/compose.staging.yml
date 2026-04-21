@@ -71,7 +71,6 @@ services:
       NEXT_TELEMETRY_DISABLED: "${NEXTJS_TELEMETRY_DISABLED:-1}"
       HOSTNAME: ${NEXTJS_HOSTNAME:-0.0.0.0}
       PORT: "${NEXTJS_PORT:-3000}"
-      DATABASE_URL: ${DATABASE_URL}
     image: ${NEXTJS_IMAGE:-universe/nextjs}:${NEXTJS_IMAGE_TAG:-staging}
     build:
       context: ${NEXTJS_CONTEXT:-../app}
@@ -84,10 +83,11 @@ services:
       - "${NEXTJS_PORT:-3000}"
     secrets:
       - next_server_actions_encryption_key
+      - database_url
     entrypoint:
       - /bin/sh
       - -c
-      - export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$$(cat /run/secrets/next_server_actions_encryption_key)" && exec node server.js
+      - export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$$(cat /run/secrets/next_server_actions_encryption_key)" && export DATABASE_URL="$$(cat /run/secrets/database_url)" && exec node server.js
 
   ai-services:
     init: true
@@ -245,3 +245,5 @@ volumes:
 secrets:
   next_server_actions_encryption_key:
     file: ./secrets/staging/next_server_actions_encryption_key.txt
+  database_url:
+    file: ./secrets/staging/database_url.txt
