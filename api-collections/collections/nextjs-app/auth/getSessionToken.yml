@@ -1,0 +1,20 @@
+info:
+  name: Clerk - Get Session Token
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{clerkFrontendApiUrl}}/v1/client/sessions/{{clerkSessionId}}/tokens"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Origin
+      value: "{{url}}"
+  auth: none
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

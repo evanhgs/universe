@@ -1,0 +1,27 @@
+info:
+  name: Account - Update Current Roles
+  type: http
+  seq: 5
+
+http:
+  method: PUT
+  url: "{{url}}/api/account/me/roles"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Authorization
+      value: Bearer {{clerkSessionToken}}
+      disabled: true
+  body:
+    type: json
+    data: |-
+      {
+        "roles": ["BUYER", "SELLER"]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
