@@ -1,0 +1,16 @@
+opencollection: 1.0.0
+info:
+  name: "universe"
+  type: workspace
+
+collections:
+  - name: "ai-services"
+    path: "collections/ai-services"
+  - name: "nextjs-app"
+    path: "collections/nextjs-app"
+
+specs:
+
+docs: ''
+
+activeEnvironmentUid: 1f3v0xs00000000000000
