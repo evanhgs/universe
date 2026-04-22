@@ -33,7 +33,7 @@ services:
     init: true
     working_dir: /app
     ports:
-      - "${NEXTJS_PORT:-3000}:${NEXTJS_PORT:-3000}"
+      - "${NEXTJS_PORT:-3000}:3000"
     environment:
       APP_ENV: ${APP_ENV:-development}
       APP_URL: ${APP_URL:-http://localhost:3000}
