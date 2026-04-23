@@ -7,9 +7,12 @@ http:
   method: GET
   url: "{{url}}/api/account/me/roles"
   headers:
-    - name: Authorization
-      value: Bearer {{clerkSessionToken}}
-      disabled: true
+    - name: Accept
+      value: application/json
+    - name: Origin
+      value: "{{url}}"
+    - name: Referer
+      value: "{{url}}/"
   auth: inherit
 
 settings:

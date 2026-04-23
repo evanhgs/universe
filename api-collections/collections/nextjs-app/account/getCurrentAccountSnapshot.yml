@@ -9,8 +9,6 @@ http:
   headers:
     - name: Authorization
       value: Bearer {{clerkSessionToken}}
-      disabled: true
-  auth: inherit
 
 settings:
   encodeUrl: true

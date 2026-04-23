@@ -9,9 +9,12 @@ http:
   headers:
     - name: Content-Type
       value: application/json
-    - name: Authorization
-      value: Bearer {{clerkSessionToken}}
-      disabled: true
+    - name: Accept
+      value: application/json
+    - name: Origin
+      value: "{{url}}"
+    - name: Referer
+      value: "{{url}}/"
   body:
     type: json
     data: |-

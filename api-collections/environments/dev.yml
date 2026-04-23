@@ -2,17 +2,3 @@ name: dev
 variables:
   - name: url
     value: http://localhost:3000
-  - name: clerkFrontendApiUrl
-    value: https://replace-me.clerk.accounts.dev
-  - name: clerkIdentifier
-    value: replace-me@example.com
-  - name: clerkPassword
-    value: replace-me
-  - name: clerkSignInId
-    value: sign_in_replace_me
-  - name: clerkEmailCode
-    value: "123456"
-  - name: clerkSessionId
-    value: sess_replace_me
-  - name: clerkSessionToken
-    value: replace-me

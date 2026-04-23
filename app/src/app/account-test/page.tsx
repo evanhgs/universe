@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@clerk/nextjs";
 import { useState } from "react";
 
 type JsonValue =
@@ -19,6 +20,17 @@ const initialState: ApiState = {
   status: null,
   body: null,
 };
+
+const sectionClass =
+  "rounded-2xl border border-black/10 bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,0.08)]";
+const buttonClass =
+  "rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700";
+const secondaryButtonClass =
+  "rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50";
+const textareaClass =
+  "mt-3 block w-full rounded-2xl border border-slate-200 bg-slate-950 p-4 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-amber-400";
+const preClass =
+  "mt-3 overflow-x-auto rounded-2xl border border-slate-200 bg-slate-950 p-4 text-sm leading-6 text-slate-100";
 
 async function request(path: string, init?: RequestInit) {
   const response = await fetch(path, {
@@ -40,9 +52,11 @@ async function request(path: string, init?: RequestInit) {
 }
 
 export default function AccountTestPage() {
+  const { getToken, isLoaded, userId } = useAuth();
   const [me, setMe] = useState<ApiState>(initialState);
   const [profile, setProfile] = useState<ApiState>(initialState);
   const [roles, setRoles] = useState<ApiState>(initialState);
+  const [sessionToken, setSessionToken] = useState<string>("");
   const [profilePayload, setProfilePayload] = useState(
     JSON.stringify(
       {
@@ -66,6 +80,7 @@ export default function AccountTestPage() {
     ),
   );
   const [error, setError] = useState<string | null>(null);
+  const [tokenStatus, setTokenStatus] = useState<string | null>(null);
 
   async function run(action: () => Promise<void>) {
     setError(null);
@@ -77,117 +92,235 @@ export default function AccountTestPage() {
     }
   }
 
+  async function loadSessionToken() {
+    setTokenStatus(null);
+    setError(null);
+
+    try {
+      const token = await getToken();
+
+      if (!token) {
+        setSessionToken("");
+        setTokenStatus("Aucun token disponible. Connecte-toi d'abord avec Clerk.");
+        return;
+      }
+
+      setSessionToken(token);
+      setTokenStatus("Session token charge. Tu peux le copier dans Bruno.");
+    } catch (err) {
+      setSessionToken("");
+      setError(err instanceof Error ? err.message : "Unknown error");
+    }
+  }
+
+  async function copySessionToken() {
+    if (!sessionToken) {
+      setTokenStatus("Charge d'abord un session token.");
+      return;
+    }
+
+    await navigator.clipboard.writeText(sessionToken);
+    setTokenStatus("Session token copie dans le presse-papiers.");
+  }
+
+  function renderStatus(status: number | null) {
+    if (status === null) {
+      return (
+        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+          not called
+        </span>
+      );
+    }
+
+    const tone =
+      status >= 200 && status < 300
+        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+        : "border-rose-200 bg-rose-50 text-rose-700";
+
+    return <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${tone}`}>{status}</span>;
+  }
+
   return (
-    <main className="p-6">
-      <h1>Account API test</h1>
-      <p>Routes testees: /api/account/me, /api/account/me/profile, /api/account/me/roles</p>
-      <p>Il faut etre connecte avec Clerk pour que ces routes repondent en 200.</p>
+    <main className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#fff9ed_100%)] px-4 py-10 text-slate-900 sm:px-6">
+      <div className="mx-auto max-w-5xl space-y-6">
+        <section className="overflow-hidden rounded-[28px] border border-black/10 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.10)]">
+          <div className="bg-[radial-gradient(circle_at_top_left,#f59e0b_0%,transparent_35%),linear-gradient(135deg,#0f172a_0%,#1e293b_100%)] px-6 py-8 text-white sm:px-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-200">Debug Surface</p>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight">Account API test</h1>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-200">
+              Routes testees: <code>/api/account/me</code>, <code>/api/account/me/profile</code>,{" "}
+              <code>/api/account/me/roles</code>. Connecte-toi avec Clerk dans le navigateur puis reutilise un
+              vrai session token dans Bruno.
+            </p>
+          </div>
+          <div className="grid gap-4 border-t border-slate-200 bg-white px-6 py-5 text-sm sm:grid-cols-3 sm:px-8">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Workflow Bruno</p>
+              <p className="mt-2 leading-6 text-slate-700">
+                Charge un token Clerk ici, colle-le dans <code>clerkSessionToken</code>, puis appelle les routes{" "}
+                <code>/api/account/...</code>.
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Etat Clerk</p>
+              <p className="mt-2 leading-6 text-slate-700">
+                {isLoaded ? (userId ? `connecte (${userId})` : "non connecte") : "chargement"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Acces</p>
+              <p className="mt-2 leading-6 text-slate-700">Ces routes doivent repondre en 200 seulement si la session est valide.</p>
+            </div>
+          </div>
+        </section>
 
-      {error ? <p style={{ color: "red" }}>{error}</p> : null}
+        {error ? (
+          <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+            {error}
+          </p>
+        ) : null}
 
-      <hr style={{ margin: "16px 0" }} />
+        <section className={sectionClass}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Bruno session token</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                Charge un vrai token de session depuis Clerk puis copie-le dans Bruno pour tester les endpoints locaux.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button className={buttonClass} onClick={() => void loadSessionToken()} type="button">
+                Load session token
+              </button>
+              <button className={secondaryButtonClass} onClick={() => void copySessionToken()} type="button">
+                Copy session token
+              </button>
+            </div>
+          </div>
+          <p className="mt-4 text-sm text-slate-600">
+            {tokenStatus ?? "Charge un token si tu veux tester Bruno avec Authorization: Bearer."}
+          </p>
+          <textarea className={textareaClass} readOnly rows={8} value={sessionToken} />
+        </section>
 
-      <section>
-        <h2>GET /api/account/me</h2>
-        <button
-          onClick={() =>
-            run(async () => {
-              setMe(await request("/api/account/me"));
-            })
-          }
-          type="button"
-        >
-          Load me
-        </button>
-        <p>Status: {me.status ?? "not called"}</p>
-        <pre>{JSON.stringify(me.body, null, 2)}</pre>
-      </section>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <section className={sectionClass}>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold">GET /api/account/me</h2>
+              {renderStatus(me.status)}
+            </div>
+            <p className="mt-2 text-sm text-slate-600">Recupere le snapshot du compte courant.</p>
+            <button
+              className={`mt-4 ${buttonClass}`}
+              onClick={() =>
+                run(async () => {
+                  setMe(await request("/api/account/me"));
+                })
+              }
+              type="button"
+            >
+              Load me
+            </button>
+            <pre className={preClass}>{JSON.stringify(me.body, null, 2)}</pre>
+          </section>
 
-      <hr style={{ margin: "16px 0" }} />
+          <section className={sectionClass}>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold">GET /api/account/me/profile</h2>
+              {renderStatus(profile.status)}
+            </div>
+            <p className="mt-2 text-sm text-slate-600">Charge le profil public/prive du compte courant.</p>
+            <button
+              className={`mt-4 ${buttonClass}`}
+              onClick={() =>
+                run(async () => {
+                  setProfile(await request("/api/account/me/profile"));
+                })
+              }
+              type="button"
+            >
+              Load profile
+            </button>
+            <pre className={preClass}>{JSON.stringify(profile.body, null, 2)}</pre>
+          </section>
+        </div>
 
-      <section>
-        <h2>GET /api/account/me/profile</h2>
-        <button
-          onClick={() =>
-            run(async () => {
-              setProfile(await request("/api/account/me/profile"));
-            })
-          }
-          type="button"
-        >
-          Load profile
-        </button>
-        <p>Status: {profile.status ?? "not called"}</p>
-        <pre>{JSON.stringify(profile.body, null, 2)}</pre>
-      </section>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <section className={sectionClass}>
+            <h2 className="text-lg font-semibold">PATCH /api/account/me/profile</h2>
+            <p className="mt-2 text-sm text-slate-600">Edite le payload puis envoie la mise a jour du profil.</p>
+            <textarea
+              className={textareaClass}
+              onChange={(event) => setProfilePayload(event.target.value)}
+              rows={12}
+              value={profilePayload}
+            />
+            <button
+              className={`mt-4 ${buttonClass}`}
+              onClick={() =>
+                run(async () => {
+                  setProfile(
+                    await request("/api/account/me/profile", {
+                      method: "PATCH",
+                      body: profilePayload,
+                    }),
+                  );
+                })
+              }
+              type="button"
+            >
+              Update profile
+            </button>
+          </section>
 
-      <section>
-        <h2>PATCH /api/account/me/profile</h2>
-        <textarea
-          onChange={(event) => setProfilePayload(event.target.value)}
-          rows={12}
-          style={{ display: "block", width: "100%", marginTop: 8 }}
-          value={profilePayload}
-        />
-        <button
-          onClick={() =>
-            run(async () => {
-              setProfile(
-                await request("/api/account/me/profile", {
-                  method: "PATCH",
-                  body: profilePayload,
-                }),
-              );
-            })
-          }
-          type="button"
-        >
-          Update profile
-        </button>
-      </section>
+          <section className={sectionClass}>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold">GET /api/account/me/roles</h2>
+              {renderStatus(roles.status)}
+            </div>
+            <p className="mt-2 text-sm text-slate-600">Liste les roles actuellement attaches au compte.</p>
+            <button
+              className={`mt-4 ${buttonClass}`}
+              onClick={() =>
+                run(async () => {
+                  setRoles(await request("/api/account/me/roles"));
+                })
+              }
+              type="button"
+            >
+              Load roles
+            </button>
+            <pre className={preClass}>{JSON.stringify(roles.body, null, 2)}</pre>
+          </section>
+        </div>
 
-      <hr style={{ margin: "16px 0" }} />
-
-      <section>
-        <h2>GET /api/account/me/roles</h2>
-        <button
-          onClick={() =>
-            run(async () => {
-              setRoles(await request("/api/account/me/roles"));
-            })
-          }
-          type="button"
-        >
-          Load roles
-        </button>
-        <p>Status: {roles.status ?? "not called"}</p>
-        <pre>{JSON.stringify(roles.body, null, 2)}</pre>
-      </section>
-
-      <section>
-        <h2>PUT /api/account/me/roles</h2>
-        <textarea
-          onChange={(event) => setRolesPayload(event.target.value)}
-          rows={8}
-          style={{ display: "block", width: "100%", marginTop: 8 }}
-          value={rolesPayload}
-        />
-        <button
-          onClick={() =>
-            run(async () => {
-              setRoles(
-                await request("/api/account/me/roles", {
-                  method: "PUT",
-                  body: rolesPayload,
-                }),
-              );
-            })
-          }
-          type="button"
-        >
-          Update roles
-        </button>
-      </section>
+        <section className={sectionClass}>
+          <h2 className="text-lg font-semibold">PUT /api/account/me/roles</h2>
+          <p className="mt-2 text-sm text-slate-600">Teste la mise a jour self-service des roles avec un payload JSON.</p>
+          <textarea
+            className={textareaClass}
+            onChange={(event) => setRolesPayload(event.target.value)}
+            rows={8}
+            value={rolesPayload}
+          />
+          <button
+            className={`mt-4 ${buttonClass}`}
+            onClick={() =>
+              run(async () => {
+                setRoles(
+                  await request("/api/account/me/roles", {
+                    method: "PUT",
+                    body: rolesPayload,
+                  }),
+                );
+              })
+            }
+            type="button"
+          >
+            Update roles
+          </button>
+        </section>
+      </div>
     </main>
   );
 }
