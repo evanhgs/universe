@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { RoleCode } from "../../../generated/prisma/enums";
+import type { BeatApiPayload } from "../beats/beat.types";
 
 export type ProfileApiPayload = {
   id: string;
@@ -23,6 +24,7 @@ export type ProfileApiPayload = {
     isPublic: boolean;
     viewerCanEdit: boolean;
   };
+  beats: BeatApiPayload[];
 };
 
 export type ProfileListItemApiPayload = {

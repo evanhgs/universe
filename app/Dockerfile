@@ -20,7 +20,7 @@ ENV NODE_ENV=development
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
-CMD ["npm", "run", "dev", "--", "--hostname", "0.0.0.0", "--port", "3000"]
+CMD ["sh", "-c", "npm run dev -- --hostname ${HOSTNAME:-0.0.0.0} --port ${PORT:-3000}"]
 
 FROM base AS deps
 RUN apk add --no-cache libc6-compat

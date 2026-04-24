@@ -1,11 +1,7 @@
 import type { Metadata } from "next";
-import {
-  ClerkProvider,
-  Show,
-  SignInButton,
-  SignUpButton,
-  UserButton,
-} from "@clerk/nextjs";
+import { ClerkProvider, Show } from "@clerk/nextjs";
+
+import { SignedInActions, SignedOutActions } from "./auth-buttons";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -28,15 +24,10 @@ export default function RootLayout({
             </div>
             <div className="flex items-center gap-3">
               <Show when="signed-out">
-                <SignInButton />
-                <SignUpButton>
-                  <button className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white">
-                    Sign up
-                  </button>
-                </SignUpButton>
+                <SignedOutActions />
               </Show>
               <Show when="signed-in">
-                <UserButton />
+                <SignedInActions />
               </Show>
             </div>
           </header>

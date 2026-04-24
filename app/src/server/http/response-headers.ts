@@ -7,3 +7,8 @@ export const PRIVATE_JSON_HEADERS = {
   Vary: "Cookie",
   "X-Content-Type-Options": "nosniff",
 } as const;
+
+export const PUBLIC_JSON_HEADERS = {
+  "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+  "X-Content-Type-Options": "nosniff",
+} as const;

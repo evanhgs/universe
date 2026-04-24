@@ -5,6 +5,7 @@ import type {
   ProfileListItemApiPayload,
 } from "./profile.types";
 import { findAllProfiles, findProfileBySlug } from "./profile.repository";
+import { listProfileBeatPayloads } from "../beats/beat.service";
 
 const profileSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -29,6 +30,8 @@ export async function getProfilePayloadBySlug(
     return null;
   }
 
+  const beats = await listProfileBeatPayloads(profile.slug);
+
   return {
     id: profile.id,
     slug: profile.slug,
@@ -50,6 +53,7 @@ export async function getProfilePayloadBySlug(
       isPublic: profile.isPublic,
       viewerCanEdit,
     },
+    beats,
   };
 }
 

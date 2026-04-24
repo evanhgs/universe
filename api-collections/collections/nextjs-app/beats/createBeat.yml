@@ -1,0 +1,52 @@
+info:
+  name: Beats - Create Beat
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{url}}/api/beats"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Authorization
+      value: Bearer {{clerkSessionToken}}
+  body:
+    type: json
+    data: |-
+      {
+        "title": "Midnight Bounce",
+        "description": "Instrumentale V1 de test avec asset audio reference.",
+        "priceAmount": 29.99,
+        "currency": "EUR",
+        "primaryGenre": "trap",
+        "primaryMood": "dark",
+        "tags": ["trap", "dark", "demo"],
+        "bpm": 142,
+        "musicalKey": "F minor",
+        "visibility": "PUBLIC",
+        "publish": true,
+        "audioAsset": {
+          "bucket": "local-dev",
+          "objectKey": "demo/midnight-bounce.mp3",
+          "originalFilename": "midnight-bounce.mp3",
+          "mimeType": "audio/mpeg",
+          "extension": "mp3",
+          "sizeBytes": 1234567
+        },
+        "thumbnailAsset": {
+          "bucket": "local-dev",
+          "objectKey": "demo/midnight-bounce.jpg",
+          "originalFilename": "midnight-bounce.jpg",
+          "mimeType": "image/jpeg",
+          "extension": "jpg",
+          "sizeBytes": 234567
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

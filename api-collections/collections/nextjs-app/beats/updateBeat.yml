@@ -1,0 +1,28 @@
+info:
+  name: Beats - Update Beat
+  type: http
+  seq: 4
+
+http:
+  method: PATCH
+  url: "{{url}}/api/beats/midnight-bounce"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Authorization
+      value: Bearer {{clerkSessionToken}}
+  body:
+    type: json
+    data: |-
+      {
+        "description": "Instrumentale V1 de test mise a jour.",
+        "priceAmount": 24.99,
+        "tags": ["trap", "demo", "updated"]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
