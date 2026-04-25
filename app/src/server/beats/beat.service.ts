@@ -5,6 +5,7 @@ import { syncCurrentAccountFromClerk } from "@/server/account/account.sync";
 import type { AssetType } from "../../../generated/prisma/enums";
 import {
   createBeat,
+  findPublishedBeatPreviewBySlug,
   findPublishedBeats,
   findVisibleBeatBySlug,
   softDeleteBeatBySlug,
@@ -120,6 +121,32 @@ export async function getBeatPayloadBySlug(slug: string, viewerClerkUserId: stri
   };
 }
 
+export async function getBeatPreviewPayloadBySlug(slug: string) {
+  const beat = await findPublishedBeatPreviewBySlug(slug);
+  const preview = beat?.assets[0]?.asset;
+
+  if (!beat || !preview) {
+    return null;
+  }
+
+  return {
+    beat: {
+      id: beat.id,
+      slug: beat.slug,
+      title: beat.title,
+    },
+    preview: {
+      id: preview.id,
+      bucket: preview.bucket,
+      objectKey: preview.objectKey,
+      originalFilename: preview.originalFilename,
+      mimeType: preview.mimeType,
+      sizeBytes: bigintToNumber(preview.sizeBytes),
+      delivery: "public_storage_reference" as const,
+    },
+  };
+}
+
 export async function updateBeatForCurrentSeller(
   clerkUserId: string,
   slug: string,
@@ -140,6 +167,7 @@ export async function deleteBeatForCurrentSeller(clerkUserId: string, slug: stri
 export async function listProfileBeatPayloads(profileSlug: string) {
   const beats = await findPublishedBeats({
     sellerSlug: profileSlug,
+    sort: "newest",
     limit: 8,
   });
 

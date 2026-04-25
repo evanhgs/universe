@@ -37,12 +37,14 @@ services:
   nextjs:
     <<: *nextjs-runtime
     environment:
+      APP_ENV: ${APP_ENV:-production}
       APP_URL: ${APP_URL}
       AI_SERVICES_URL: ${AI_SERVICES_URL}
       CLERK_AUTHORIZED_PARTIES: ${CLERK_AUTHORIZED_PARTIES}
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
       CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
       CLERK_WEBHOOK_SIGNING_SECRET: ${CLERK_WEBHOOK_SIGNING_SECRET}
+      STRIPE_AUTOMATIC_TAX_ENABLED: "${STRIPE_AUTOMATIC_TAX_ENABLED:-false}"
       NODE_ENV: ${NEXTJS_NODE_ENV:-production}
       NEXT_TELEMETRY_DISABLED: "${NEXTJS_TELEMETRY_DISABLED:-1}"
       HOSTNAME: ${NEXTJS_HOSTNAME:-0.0.0.0}
@@ -57,10 +59,12 @@ services:
     secrets:
       - next_server_actions_encryption_key
       - database_url
+      - stripe_secret_key
+      - stripe_webhook_secret
     entrypoint:
       - /bin/sh
       - -c
-      - export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$$(cat /run/secrets/next_server_actions_encryption_key)" && export DATABASE_URL="$$(cat /run/secrets/database_url)" && exec node server.js
+      - export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$$(cat /run/secrets/next_server_actions_encryption_key)" && export DATABASE_URL="$$(cat /run/secrets/database_url)" && export STRIPE_SECRET_KEY="$$(cat /run/secrets/stripe_secret_key)" && export STRIPE_WEBHOOK_SECRET="$$(cat /run/secrets/stripe_webhook_secret)" && exec node server.js
 
   ai-services:
     init: true
@@ -227,3 +231,7 @@ secrets:
     file: ./secrets/prod/next_server_actions_encryption_key.txt
   database_url:
     file: ./secrets/prod/database_url.txt
+  stripe_secret_key:
+    file: ./secrets/prod/stripe_secret_key.txt
+  stripe_webhook_secret:
+    file: ./secrets/prod/stripe_webhook_secret.txt

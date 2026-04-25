@@ -159,7 +159,11 @@ async function refreshSellerBeatCount(userId: string) {
 
 export async function createBeat(ownerId: string, input: CreateBeatInput) {
   const prisma = getPrisma();
-  await assertMediaObjectKeysAvailable([input.audioAsset, input.thumbnailAsset]);
+  await assertMediaObjectKeysAvailable([
+    input.audioAsset,
+    input.previewAsset,
+    input.thumbnailAsset,
+  ]);
 
   const slug = await buildUniqueBeatSlug(input.title);
   const licenseTemplate = await ensureBasicLicenseTemplate();
@@ -216,6 +220,22 @@ export async function createBeat(ownerId: string, input: CreateBeatInput) {
       },
     });
 
+    if (input.previewAsset) {
+      const previewAsset = await tx.mediaAsset.create({
+        data: mediaAssetCreate(ownerId, input.previewAsset, "AUDIO_PREVIEW"),
+        select: { id: true },
+      });
+
+      await tx.beatAssetLink.create({
+        data: {
+          beatId: createdBeat.id,
+          assetId: previewAsset.id,
+          role: "AUDIO_PREVIEW",
+          sortOrder: 1,
+        },
+      });
+    }
+
     if (input.thumbnailAsset) {
       const thumbnailAsset = await tx.mediaAsset.create({
         data: mediaAssetCreate(ownerId, input.thumbnailAsset, "IMAGE_THUMBNAIL"),
@@ -250,10 +270,39 @@ export async function createBeat(ownerId: string, input: CreateBeatInput) {
 }
 
 export async function findPublishedBeats(query: BeatListQuery) {
+  const ownerProfileFilters: Prisma.UserProfileWhereInput[] = [];
+
+  if (query.producer) {
+    ownerProfileFilters.push({
+      OR: [
+        { slug: { equals: query.producer, mode: "insensitive" } },
+        { displayName: { contains: query.producer, mode: "insensitive" } },
+      ],
+    });
+  }
+
+  if (query.sellerSlug) {
+    ownerProfileFilters.push({
+      slug: { equals: query.sellerSlug, mode: "insensitive" },
+    });
+  }
+
+  const orderBy =
+    query.sort === "price_asc"
+      ? [{ basePriceAmount: "asc" as const }, { publishedAt: "desc" as const }]
+      : query.sort === "price_desc"
+        ? [{ basePriceAmount: "desc" as const }, { publishedAt: "desc" as const }]
+        : query.sort === "bpm_asc"
+          ? [{ bpm: "asc" as const }, { publishedAt: "desc" as const }]
+          : query.sort === "bpm_desc"
+            ? [{ bpm: "desc" as const }, { publishedAt: "desc" as const }]
+            : [{ publishedAt: "desc" as const }, { createdAt: "desc" as const }];
+
   return getPrisma().beat.findMany({
     where: {
       status: "PUBLISHED",
       visibility: "PUBLIC",
+      moderationStatus: "CLEAN",
       ...(query.search
         ? {
             OR: [
@@ -266,11 +315,79 @@ export async function findPublishedBeats(query: BeatListQuery) {
       ...(query.genre
         ? { primaryGenre: { equals: query.genre, mode: "insensitive" } }
         : {}),
-      ...(query.sellerSlug ? { owner: { profile: { slug: query.sellerSlug } } } : {}),
+      ...(query.mood
+        ? { primaryMood: { equals: query.mood, mode: "insensitive" } }
+        : {}),
+      ...(query.bpm ? { bpm: query.bpm } : {}),
+      ...(query.bpmMin !== undefined || query.bpmMax !== undefined
+        ? {
+            bpm: {
+              ...(query.bpmMin !== undefined ? { gte: query.bpmMin } : {}),
+              ...(query.bpmMax !== undefined ? { lte: query.bpmMax } : {}),
+            },
+          }
+        : {}),
+      ...(query.key
+        ? { musicalKey: { contains: query.key, mode: "insensitive" } }
+        : {}),
+      ...(query.priceMin !== undefined || query.priceMax !== undefined
+        ? {
+            basePriceAmount: {
+              ...(query.priceMin !== undefined ? { gte: query.priceMin } : {}),
+              ...(query.priceMax !== undefined ? { lte: query.priceMax } : {}),
+            },
+          }
+        : {}),
+      ...(query.tags ? { tags: { hasEvery: query.tags } } : {}),
+      ...(ownerProfileFilters.length > 0
+        ? { owner: { profile: { AND: ownerProfileFilters } } }
+        : {}),
+      ...(query.licenseType
+        ? {
+            licenseOfferings: {
+              some: {
+                isActive: true,
+                licenseTemplate: { scope: query.licenseType, isActive: true },
+              },
+            },
+          }
+        : {}),
     },
-    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+    orderBy,
     take: query.limit,
     include: beatInclude,
+  });
+}
+
+export async function findPublishedBeatPreviewBySlug(slug: string) {
+  return getPrisma().beat.findFirst({
+    where: {
+      slug,
+      status: "PUBLISHED",
+      visibility: "PUBLIC",
+      moderationStatus: "CLEAN",
+    },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      assets: {
+        where: {
+          role: "AUDIO_PREVIEW",
+          asset: {
+            isPublic: true,
+            processingStatus: "READY",
+          },
+        },
+        orderBy: {
+          sortOrder: "asc",
+        },
+        take: 1,
+        select: {
+          asset: true,
+        },
+      },
+    },
   });
 }
 
@@ -320,7 +437,11 @@ export async function updateBeatBySlug(ownerId: string, slug: string, input: Upd
 
   const publishedAt = input.status === "PUBLISHED" ? new Date() : undefined;
   const priceAmount = input.isFree ? 0 : input.priceAmount;
-  await assertMediaObjectKeysAvailable([input.audioAsset, input.thumbnailAsset]);
+  await assertMediaObjectKeysAvailable([
+    input.audioAsset,
+    input.previewAsset,
+    input.thumbnailAsset,
+  ]);
 
   const beat = await prisma.$transaction(async (tx) => {
     const updated = await tx.beat.update({
@@ -381,6 +502,28 @@ export async function updateBeatBySlug(ownerId: string, slug: string, input: Upd
       await tx.beatAssetLink.create({
         data: { beatId: updated.id, assetId: audioAsset.id, role: "AUDIO_SOURCE" },
       });
+    }
+
+    if (input.previewAsset !== undefined) {
+      await tx.beatAssetLink.deleteMany({
+        where: { beatId: updated.id, role: "AUDIO_PREVIEW" },
+      });
+
+      if (input.previewAsset) {
+        const previewAsset = await tx.mediaAsset.create({
+          data: mediaAssetCreate(ownerId, input.previewAsset, "AUDIO_PREVIEW"),
+          select: { id: true },
+        });
+
+        await tx.beatAssetLink.create({
+          data: {
+            beatId: updated.id,
+            assetId: previewAsset.id,
+            role: "AUDIO_PREVIEW",
+            sortOrder: 1,
+          },
+        });
+      }
     }
 
     if (input.thumbnailAsset !== undefined) {

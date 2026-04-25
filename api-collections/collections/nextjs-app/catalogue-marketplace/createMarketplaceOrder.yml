@@ -1,0 +1,25 @@
+info:
+  name: Marketplace - Create Direct Purchase Order
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{url}}/api/marketplace/orders"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "beatSlug": "{{beatSlug}}",
+        "licenseOfferingId": "{{licenseOfferingId}}"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -2,3 +2,13 @@ name: dev
 variables:
   - secret: true
     name: clerkSessionToken
+  - name: beatSlug
+    value: midnight-bounce
+  - name: licenseOfferingId
+    value: ""
+  - name: marketplaceOrderId
+    value: ""
+  - name: stripeSessionId
+    value: ""
+  - name: entitlementId
+    value: ""

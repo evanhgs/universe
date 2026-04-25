@@ -1,0 +1,15 @@
+info:
+  name: Catalogue Marketplace - List Beats
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{url}}/api/beats?search=midnight&genre=trap&mood=dark&bpmMin=120&bpmMax=160&key=minor&priceMin=1&priceMax=100&tags=trap,dark&producer=seed-seller&licenseType=BASIC&sort=newest&limit=24"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

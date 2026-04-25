@@ -33,6 +33,7 @@ export default async function BeatsPage({ searchParams }: BeatsPageProps) {
     search: params.search,
     genre: params.genre,
     sellerSlug: params.sellerSlug,
+    sort: "newest",
     limit: 48,
   });
 

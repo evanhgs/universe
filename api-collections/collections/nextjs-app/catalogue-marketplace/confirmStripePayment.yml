@@ -1,0 +1,24 @@
+info:
+  name: Marketplace - Confirm Stripe Payment
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{url}}/api/marketplace/orders/{{marketplaceOrderId}}/payments/stripe/confirm"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "sessionId": "{{stripeSessionId}}"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

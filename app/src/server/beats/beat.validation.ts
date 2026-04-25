@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { BeatStatus, Visibility } from "../../../generated/prisma/enums";
+import type { BeatStatus, LicenseScope, Visibility } from "../../../generated/prisma/enums";
 import {
   DEFAULT_BEAT_CURRENCY,
   MAX_BEAT_TAGS,
@@ -9,6 +9,20 @@ import type { BeatAssetInput, BeatListQuery, CreateBeatInput, UpdateBeatInput } 
 
 const allowedVisibility = new Set<Visibility>(["PUBLIC", "UNLISTED", "PRIVATE"]);
 const allowedEditableStatuses = new Set<BeatStatus>(["DRAFT", "PUBLISHED", "HIDDEN", "ARCHIVED"]);
+const allowedLicenseScopes = new Set<LicenseScope>([
+  "BASIC",
+  "PREMIUM",
+  "UNLIMITED",
+  "EXCLUSIVE",
+  "CUSTOM",
+]);
+const allowedSorts = new Set<BeatListQuery["sort"]>([
+  "newest",
+  "price_asc",
+  "price_desc",
+  "bpm_asc",
+  "bpm_desc",
+]);
 
 function normalizeOptionalString(value: unknown) {
   if (value === undefined) {
@@ -62,6 +76,20 @@ function parsePrice(value: unknown) {
   return Math.round(parsed * 100) / 100;
 }
 
+function parseOptionalPrice(value: unknown, field: string) {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100000) {
+    throw new Error(`${field} must be a valid positive amount.`);
+  }
+
+  return Math.round(parsed * 100) / 100;
+}
+
 function parseCurrency(value: unknown) {
   const currency = normalizeOptionalString(value) ?? DEFAULT_BEAT_CURRENCY;
 
@@ -100,6 +128,23 @@ function parseTags(value: unknown) {
   return tags;
 }
 
+function parseTagListParam(value: string | null) {
+  if (!value) {
+    return undefined;
+  }
+
+  const tags = Array.from(
+    new Set(
+      value
+        .split(",")
+        .map((tag) => tag.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  );
+
+  return tags.length > 0 ? tags.slice(0, MAX_BEAT_TAGS) : undefined;
+}
+
 function parseVisibility(value: unknown) {
   const visibility = (normalizeOptionalString(value) ?? "PUBLIC").toUpperCase() as Visibility;
 
@@ -122,6 +167,32 @@ function parseStatus(value: unknown) {
   }
 
   return status;
+}
+
+function parseLicenseType(value: string | null) {
+  const licenseType = normalizeOptionalString(value)?.toUpperCase() as
+    | LicenseScope
+    | undefined;
+
+  if (licenseType === undefined) {
+    return undefined;
+  }
+
+  if (!allowedLicenseScopes.has(licenseType)) {
+    throw new Error("licenseType is invalid.");
+  }
+
+  return licenseType;
+}
+
+function parseSort(value: string | null): BeatListQuery["sort"] {
+  const sort = (normalizeOptionalString(value) ?? "newest").toLowerCase() as BeatListQuery["sort"];
+
+  if (!allowedSorts.has(sort)) {
+    throw new Error("sort is invalid.");
+  }
+
+  return sort;
 }
 
 function parseBoolean(value: unknown, defaultValue: boolean) {
@@ -184,6 +255,10 @@ export function parseCreateBeatInput(payload: unknown): CreateBeatInput {
     isFree,
     brandingRequired: parseBoolean(body.brandingRequired, isFree),
     audioAsset: parseAsset(body.audioAsset, "audioAsset"),
+    previewAsset:
+      body.previewAsset === undefined || body.previewAsset === null
+        ? null
+        : parseAsset(body.previewAsset, "previewAsset"),
     thumbnailAsset:
       body.thumbnailAsset === undefined || body.thumbnailAsset === null
         ? null
@@ -222,6 +297,12 @@ export function parseUpdateBeatInput(payload: unknown): UpdateBeatInput {
     ...(body.isFree !== undefined ? { isFree: parseBoolean(body.isFree, false) } : {}),
     ...(body.brandingRequired !== undefined ? { brandingRequired: parseBoolean(body.brandingRequired, false) } : {}),
     ...(body.audioAsset !== undefined ? { audioAsset: parseAsset(body.audioAsset, "audioAsset") } : {}),
+    ...(body.previewAsset !== undefined
+      ? {
+          previewAsset:
+            body.previewAsset === null ? null : parseAsset(body.previewAsset, "previewAsset"),
+        }
+      : {}),
     ...(body.thumbnailAsset !== undefined
       ? {
           thumbnailAsset:
@@ -233,11 +314,27 @@ export function parseUpdateBeatInput(payload: unknown): UpdateBeatInput {
 
 export function parseBeatListQuery(url: URL): BeatListQuery {
   const limit = Number(url.searchParams.get("limit") ?? 24);
+  const bpm = parseOptionalInteger(url.searchParams.get("bpm"), "bpm", 20, 300);
+  const bpmMin = parseOptionalInteger(url.searchParams.get("bpmMin"), "bpmMin", 20, 300);
+  const bpmMax = parseOptionalInteger(url.searchParams.get("bpmMax"), "bpmMax", 20, 300);
+  const priceMin = parseOptionalPrice(url.searchParams.get("priceMin"), "priceMin");
+  const priceMax = parseOptionalPrice(url.searchParams.get("priceMax"), "priceMax");
 
   return {
     search: normalizeOptionalString(url.searchParams.get("search")) ?? undefined,
     genre: normalizeOptionalString(url.searchParams.get("genre")) ?? undefined,
+    mood: normalizeOptionalString(url.searchParams.get("mood")) ?? undefined,
+    bpm: bpm ?? undefined,
+    bpmMin: bpmMin ?? undefined,
+    bpmMax: bpmMax ?? undefined,
+    key: normalizeOptionalString(url.searchParams.get("key")) ?? undefined,
+    priceMin,
+    priceMax,
+    tags: parseTagListParam(url.searchParams.get("tags")),
+    producer: normalizeOptionalString(url.searchParams.get("producer")) ?? undefined,
     sellerSlug: normalizeOptionalString(url.searchParams.get("sellerSlug")) ?? undefined,
+    licenseType: parseLicenseType(url.searchParams.get("licenseType")),
+    sort: parseSort(url.searchParams.get("sort")),
     limit: Number.isInteger(limit) && limit > 0 ? Math.min(limit, 50) : 24,
   };
 }

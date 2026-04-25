@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { AssetType, BeatStatus, Visibility } from "../../../generated/prisma/enums";
+import type { AssetType, BeatStatus, LicenseScope, Visibility } from "../../../generated/prisma/enums";
 
 export type BeatAssetInput = {
   bucket: string;
@@ -27,6 +27,7 @@ export type CreateBeatInput = {
   isFree: boolean;
   brandingRequired: boolean;
   audioAsset: BeatAssetInput;
+  previewAsset?: BeatAssetInput | null;
   thumbnailAsset?: BeatAssetInput | null;
 };
 
@@ -45,6 +46,7 @@ export type UpdateBeatInput = Partial<
     | "visibility"
     | "isFree"
     | "brandingRequired"
+    | "previewAsset"
   >
 > & {
   status?: BeatStatus;
@@ -94,6 +96,17 @@ export type BeatApiPayload = {
 export type BeatListQuery = {
   search?: string;
   genre?: string;
+  mood?: string;
+  bpm?: number;
+  bpmMin?: number;
+  bpmMax?: number;
+  key?: string;
+  priceMin?: number;
+  priceMax?: number;
+  tags?: string[];
+  producer?: string;
   sellerSlug?: string;
+  licenseType?: LicenseScope;
+  sort: "newest" | "price_asc" | "price_desc" | "bpm_asc" | "bpm_desc";
   limit: number;
 };

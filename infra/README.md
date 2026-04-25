@@ -103,6 +103,18 @@ The Next.js service now expects these runtime variables from `infra/env/stack.*.
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`: Clerk publishable key exposed to the browser
 - `CLERK_SECRET_KEY`: Clerk server secret used by Next.js on the server side
 
+Stripe marketplace payments use the same environment split:
+
+- Development reads `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_AUTOMATIC_TAX_ENABLED` from `infra/env/stack.dev.env`.
+- Staging and production read `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` from Docker secrets:
+  - `infra/secrets/staging/stripe_secret_key.txt`
+  - `infra/secrets/staging/stripe_webhook_secret.txt`
+  - `infra/secrets/prod/stripe_secret_key.txt`
+  - `infra/secrets/prod/stripe_webhook_secret.txt`
+- `STRIPE_AUTOMATIC_TAX_ENABLED` stays in `stack.*.env` because it is configuration, not a secret.
+
+The Stripe webhook endpoint is `/api/webhooks/stripe`. In local development, use Stripe CLI forwarding and copy the printed `whsec_...` value into `STRIPE_WEBHOOK_SECRET`.
+
 The reverse proxy is configured to preserve `Host`, `X-Forwarded-Host`, `X-Forwarded-Proto`, and `X-Forwarded-Port` so Clerk and Next.js can reconstruct the original request origin correctly behind Caddy.
 
 Clerk CSP is enforced in Next.js middleware instead of a static `next.config.ts` header. This keeps Clerk's required domains and per-request nonce generation aligned with the App Router.
