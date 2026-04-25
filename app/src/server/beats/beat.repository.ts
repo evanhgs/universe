@@ -2,6 +2,7 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 
+import { Prisma } from "../../../generated/prisma/client";
 import type { AssetType } from "../../../generated/prisma/enums";
 import {
   BEAT_SLUG_PATTERN,
@@ -36,6 +37,8 @@ const beatInclude = {
     },
   },
 } as const;
+
+const DUPLICATE_BEAT_ASSET_ERROR = "beat_asset_duplicate";
 
 function slugify(value: string) {
   const normalized = value
@@ -86,6 +89,40 @@ function mediaAssetCreate(ownerId: string, asset: BeatAssetInput, assetType: Ass
   };
 }
 
+function isObjectKeyUniqueConstraintError(error: unknown) {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+    return false;
+  }
+
+  const target = error.meta?.target;
+
+  return Array.isArray(target) && target.includes("objectKey");
+}
+
+async function assertMediaObjectKeysAvailable(assets: Array<BeatAssetInput | null | undefined>) {
+  const objectKeys = assets
+    .map((asset) => asset?.objectKey)
+    .filter((objectKey): objectKey is string => Boolean(objectKey));
+  const uniqueObjectKeys = new Set(objectKeys);
+
+  if (uniqueObjectKeys.size !== objectKeys.length) {
+    throw new Error(DUPLICATE_BEAT_ASSET_ERROR);
+  }
+
+  if (uniqueObjectKeys.size === 0) {
+    return;
+  }
+
+  const existingAsset = await getPrisma().mediaAsset.findFirst({
+    where: { objectKey: { in: [...uniqueObjectKeys] } },
+    select: { id: true },
+  });
+
+  if (existingAsset) {
+    throw new Error(DUPLICATE_BEAT_ASSET_ERROR);
+  }
+}
+
 async function ensureBasicLicenseTemplate() {
   return getPrisma().licenseTemplate.upsert({
     where: { code: DEFAULT_BASIC_LICENSE_CODE },
@@ -122,6 +159,8 @@ async function refreshSellerBeatCount(userId: string) {
 
 export async function createBeat(ownerId: string, input: CreateBeatInput) {
   const prisma = getPrisma();
+  await assertMediaObjectKeysAvailable([input.audioAsset, input.thumbnailAsset]);
+
   const slug = await buildUniqueBeatSlug(input.title);
   const licenseTemplate = await ensureBasicLicenseTemplate();
   const publishedAt = input.publish ? new Date() : null;
@@ -197,6 +236,12 @@ export async function createBeat(ownerId: string, input: CreateBeatInput) {
       where: { id: createdBeat.id },
       include: beatInclude,
     });
+  }).catch((error: unknown) => {
+    if (isObjectKeyUniqueConstraintError(error)) {
+      throw new Error(DUPLICATE_BEAT_ASSET_ERROR);
+    }
+
+    throw error;
   });
 
   await refreshSellerBeatCount(ownerId);
@@ -275,6 +320,7 @@ export async function updateBeatBySlug(ownerId: string, slug: string, input: Upd
 
   const publishedAt = input.status === "PUBLISHED" ? new Date() : undefined;
   const priceAmount = input.isFree ? 0 : input.priceAmount;
+  await assertMediaObjectKeysAvailable([input.audioAsset, input.thumbnailAsset]);
 
   const beat = await prisma.$transaction(async (tx) => {
     const updated = await tx.beat.update({
@@ -363,6 +409,12 @@ export async function updateBeatBySlug(ownerId: string, slug: string, input: Upd
       where: { id: updated.id },
       include: beatInclude,
     });
+  }).catch((error: unknown) => {
+    if (isObjectKeyUniqueConstraintError(error)) {
+      throw new Error(DUPLICATE_BEAT_ASSET_ERROR);
+    }
+
+    throw error;
   });
 
   await refreshSellerBeatCount(ownerId);
