@@ -42,9 +42,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { userId } = await auth();
+  const { isAuthenticated, userId } = await auth();
 
-  if (!userId) {
+  if (!isAuthenticated) {
     return NextResponse.json(
       { error: "unauthorized" },
       { status: 401, headers: PRIVATE_JSON_HEADERS },

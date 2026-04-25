@@ -6,6 +6,7 @@ info:
 http:
   method: GET
   url: "{{url}}/api/beats"
+  auth: inherit
 
 settings:
   encodeUrl: true

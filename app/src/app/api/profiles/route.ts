@@ -7,9 +7,9 @@ import { listProfilesPayload } from "@/server/profiles/profile.service";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const { userId } = await auth();
+  const { isAuthenticated } = await auth();
 
-  if (!userId) {
+  if (!isAuthenticated) {
     return NextResponse.json(
       {
         error: "unauthorized",

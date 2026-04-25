@@ -5,9 +5,9 @@ import { PRIVATE_JSON_HEADERS } from "@/server/http/response-headers";
 import { getCurrentAccountSnapshot } from "@/server/account/account.service";
 
 export async function GET() {
-  const { userId } = await auth();
+  const { isAuthenticated } = await auth();
 
-  if (!userId) {
+  if (!isAuthenticated) {
     return NextResponse.json(
       { error: "unauthorized" },
       { status: 401, headers: PRIVATE_JSON_HEADERS },

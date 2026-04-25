@@ -6,9 +6,7 @@ info:
 http:
   method: GET
   url: "{{url}}/api/account/me"
-  headers:
-    - name: Authorization
-      value: Bearer {{clerkSessionToken}}
+  auth: inherit
 
 settings:
   encodeUrl: true

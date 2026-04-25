@@ -9,9 +9,9 @@ import {
 import { parseProfileUpdateInput } from "@/server/account/account.validation";
 
 export async function GET() {
-  const { userId } = await auth();
+  const { isAuthenticated } = await auth();
 
-  if (!userId) {
+  if (!isAuthenticated) {
     return NextResponse.json(
       { error: "unauthorized" },
       { status: 401, headers: PRIVATE_JSON_HEADERS },
@@ -27,9 +27,9 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  const { userId } = await auth();
+  const { isAuthenticated, userId } = await auth();
 
-  if (!userId) {
+  if (!isAuthenticated) {
     return NextResponse.json(
       { error: "unauthorized" },
       { status: 401, headers: PRIVATE_JSON_HEADERS },
