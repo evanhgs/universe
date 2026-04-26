@@ -85,11 +85,22 @@ Create a real secret file before using staging or production:
 
 - `secrets/staging/next_server_actions_encryption_key.txt`
 - `secrets/staging/database_url.txt`
+- `secrets/staging/postgres_password.txt`
+- `secrets/staging/clerk_secret_key.txt`
+- `secrets/staging/clerk_webhook_signing_secret.txt`
+- `secrets/staging/stripe_secret_key.txt`
+- `secrets/staging/stripe_webhook_secret.txt`
 - `secrets/prod/next_server_actions_encryption_key.txt`
 - `secrets/prod/database_url.txt`
+- `secrets/prod/clerk_secret_key.txt`
+- `secrets/prod/clerk_webhook_signing_secret.txt`
+- `secrets/prod/stripe_secret_key.txt`
+- `secrets/prod/stripe_webhook_secret.txt`
 
 - The Next.js encryption key file must be a base64-encoded AES key as documented by Next.js for multi-instance deployments.
 - The database URL file must contain the full Postgres connection string on a single line.
+- Staging Postgres reads `POSTGRES_PASSWORD_FILE` from `secrets/staging/postgres_password.txt`. Keep this value aligned with the password embedded in `secrets/staging/database_url.txt`.
+- Secret file values are injected by the container entrypoint and are not listed in the Compose `environment` block.
 
 Templates are present for env files and secret filenames, but real runtime values should live only in ignored `*.env` and `secrets/**/*.txt` files.
 
@@ -101,7 +112,8 @@ The Next.js service now expects these runtime variables from `infra/env/stack.*.
 - `AI_SERVICES_URL`: public origin of the backend API when browser calls are cross-origin
 - `CLERK_AUTHORIZED_PARTIES`: comma-separated origin allowlist used by Clerk middleware
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`: Clerk publishable key exposed to the browser
-- `CLERK_SECRET_KEY`: Clerk server secret used by Next.js on the server side
+- `CLERK_SECRET_KEY`: Clerk server secret read from Docker secrets in staging and production
+- `CLERK_WEBHOOK_SIGNING_SECRET`: Clerk webhook secret read from Docker secrets in staging and production
 
 Stripe marketplace payments use the same environment split:
 

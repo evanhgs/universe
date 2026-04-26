@@ -42,8 +42,6 @@ services:
       AI_SERVICES_URL: ${AI_SERVICES_URL}
       CLERK_AUTHORIZED_PARTIES: ${CLERK_AUTHORIZED_PARTIES}
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
-      CLERK_WEBHOOK_SIGNING_SECRET: ${CLERK_WEBHOOK_SIGNING_SECRET}
       STRIPE_AUTOMATIC_TAX_ENABLED: "${STRIPE_AUTOMATIC_TAX_ENABLED:-false}"
       NODE_ENV: ${NEXTJS_NODE_ENV:-production}
       NEXT_TELEMETRY_DISABLED: "${NEXTJS_TELEMETRY_DISABLED:-1}"
@@ -61,10 +59,21 @@ services:
       - database_url
       - stripe_secret_key
       - stripe_webhook_secret
+      - clerk_secret_key
+      - clerk_webhook_signing_secret
     entrypoint:
       - /bin/sh
       - -c
-      - export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$$(cat /run/secrets/next_server_actions_encryption_key)" && export DATABASE_URL="$$(cat /run/secrets/database_url)" && export STRIPE_SECRET_KEY="$$(cat /run/secrets/stripe_secret_key)" && export STRIPE_WEBHOOK_SECRET="$$(cat /run/secrets/stripe_webhook_secret)" && exec node server.js
+      - |
+        set -eu
+        NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$$(cat /run/secrets/next_server_actions_encryption_key)"
+        DATABASE_URL="$$(cat /run/secrets/database_url)"
+        STRIPE_SECRET_KEY="$$(cat /run/secrets/stripe_secret_key)"
+        STRIPE_WEBHOOK_SECRET="$$(cat /run/secrets/stripe_webhook_secret)"
+        CLERK_SECRET_KEY="$$(cat /run/secrets/clerk_secret_key)"
+        CLERK_WEBHOOK_SIGNING_SECRET="$$(cat /run/secrets/clerk_webhook_signing_secret)"
+        export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY DATABASE_URL STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET CLERK_SECRET_KEY CLERK_WEBHOOK_SIGNING_SECRET
+        exec node server.js
 
   ai-services:
     init: true
@@ -235,3 +244,7 @@ secrets:
     file: ./secrets/prod/stripe_secret_key.txt
   stripe_webhook_secret:
     file: ./secrets/prod/stripe_webhook_secret.txt
+  clerk_secret_key:
+    file: ./secrets/prod/clerk_secret_key.txt
+  clerk_webhook_signing_secret:
+    file: ./secrets/prod/clerk_webhook_signing_secret.txt
