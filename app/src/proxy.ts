@@ -22,7 +22,7 @@ const connectSrc = Array.from(
   ]),
 );
 
-export default clerkMiddleware({
+const proxy = clerkMiddleware({
   authorizedParties: authorizedParties.length > 0 ? authorizedParties : undefined,
   contentSecurityPolicy: {
     strict: true,
@@ -32,9 +32,12 @@ export default clerkMiddleware({
   },
 });
 
+export default proxy;
+
 export const config = {
   matcher: [
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    "/(api|trpc)(.*)",
+    // Clerk must also run for 404s from broken public/media asset URLs because
+    // the root layout renders Clerk auth controls for those error responses.
+    "/((?!_next).*)",
   ],
 };
