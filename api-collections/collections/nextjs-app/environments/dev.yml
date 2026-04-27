@@ -12,3 +12,25 @@ variables:
     value: ""
   - name: entitlementId
     value: ""
+  - name: audioFilePath
+    value: /absolute/path/to/audio.wav
+  - name: audioFilename
+    value: audio.wav
+  - name: audioMimeType
+    value: audio/wav
+  - name: audioSizeBytes
+    value: "12345678"
+  - name: uploadBeatTitle
+    value: Bruno Upload Beat
+  - name: uploadBeatPriceAmount
+    value: "19.99"
+  - name: uploadBeatCurrency
+    value: EUR
+  - name: uploadBeatGenre
+    value: trap
+  - name: uploadBeatMood
+    value: dark
+  - name: uploadBeatBpm
+    value: "140"
+  - name: uploadBeatMusicalKey
+    value: Am

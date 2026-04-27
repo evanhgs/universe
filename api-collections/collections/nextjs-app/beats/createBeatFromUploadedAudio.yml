@@ -1,0 +1,52 @@
+info:
+  name: Beats - Create Beat From Uploaded Audio
+  type: http
+  seq: 8
+
+http:
+  method: POST
+  url: "{{url}}/api/beats"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "title": "{{uploadBeatTitle}}",
+        "description": "Created from Bruno after direct S3 upload.",
+        "priceAmount": "{{uploadBeatPriceAmount}}",
+        "currency": "{{uploadBeatCurrency}}",
+        "primaryGenre": "{{uploadBeatGenre}}",
+        "primaryMood": "{{uploadBeatMood}}",
+        "tags": ["bruno", "s3-upload"],
+        "bpm": "{{uploadBeatBpm}}",
+        "musicalKey": "{{uploadBeatMusicalKey}}",
+        "visibility": "PUBLIC",
+        "publish": true,
+        "isFree": false,
+        "brandingRequired": false,
+        "audioAsset": {
+          "bucket": "{{audioBucket}}",
+          "objectKey": "{{audioObjectKey}}",
+          "originalFilename": "{{audioOriginalFilename}}",
+          "mimeType": "{{audioAssetMimeType}}",
+          "extension": "{{audioExtension}}",
+          "sizeBytes": "{{audioAssetSizeBytes}}"
+        },
+        "previewAsset": null,
+        "thumbnailAsset": null
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  Run this after the S3 PUT returns success.
+  The audio bytes are already in S3; this request only stores metadata and creates the beat records.

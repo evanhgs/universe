@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{url}}/api/beats/midnight-bounce"
+  url: "{{url}}/api/beats/"
 
 settings:
   encodeUrl: true

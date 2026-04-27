@@ -1,0 +1,48 @@
+info:
+  name: Beats - Presign Audio Source Upload
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{url}}/api/storage/uploads/presign"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "kind": "audio-source",
+        "filename": "{{audioFilename}}",
+        "mimeType": "{{audioMimeType}}",
+        "sizeBytes": "{{audioSizeBytes}}"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const data = typeof res.body === "string" ? JSON.parse(res.body) : res.body;
+
+        bru.setVar("uploadUrl", data.upload.url);
+        bru.setVar("uploadContentType", data.upload.headers["Content-Type"] || data.asset.mimeType);
+        bru.setVar("audioBucket", data.asset.bucket);
+        bru.setVar("audioObjectKey", data.asset.objectKey);
+        bru.setVar("audioOriginalFilename", data.asset.originalFilename);
+        bru.setVar("audioAssetMimeType", data.asset.mimeType);
+        bru.setVar("audioExtension", data.asset.extension);
+        bru.setVar("audioAssetSizeBytes", data.asset.sizeBytes);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  Run this request first while authenticated as a SELLER.
+  The after-response script saves uploadUrl and audio* runtime variables for the S3 upload and beat creation steps.

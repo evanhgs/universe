@@ -1,0 +1,28 @@
+info:
+  name: Beats - Upload Audio To S3
+  type: http
+  seq: 7
+
+http:
+  method: PUT
+  url: "{{uploadUrl}}"
+  headers:
+    - name: Content-Type
+      value: "{{uploadContentType}}"
+  body:
+    type: file
+    data:
+      - filePath: /home/evan/Downloads/SENS_103BPM_Am_@liimkaa_.mp3
+        contentType: audio/mpeg
+        selected: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  Run this request immediately after presign; the signed S3 URL expires quickly.
+  This request goes directly to S3, so it does not use Clerk auth.
+  Set audioFilePath in the dev environment to an absolute path on your machine.
