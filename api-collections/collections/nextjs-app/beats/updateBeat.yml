@@ -16,7 +16,7 @@ http:
     data: |-
       {
         "description": "Instrumentale V1 de test mise a jour.",
-        "priceAmount": 24.99,
+        "priceAmount": 28.99,
         "tags": ["trap", "demo", "updated"]
       }
   auth: inherit

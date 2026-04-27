@@ -1,6 +1,7 @@
 import "server-only";
 
 import { syncCurrentAccountFromClerk } from "@/server/account/account.sync";
+import { getPublicAssetUrl } from "@/server/storage/s3";
 
 import type { AssetType } from "../../../generated/prisma/enums";
 import {
@@ -31,7 +32,7 @@ function bigintToNumber(value: bigint | number | null) {
   return typeof value === "number" ? value : Number(value);
 }
 
-function serializeBeat(beat: BeatRecord): BeatApiPayload {
+async function serializeBeat(beat: BeatRecord): Promise<BeatApiPayload> {
   return {
     id: beat.id,
     slug: beat.slug,
@@ -58,15 +59,22 @@ function serializeBeat(beat: BeatRecord): BeatApiPayload {
       slug: beat.owner.profile?.slug ?? null,
       displayName: beat.owner.profile?.displayName ?? null,
     },
-    assets: beat.assets.map(({ role, asset }) => ({
-      id: asset.id,
-      role: role as AssetType,
-      bucket: asset.bucket,
-      objectKey: asset.objectKey,
-      originalFilename: asset.originalFilename,
-      mimeType: asset.mimeType,
-      sizeBytes: bigintToNumber(asset.sizeBytes),
-    })),
+    assets: await Promise.all(
+      beat.assets.map(async ({ role, asset }) => ({
+        id: asset.id,
+        role: role as AssetType,
+        bucket: asset.bucket,
+        objectKey: asset.objectKey,
+        url: await getPublicAssetUrl({
+          bucket: asset.bucket,
+          objectKey: asset.objectKey,
+          isPublic: asset.isPublic,
+        }),
+        originalFilename: asset.originalFilename,
+        mimeType: asset.mimeType,
+        sizeBytes: bigintToNumber(asset.sizeBytes),
+      })),
+    ),
   };
 }
 
@@ -95,7 +103,7 @@ export async function createBeatForCurrentSeller(clerkUserId: string, input: Cre
 export async function listPublishedBeatsPayload(query: BeatListQuery) {
   const beats = await findPublishedBeats(query);
 
-  return beats.map(serializeBeat);
+  return Promise.all(beats.map(serializeBeat));
 }
 
 export async function getBeatPayloadBySlug(slug: string, viewerClerkUserId: string | null) {
@@ -106,7 +114,7 @@ export async function getBeatPayloadBySlug(slug: string, viewerClerkUserId: stri
   }
 
   return {
-    ...serializeBeat(result.beat),
+    ...(await serializeBeat(result.beat)),
     viewer: {
       status: result.beat.status,
       visibility: result.beat.visibility,
@@ -139,6 +147,11 @@ export async function getBeatPreviewPayloadBySlug(slug: string) {
       id: preview.id,
       bucket: preview.bucket,
       objectKey: preview.objectKey,
+      url: await getPublicAssetUrl({
+        bucket: preview.bucket,
+        objectKey: preview.objectKey,
+        isPublic: preview.isPublic,
+      }),
       originalFilename: preview.originalFilename,
       mimeType: preview.mimeType,
       sizeBytes: bigintToNumber(preview.sizeBytes),
@@ -171,5 +184,5 @@ export async function listProfileBeatPayloads(profileSlug: string) {
     limit: 8,
   });
 
-  return beats.map(serializeBeat);
+  return Promise.all(beats.map(serializeBeat));
 }

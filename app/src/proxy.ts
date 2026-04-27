@@ -8,6 +8,7 @@ const splitEnvList = (value: string | undefined) =>
 
 const appUrl = process.env.APP_URL;
 const apiUrl = process.env.AI_SERVICES_URL;
+const s3PublicEndpoint = process.env.S3_PUBLIC_ENDPOINT;
 const authorizedParties = Array.from(
   new Set([
     ...splitEnvList(process.env.CLERK_AUTHORIZED_PARTIES),
@@ -18,16 +19,20 @@ const authorizedParties = Array.from(
 const connectSrc = Array.from(
   new Set([
     ...(apiUrl ? [apiUrl] : []),
+    ...(s3PublicEndpoint ? [s3PublicEndpoint] : []),
     ...(process.env.NODE_ENV !== "production" ? ["ws:", "wss:"] : []),
   ]),
 );
+const storageAssetSrc = s3PublicEndpoint ? [s3PublicEndpoint] : [];
 
-const proxy = clerkMiddleware({
+export const proxy = clerkMiddleware({
   authorizedParties: authorizedParties.length > 0 ? authorizedParties : undefined,
   contentSecurityPolicy: {
     strict: true,
     directives: {
       ...(connectSrc.length > 0 ? { "connect-src": connectSrc } : {}),
+      ...(storageAssetSrc.length > 0 ? { "img-src": storageAssetSrc } : {}),
+      ...(storageAssetSrc.length > 0 ? { "media-src": storageAssetSrc } : {}),
     },
   },
 });
@@ -38,6 +43,6 @@ export const config = {
   matcher: [
     // Clerk must also run for 404s from broken public/media asset URLs because
     // the root layout renders Clerk auth controls for those error responses.
-    "/((?!_next).*)",
+    "/((?!_next|__nextjs).*)",
   ],
 };

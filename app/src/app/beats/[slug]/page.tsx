@@ -36,7 +36,7 @@ export default async function BeatDetailPage({ params }: BeatDetailPageProps) {
     notFound();
   }
 
-  const audio = beat.assets.find((asset) => asset.role === "AUDIO_SOURCE");
+  const audio = beat.assets.find((asset) => asset.role === "AUDIO_PREVIEW");
   const thumbnail = beat.assets.find((asset) => asset.role === "IMAGE_THUMBNAIL");
 
   return (
@@ -46,9 +46,9 @@ export default async function BeatDetailPage({ params }: BeatDetailPageProps) {
           Retour au catalogue
         </Link>
         <div className="mt-6 aspect-video overflow-hidden border border-black/10 bg-black/[0.04]">
-          {thumbnail ? (
+          {thumbnail?.url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img alt="" className="h-full w-full object-cover" src={`/${thumbnail.objectKey}`} />
+            <img alt="" className="h-full w-full object-cover" src={thumbnail.url} />
           ) : null}
         </div>
         <div className="mt-8">
@@ -62,8 +62,8 @@ export default async function BeatDetailPage({ params }: BeatDetailPageProps) {
             {beat.description ?? "Le vendeur n a pas encore ajoute de description."}
           </p>
         </div>
-        {audio ? (
-          <audio className="mt-6 w-full" controls preload="none" src={`/${audio.objectKey}`} />
+        {audio?.url ? (
+          <audio className="mt-6 w-full" controls preload="none" src={audio.url} />
         ) : null}
       </section>
 

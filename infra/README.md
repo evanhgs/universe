@@ -90,6 +90,8 @@ Create a real secret file before using staging or production:
 - `secrets/staging/clerk_webhook_signing_secret.txt`
 - `secrets/staging/stripe_secret_key.txt`
 - `secrets/staging/stripe_webhook_secret.txt`
+- `secrets/staging/s3_access_key_id.txt`
+- `secrets/staging/s3_secret_access_key.txt`
 - `secrets/prod/next_server_actions_encryption_key.txt`
 - `secrets/prod/database_url.txt`
 - `secrets/prod/clerk_secret_key.txt`
@@ -103,6 +105,18 @@ Create a real secret file before using staging or production:
 - Secret file values are injected by the container entrypoint and are not listed in the Compose `environment` block.
 
 Templates are present for env files and secret filenames, but real runtime values should live only in ignored `*.env` and `secrets/**/*.txt` files.
+
+## S3-compatible storage
+
+Development and staging can use a RustFS bucket through the S3-compatible API.
+
+- `S3_PUBLIC_ENDPOINT`: browser-reachable S3 endpoint, for example `https://s3.evanhgs.fr`
+- `S3_REGION`: signing region, defaults to `us-east-1`
+- `S3_BUCKET_BEATS`: bucket used for beat audio and images
+- `S3_FORCE_PATH_STYLE`: keep `true` for RustFS-style URLs such as `/bucket/key`
+- `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY`: development can read these from `stack.dev.env`; staging reads them from Docker secrets
+
+The app does not proxy upload bytes through Next.js. It generates a short-lived presigned `PUT` URL at `/api/storage/uploads/presign`, then the browser uploads directly to RustFS. Public beat thumbnails and audio previews are returned as short-lived presigned `GET` URLs in beat payloads.
 
 ## Clerk and forwarded headers
 

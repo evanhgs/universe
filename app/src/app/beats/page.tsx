@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { listPublishedBeatsPayload } from "@/server/beats/beat.service";
+import { BeatUploadTester } from "./beat-upload-tester";
 
 type BeatsPageProps = {
   searchParams: Promise<{
@@ -60,6 +61,8 @@ export default async function BeatsPage({ searchParams }: BeatsPageProps) {
         </Link>
       </div>
 
+      <BeatUploadTester />
+
       <form className="mt-6 grid gap-3 md:grid-cols-[1fr_180px_auto]" action="/beats">
         <input
           className="h-11 rounded-lg border border-black/15 px-4 text-sm outline-none focus:border-black"
@@ -98,12 +101,12 @@ export default async function BeatsPage({ searchParams }: BeatsPageProps) {
               <article key={beat.id} className="border border-black/10 bg-white">
                 <Link href={`/beats/${beat.slug}`}>
                   <div className="aspect-video bg-black/[0.04]">
-                    {thumbnail ? (
+                    {thumbnail?.url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         alt=""
                         className="h-full w-full object-cover"
-                        src={`/${thumbnail.objectKey}`}
+                        src={thumbnail.url}
                       />
                     ) : null}
                   </div>

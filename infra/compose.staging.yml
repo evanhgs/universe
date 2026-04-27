@@ -74,6 +74,10 @@ services:
       CLERK_AUTHORIZED_PARTIES: ${CLERK_AUTHORIZED_PARTIES}
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
       STRIPE_AUTOMATIC_TAX_ENABLED: "${STRIPE_AUTOMATIC_TAX_ENABLED:-false}"
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET_BEATS: ${S3_BUCKET_BEATS}
+      S3_FORCE_PATH_STYLE: "${S3_FORCE_PATH_STYLE:-true}"
       NODE_ENV: ${NEXTJS_NODE_ENV:-production}
       NEXT_TELEMETRY_DISABLED: "${NEXTJS_TELEMETRY_DISABLED:-1}"
       HOSTNAME: ${NEXTJS_HOSTNAME:-0.0.0.0}
@@ -95,6 +99,8 @@ services:
       - stripe_webhook_secret
       - clerk_secret_key
       - clerk_webhook_signing_secret
+      - s3_access_key_id
+      - s3_secret_access_key
     entrypoint:
       - /bin/sh
       - -c
@@ -106,7 +112,9 @@ services:
         STRIPE_WEBHOOK_SECRET="$$(cat /run/secrets/stripe_webhook_secret)"
         CLERK_SECRET_KEY="$$(cat /run/secrets/clerk_secret_key)"
         CLERK_WEBHOOK_SIGNING_SECRET="$$(cat /run/secrets/clerk_webhook_signing_secret)"
-        export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY DATABASE_URL STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET CLERK_SECRET_KEY CLERK_WEBHOOK_SIGNING_SECRET
+        S3_ACCESS_KEY_ID="$$(cat /run/secrets/s3_access_key_id)"
+        S3_SECRET_ACCESS_KEY="$$(cat /run/secrets/s3_secret_access_key)"
+        export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY DATABASE_URL STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET CLERK_SECRET_KEY CLERK_WEBHOOK_SIGNING_SECRET S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY
         exec node server.js
 
   ai-services:
@@ -277,3 +285,7 @@ secrets:
     file: ./secrets/staging/clerk_secret_key.txt
   clerk_webhook_signing_secret:
     file: ./secrets/staging/clerk_webhook_signing_secret.txt
+  s3_access_key_id:
+    file: ./secrets/staging/s3_access_key_id.txt
+  s3_secret_access_key:
+    file: ./secrets/staging/s3_secret_access_key.txt

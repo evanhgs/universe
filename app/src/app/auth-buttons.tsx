@@ -1,6 +1,6 @@
 "use client";
 
-import { SignInButton, UserButton, useClerk } from "@clerk/nextjs";
+import { SignInButton, UserButton, useClerk, useUser } from "@clerk/nextjs";
 
 export function SignedOutActions() {
   const { openSignUp } = useClerk();
@@ -21,4 +21,14 @@ export function SignedOutActions() {
 
 export function SignedInActions() {
   return <UserButton />;
+}
+
+export function AuthActions() {
+  const { isLoaded, isSignedIn } = useUser();
+
+  if (!isLoaded) {
+    return null;
+  }
+
+  return isSignedIn ? <SignedInActions /> : <SignedOutActions />;
 }

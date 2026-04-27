@@ -72,7 +72,7 @@ async function buildUniqueBeatSlug(title: string) {
 function mediaAssetCreate(ownerId: string, asset: BeatAssetInput, assetType: AssetType) {
   return {
     ownerId,
-    provider: "OTHER" as const,
+    provider: "S3" as const,
     bucket: asset.bucket,
     objectKey: asset.objectKey,
     originalFilename: asset.originalFilename,

@@ -59,6 +59,7 @@ export type BeatAssetPayload = {
   role: AssetType;
   bucket: string;
   objectKey: string;
+  url: string | null;
   originalFilename: string | null;
   mimeType: string | null;
   sizeBytes: number | null;

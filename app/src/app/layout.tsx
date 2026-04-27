@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { ClerkProvider, Show } from "@clerk/nextjs";
+import { ClerkProvider } from "@clerk/nextjs";
 
-import { SignedInActions, SignedOutActions } from "./auth-buttons";
+import { AuthActions } from "./auth-buttons";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,12 +23,7 @@ export default function RootLayout({
               Universe
             </div>
             <div className="flex items-center gap-3">
-              <Show when="signed-out">
-                <SignedOutActions />
-              </Show>
-              <Show when="signed-in">
-                <SignedInActions />
-              </Show>
+              <AuthActions />
             </div>
           </header>
           {children}

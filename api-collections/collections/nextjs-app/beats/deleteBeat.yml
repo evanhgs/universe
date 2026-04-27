@@ -6,9 +6,6 @@ info:
 http:
   method: DELETE
   url: "{{url}}/api/beats/midnight-bounce"
-  headers:
-    - name: Authorization
-      value: Bearer {{clerkSessionToken}}
   auth: inherit
 
 settings:
