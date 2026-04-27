@@ -431,8 +431,12 @@ export async function updateBeatBySlug(ownerId: string, slug: string, input: Upd
     select: { id: true, ownerId: true, firstPublishedAt: true },
   });
 
-  if (!existing || existing.ownerId !== ownerId) {
+  if (!existing) {
     return null;
+  }
+
+  if (existing.ownerId !== ownerId) {
+    throw new Error("beat_forbidden");
   }
 
   const publishedAt = input.status === "PUBLISHED" ? new Date() : undefined;
@@ -567,12 +571,22 @@ export async function updateBeatBySlug(ownerId: string, slug: string, input: Upd
 
 export async function softDeleteBeatBySlug(ownerId: string, slug: string) {
   const prisma = getPrisma();
-  const beat = await prisma.beat.updateMany({
-    where: {
-      slug,
-      ownerId,
-      status: { not: "DELETED" },
-    },
+
+  const existing = await prisma.beat.findUnique({
+    where: { slug },
+    select: { id: true, ownerId: true, status: true },
+  });
+
+  if (!existing || existing.status === "DELETED") {
+    return false;
+  }
+
+  if (existing.ownerId !== ownerId) {
+    throw new Error("beat_forbidden");
+  }
+
+  await prisma.beat.update({
+    where: { id: existing.id },
     data: {
       status: "DELETED",
       visibility: "PRIVATE",
@@ -582,5 +596,5 @@ export async function softDeleteBeatBySlug(ownerId: string, slug: string) {
 
   await refreshSellerBeatCount(ownerId);
 
-  return beat.count > 0;
+  return true;
 }

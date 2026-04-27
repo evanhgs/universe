@@ -29,17 +29,27 @@ function invalidSlugResponse() {
 }
 
 function mutationErrorResponse(error: unknown) {
-  const message = error instanceof Error ? error.message : "Unknown error.";
+  const code = error instanceof Error ? error.message : "Unknown error.";
   const status =
-    message === "seller_role_required"
+    code === "seller_role_required"
       ? 403
-      : message === "beat_asset_duplicate"
+      : code === "beat_forbidden"
+        ? 403
+      : code === "beat_asset_duplicate"
         ? 409
         : 400;
+  const message =
+    code === "beat_forbidden"
+      ? "You do not have permission to modify this beat."
+      : code === "seller_role_required"
+        ? "A seller account is required to modify beats."
+      : code === "beat_asset_duplicate"
+        ? "This beat asset is already attached to another beat."
+      : code;
 
   return NextResponse.json(
     {
-      error: message,
+      error: code,
       message,
     },
     {
@@ -109,13 +119,13 @@ export async function PATCH(request: Request, context: RouteContext) {
 
 export async function DELETE(_request: Request, context: RouteContext) {
   const { slug } = await context.params;
-  const { userId } = await auth();
+  const { isAuthenticated, userId } = await auth();
 
   if (!BEAT_SLUG_PATTERN.test(slug)) {
     return invalidSlugResponse();
   }
 
-  if (!userId) {
+  if (!isAuthenticated) {
     return NextResponse.json(
       { error: "unauthorized" },
       { status: 401, headers: PRIVATE_JSON_HEADERS },
