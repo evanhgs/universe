@@ -160,9 +160,17 @@ function splitTags(value: string) {
   );
 }
 
+function createClientId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `license-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 function createLicenseDraft(scope: LicenseScope, priceAmount = "19.99"): LicenseDraft {
   return {
-    id: crypto.randomUUID(),
+    id: createClientId(),
     scope,
     customTitle: "",
     priceAmount,

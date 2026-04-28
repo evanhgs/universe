@@ -63,6 +63,7 @@ export async function createStripeCheckoutSession(args: {
     client_reference_id: args.orderId,
     success_url: args.successUrl,
     cancel_url: args.cancelUrl,
+    billing_address_collection: "auto",
     automatic_tax: {
       enabled: getStripeAutomaticTaxEnabled(),
     },
@@ -72,6 +73,7 @@ export async function createStripeCheckoutSession(args: {
         price_data: {
           currency: args.currency.toLowerCase(),
           unit_amount: args.amountCents,
+          tax_behavior: "exclusive",
           product_data: {
             name: args.title,
           },

@@ -13,7 +13,7 @@ type BeatsPageProps = {
 
 export const dynamic = "force-dynamic";
 
-function formatPrice(priceAmount: number | null, currency: string, isFree: boolean) {
+function formatPriceHT(priceAmount: number | null, currency: string, isFree: boolean) {
   if (isFree || priceAmount === 0) {
     return "Gratuit";
   }
@@ -22,10 +22,10 @@ function formatPrice(priceAmount: number | null, currency: string, isFree: boole
     return "Prix a definir";
   }
 
-  return new Intl.NumberFormat("fr-FR", {
+  return `${new Intl.NumberFormat("fr-FR", {
     style: "currency",
     currency,
-  }).format(priceAmount);
+  }).format(priceAmount)} HT`;
 }
 
 export default async function BeatsPage({ searchParams }: BeatsPageProps) {
@@ -114,7 +114,7 @@ export default async function BeatsPage({ searchParams }: BeatsPageProps) {
                     <div className="flex items-start justify-between gap-3">
                       <h2 className="text-lg font-semibold text-black">{beat.title}</h2>
                       <p className="shrink-0 text-sm font-semibold text-black">
-                        {formatPrice(beat.priceAmount, beat.currency, beat.isFree)}
+                        A partir de {formatPriceHT(beat.priceAmount, beat.currency, beat.isFree)}
                       </p>
                     </div>
                     <p className="line-clamp-2 text-sm leading-6 text-black/60">
@@ -124,6 +124,9 @@ export default async function BeatsPage({ searchParams }: BeatsPageProps) {
                       {beat.primaryGenre ? <span>{beat.primaryGenre}</span> : null}
                       {beat.seller.slug ? <span>par {beat.seller.displayName}</span> : null}
                     </div>
+                    <span className="inline-flex h-10 items-center justify-center rounded-full border border-black px-4 text-sm font-medium text-black">
+                      Voir licences
+                    </span>
                   </div>
                 </Link>
               </article>

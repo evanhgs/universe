@@ -263,6 +263,8 @@ export async function markOrderPaidFromStripe(args: {
   orderId: string;
   paymentId: string;
   providerPaymentIntentId?: string | null;
+  taxAmount: number;
+  totalAmount: number;
   payload: Prisma.InputJsonValue;
 }) {
   const prisma = getPrisma();
@@ -288,6 +290,8 @@ export async function markOrderPaidFromStripe(args: {
       },
       data: {
         status: "PAID",
+        taxAmount: args.taxAmount,
+        totalAmount: args.totalAmount,
         paidAt,
       },
     });
@@ -303,6 +307,7 @@ export async function markOrderPaidFromStripe(args: {
       where: { id: args.paymentId },
       data: {
         status: "SUCCEEDED",
+        amount: args.totalAmount,
         providerPaymentIntentId: args.providerPaymentIntentId,
         providerPayloadJson: args.payload,
         paidAt,

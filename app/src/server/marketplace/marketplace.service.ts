@@ -52,6 +52,10 @@ function toCents(value: number) {
   return Math.round(value * 100);
 }
 
+function fromCents(value: number) {
+  return Math.round(value) / 100;
+}
+
 function stripeObjectId(value: string | { id: string } | null) {
   if (!value) {
     return null;
@@ -79,6 +83,7 @@ function serializeOrder(order: OrderRecord): MarketplaceOrderPayload {
     items: order.items.map((item) => ({
       id: item.id,
       type: item.type,
+      beatLicenseOfferingId: item.beatLicenseOfferingId,
       title: item.titleSnapshot,
       licenseName: item.licenseNameSnapshot,
       unitAmount: decimalToNumber(item.unitAmount) ?? 0,
@@ -126,8 +131,24 @@ function buildCheckoutUrl(origin: string, path: string) {
   return new URL(path, origin).toString();
 }
 
+function getPublicCheckoutOrigin(requestUrl: string) {
+  const appUrl = process.env.APP_URL;
+
+  if (appUrl) {
+    return new URL(appUrl).origin;
+  }
+
+  const requestOrigin = new URL(requestUrl).origin;
+
+  if (requestOrigin === "http://0.0.0.0:3000") {
+    return "http://localhost:3000";
+  }
+
+  return requestOrigin;
+}
+
 function buildDefaultCheckoutUrls(orderId: string, requestUrl: string) {
-  const origin = new URL(requestUrl).origin;
+  const origin = getPublicCheckoutOrigin(requestUrl);
 
   return {
     successUrl: buildCheckoutUrl(
@@ -274,6 +295,23 @@ export async function confirmStripePaymentForCurrentBuyer(
   return fulfillStripeCheckoutSession(payment.providerSessionId);
 }
 
+export async function confirmStripeCheckoutSessionForOrder(
+  orderId: string,
+  input: StripeConfirmationInput,
+) {
+  if (!input.sessionId) {
+    throw new Error("stripe_payment_not_found");
+  }
+
+  const order = await fulfillStripeCheckoutSession(input.sessionId);
+
+  if (order.id !== orderId) {
+    throw new Error("stripe_session_mismatch");
+  }
+
+  return order;
+}
+
 export async function fulfillStripeCheckoutSession(sessionId: string) {
   const session = await retrieveStripeCheckoutSession(sessionId);
   const sessionOrderId = session.client_reference_id ?? session.metadata?.orderId;
@@ -297,20 +335,31 @@ export async function fulfillStripeCheckoutSession(sessionId: string) {
     throw new Error("stripe_session_not_paid");
   }
 
-  const expectedAmount = toCents(decimalToNumber(payment.amount) ?? 0);
+  const expectedSubtotal = toCents(decimalToNumber(payment.order.subtotalAmount) ?? 0);
+  const stripeSubtotal = session.amount_subtotal ?? session.amount_total;
+  const stripeTotal = session.amount_total ?? stripeSubtotal;
+
+  if (stripeSubtotal === null || stripeTotal === null) {
+    throw new Error("stripe_amount_missing");
+  }
 
   if (
-    session.amount_total !== expectedAmount ||
+    stripeSubtotal !== expectedSubtotal ||
     session.currency?.toUpperCase() !== payment.currency
   ) {
     throw new Error("stripe_amount_mismatch");
   }
+
+  const taxAmount = fromCents(session.total_details?.amount_tax ?? stripeTotal - stripeSubtotal);
+  const totalAmount = fromCents(stripeTotal);
 
   return serializeOrder(
     await markOrderPaidFromStripe({
       orderId: payment.orderId,
       paymentId: payment.id,
       providerPaymentIntentId: stripeObjectId(session.payment_intent),
+      taxAmount,
+      totalAmount,
       payload: stripePayloadJson(session),
     }),
   );

@@ -3,16 +3,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { getBeatPayloadBySlug } from "@/server/beats/beat.service";
+import { BeatPurchasePanel } from "./beat-purchase-panel";
 
 type BeatDetailPageProps = {
   params: Promise<{
     slug: string;
   }>;
+  searchParams: Promise<{
+    checkout?: string;
+  }>;
 };
 
 export const dynamic = "force-dynamic";
 
-function formatPrice(priceAmount: number | null, currency: string, isFree: boolean) {
+function formatPriceHT(priceAmount: number | null, currency: string, isFree: boolean) {
   if (isFree || priceAmount === 0) {
     return "Gratuit";
   }
@@ -21,14 +25,14 @@ function formatPrice(priceAmount: number | null, currency: string, isFree: boole
     return "Prix a definir";
   }
 
-  return new Intl.NumberFormat("fr-FR", {
+  return `${new Intl.NumberFormat("fr-FR", {
     style: "currency",
     currency,
-  }).format(priceAmount);
+  }).format(priceAmount)} HT`;
 }
 
-export default async function BeatDetailPage({ params }: BeatDetailPageProps) {
-  const { slug } = await params;
+export default async function BeatDetailPage({ params, searchParams }: BeatDetailPageProps) {
+  const [{ slug }, query] = await Promise.all([params, searchParams]);
   const { userId } = await auth();
   const beat = await getBeatPayloadBySlug(slug, userId ?? null);
 
@@ -38,6 +42,17 @@ export default async function BeatDetailPage({ params }: BeatDetailPageProps) {
 
   const audio = beat.assets.find((asset) => asset.role === "AUDIO_PREVIEW");
   const thumbnail = beat.assets.find((asset) => asset.role === "IMAGE_THUMBNAIL");
+  const lowestLicense = beat.licenseOfferings.reduce<(typeof beat.licenseOfferings)[number] | null>(
+    (lowest, offering) =>
+      lowest === null || (offering.priceAmount ?? 0) < (lowest.priceAmount ?? 0)
+        ? offering
+        : lowest,
+    null,
+  );
+  const licenseOfferings = beat.licenseOfferings.map((offering) => ({
+    ...offering,
+    priceAmount: offering.priceAmount ?? 0,
+  }));
 
   return (
     <main className="mx-auto grid min-h-[calc(100vh-73px)] w-full max-w-6xl gap-8 px-6 py-10 lg:grid-cols-[1fr_360px]">
@@ -58,6 +73,9 @@ export default async function BeatDetailPage({ params }: BeatDetailPageProps) {
           <h1 className="mt-3 text-4xl font-semibold tracking-tight text-black">
             {beat.title}
           </h1>
+          <p>
+            Une instru du vendeur : {beat.seller.slug}
+          </p>
           <p className="mt-4 max-w-3xl text-base leading-7 text-black/65">
             {beat.description ?? "Le vendeur n a pas encore ajoute de description."}
           </p>
@@ -69,12 +87,19 @@ export default async function BeatDetailPage({ params }: BeatDetailPageProps) {
 
       <aside className="h-fit border border-black/10 bg-white p-6">
         <p className="text-3xl font-semibold text-black">
-          {formatPrice(beat.priceAmount, beat.currency, beat.isFree)}
+          A partir de{" "}
+          {formatPriceHT(lowestLicense?.priceAmount ?? beat.priceAmount, beat.currency, beat.isFree)}
         </p>
         <p className="mt-2 text-sm leading-6 text-black/60">
-          Achat direct et paiement arrivent dans la prochaine tranche V1. Cette
-          fiche expose deja le prix, les assets et l offre de licence.
+          Achat securise via Stripe. Les fichiers complets restent prives et sont
+          deverrouilles seulement apres paiement valide.
         </p>
+        <BeatPurchasePanel
+          beatSlug={beat.slug}
+          checkoutCancelled={query.checkout === "cancelled"}
+          isOwner={beat.viewer.viewerCanEdit}
+          licenseOfferings={licenseOfferings}
+        />
         <div className="mt-6 border-t border-black/10 pt-5">
           <p className="text-sm font-semibold text-black">Vendeur</p>
           {beat.seller.slug ? (

@@ -44,6 +44,7 @@ export type MarketplaceOrderPayload = {
   items: Array<{
     id: string;
     type: string;
+    beatLicenseOfferingId: string | null;
     title: string;
     licenseName: string | null;
     unitAmount: number;

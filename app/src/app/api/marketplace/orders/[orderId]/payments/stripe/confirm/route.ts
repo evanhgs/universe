@@ -3,7 +3,10 @@ import { NextResponse } from "next/server";
 
 import { PRIVATE_JSON_HEADERS } from "@/server/http/response-headers";
 import { marketplaceErrorResponse } from "@/server/marketplace/marketplace.http";
-import { confirmStripePaymentForCurrentBuyer } from "@/server/marketplace/marketplace.service";
+import {
+  confirmStripeCheckoutSessionForOrder,
+  confirmStripePaymentForCurrentBuyer,
+} from "@/server/marketplace/marketplace.service";
 import { parseStripeConfirmationInput } from "@/server/marketplace/marketplace.validation";
 
 type RouteContext = {
@@ -23,17 +26,13 @@ async function readOptionalJson(request: Request) {
 export async function POST(request: Request, context: RouteContext) {
   const { isAuthenticated, userId } = await auth();
 
-  if (!isAuthenticated) {
-    return NextResponse.json(
-      { error: "unauthorized" },
-      { status: 401, headers: PRIVATE_JSON_HEADERS },
-    );
-  }
-
   try {
     const { orderId } = await context.params;
     const input = parseStripeConfirmationInput(await readOptionalJson(request));
-    const order = await confirmStripePaymentForCurrentBuyer(userId, orderId, input);
+    const order =
+      isAuthenticated && userId
+        ? await confirmStripePaymentForCurrentBuyer(userId, orderId, input)
+        : await confirmStripeCheckoutSessionForOrder(orderId, input);
 
     return NextResponse.json(order, {
       status: 200,
