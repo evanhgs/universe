@@ -3,7 +3,16 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useMemo, useState } from "react";
 
-type UploadKind = "audio-source" | "image-thumbnail";
+type UploadKind = "audio-source" | "audio-licensed-archive" | "image-thumbnail";
+type LicenseScope = "BASIC" | "PREMIUM" | "UNLIMITED" | "EXCLUSIVE" | "CUSTOM";
+
+type LicenseDraft = {
+  id: string;
+  scope: LicenseScope;
+  customTitle: string;
+  priceAmount: string;
+  file: File | null;
+};
 
 type PresignedAsset = {
   bucket: string;
@@ -29,6 +38,17 @@ type CreatedBeatResponse = {
   title?: string;
 };
 
+const CURRENCY = "EUR";
+const MAX_LICENSES = 3;
+const licenseLabels: Record<LicenseScope, string> = {
+  BASIC: "MP3",
+  PREMIUM: "WAV",
+  UNLIMITED: "Pistes separees",
+  EXCLUSIVE: "Exclusive",
+  CUSTOM: "Personnalisee",
+};
+const licenseScopes: LicenseScope[] = ["BASIC", "PREMIUM", "UNLIMITED", "EXCLUSIVE", "CUSTOM"];
+
 const inputClass =
   "h-11 w-full rounded-lg border border-black/15 px-4 text-sm outline-none focus:border-black";
 const fileClass =
@@ -53,6 +73,14 @@ function mimeTypeFor(file: File, kind: UploadKind) {
 
   if (extension === "wav") {
     return "audio/wav";
+  }
+
+  if (extension === "zip") {
+    return "application/zip";
+  }
+
+  if (extension === "rar") {
+    return "application/vnd.rar";
   }
 
   if (extension === "jpg" || extension === "jpeg") {
@@ -132,20 +160,67 @@ function splitTags(value: string) {
   );
 }
 
+function createLicenseDraft(scope: LicenseScope, priceAmount = "19.99"): LicenseDraft {
+  return {
+    id: crypto.randomUUID(),
+    scope,
+    customTitle: "",
+    priceAmount,
+    file: null,
+  };
+}
+
+function normalizeLicenseTitle(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function licenseTitle(license: LicenseDraft) {
+  return license.scope === "CUSTOM"
+    ? normalizeLicenseTitle(license.customTitle)
+    : licenseLabels[license.scope];
+}
+
+function licenseTitleKey(value: string) {
+  return normalizeLicenseTitle(value).toLowerCase();
+}
+
+function parsePriceAmount(value: string) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return null;
+  }
+
+  return Math.round(parsed * 100) / 100;
+}
+
+function isPreviewSourceFile(file: File) {
+  const mimeType = mimeTypeFor(file, "audio-source");
+  const extension = extensionOf(file.name);
+
+  return (
+    mimeType === "audio/mpeg" ||
+    mimeType === "audio/mp3" ||
+    mimeType === "audio/wav" ||
+    mimeType === "audio/x-wav" ||
+    extension === "mp3" ||
+    extension === "wav"
+  );
+}
+
 export function BeatUploadTester() {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [priceAmount, setPriceAmount] = useState("19.99");
-  const [currency, setCurrency] = useState("EUR");
   const [primaryGenre, setPrimaryGenre] = useState("");
   const [primaryMood, setPrimaryMood] = useState("");
   const [tags, setTags] = useState("");
   const [bpm, setBpm] = useState("");
   const [musicalKey, setMusicalKey] = useState("");
-  const [isFree, setIsFree] = useState(false);
   const [publish, setPublish] = useState(true);
-  const [sourceFile, setSourceFile] = useState<File | null>(null);
+  const [licenses, setLicenses] = useState<LicenseDraft[]>([
+    createLicenseDraft("BASIC"),
+  ]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -160,11 +235,62 @@ export function BeatUploadTester() {
     return publish ? "Uploader et publier" : "Uploader en brouillon";
   }, [isSubmitting, publish]);
 
+  const usedScopes = useMemo(() => new Set(licenses.map((license) => license.scope)), [licenses]);
+
+  function updateLicense(id: string, changes: Partial<LicenseDraft>) {
+    setLicenses((current) =>
+      current.map((license) => (license.id === id ? { ...license, ...changes } : license)),
+    );
+  }
+
+  function addLicense() {
+    const nextScope = licenseScopes.find((scope) => !usedScopes.has(scope));
+
+    if (!nextScope || licenses.length >= MAX_LICENSES) {
+      return;
+    }
+
+    setLicenses((current) => [...current, createLicenseDraft(nextScope, "49.99")]);
+  }
+
+  function removeLicense(id: string) {
+    setLicenses((current) =>
+      current.length > 1 ? current.filter((license) => license.id !== id) : current,
+    );
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!sourceFile) {
-      setError("Ajoute au moins le fichier audio source.");
+    if (licenses.some((license) => !license.file)) {
+      setError("Ajoute un fichier pour chaque licence.");
+      return;
+    }
+
+    if (licenses.some((license) => license.scope === "CUSTOM" && !licenseTitle(license))) {
+      setError("Nomme chaque licence personnalisee avant d'ajouter son fichier.");
+      return;
+    }
+
+    const titleKeys = licenses.map((license) => licenseTitleKey(licenseTitle(license)));
+
+    if (new Set(titleKeys).size !== titleKeys.length) {
+      setError("Chaque type de licence doit etre unique dans une meme publication.");
+      return;
+    }
+
+    const licensePrices = licenses.map((license) => parsePriceAmount(license.priceAmount));
+
+    if (licensePrices.some((price) => price === null)) {
+      setError("Chaque licence doit avoir un prix valide en EUR.");
+      return;
+    }
+
+    const defaultLicense = licenses[0];
+    const defaultFile = defaultLicense?.file;
+
+    if (!defaultFile || !isPreviewSourceFile(defaultFile)) {
+      setError("Le fichier de la premiere licence doit etre un MP3 ou WAV pour generer la preview.");
       return;
     }
 
@@ -173,8 +299,34 @@ export function BeatUploadTester() {
     setCreatedBeat(null);
 
     try {
-      setStatus("Presign et upload audio source vers S3...");
-      const audioAsset = await uploadToStorage("audio-source", sourceFile);
+      const uploadedLicenses = [];
+
+      for (const [index, license] of licenses.entries()) {
+        const file = license.file;
+
+        if (!file) {
+          throw new Error("license_file_missing");
+        }
+
+        const kind: UploadKind = index === 0 ? "audio-source" : "audio-licensed-archive";
+        setStatus(`Upload ${licenseTitle(license)} vers S3...`);
+        const asset = await uploadToStorage(kind, file);
+        const price = licensePrices[index];
+
+        if (price === null) {
+          throw new Error("license_price_invalid");
+        }
+
+        uploadedLicenses.push({
+          draft: license,
+          asset,
+          price,
+        });
+      }
+
+      const audioAsset = uploadedLicenses[0].asset;
+      const lowestPrice = Math.min(...uploadedLicenses.map((license) => license.price));
+      const isFree = uploadedLicenses.every((license) => license.price === 0);
 
       let thumbnailAsset: PresignedAsset | null = null;
 
@@ -194,8 +346,8 @@ export function BeatUploadTester() {
         body: JSON.stringify({
           title,
           description,
-          priceAmount: isFree ? 0 : Number(priceAmount),
-          currency,
+          priceAmount: lowestPrice,
+          currency: CURRENCY,
           primaryGenre,
           primaryMood,
           tags: splitTags(tags),
@@ -207,6 +359,14 @@ export function BeatUploadTester() {
           brandingRequired: isFree,
           audioAsset,
           thumbnailAsset,
+          licenseOfferings: uploadedLicenses.map((license, index) => ({
+            scope: license.draft.scope,
+            title: licenseTitle(license.draft),
+            priceAmount: license.price,
+            currency: CURRENCY,
+            isDefault: index === 0,
+            assets: [license.asset],
+          })),
         }),
       });
       const beat = await readJsonResponse<CreatedBeatResponse>(response);
@@ -261,30 +421,6 @@ export function BeatUploadTester() {
             />
           </label>
           <label className={labelClass}>
-            Prix
-            <input
-              className={`mt-2 ${inputClass}`}
-              disabled={isFree}
-              min="0"
-              onChange={(event) => setPriceAmount(event.target.value)}
-              placeholder="19.99"
-              step="0.01"
-              type="number"
-              value={priceAmount}
-            />
-          </label>
-          <label className={labelClass}>
-            Devise
-            <input
-              className={`mt-2 ${inputClass}`}
-              maxLength={3}
-              onChange={(event) => setCurrency(event.target.value.toUpperCase())}
-              placeholder="EUR"
-              required
-              value={currency}
-            />
-          </label>
-          <label className={labelClass}>
             Genre
             <input
               className={`mt-2 ${inputClass}`}
@@ -332,6 +468,13 @@ export function BeatUploadTester() {
               value={tags}
             />
           </label>
+          <div className={labelClass}>
+            Devise
+            <div className="mt-2 flex h-11 items-center rounded-lg border border-black/10 bg-black/[0.03] px-4 text-sm text-black/65">
+              EUR
+            </div>
+            <p className={helperClass}>Devise fixee en V1. Le choix pourra etre gere plus tard au paiement.</p>
+          </div>
         </div>
 
         <label className={labelClass}>
@@ -344,18 +487,119 @@ export function BeatUploadTester() {
           />
         </label>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className={labelClass}>
-            Audio source
-            <input
-              accept="audio/mpeg,audio/mp3,audio/wav,audio/x-wav"
-              className={`mt-2 ${fileClass}`}
-              onChange={(event) => setSourceFile(event.target.files?.[0] ?? null)}
-              required
-              type="file"
-            />
-            <p className={helperClass}>MP3 ou WAV. Maximum API: 250 Mo.</p>
-          </label>
+        <div className="grid gap-4">
+          <div className="flex flex-col gap-3 border-t border-black/10 pt-5 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-black">Licences</p>
+              <p className={helperClass}>
+                Maximum 3. La premiere licence sert de source pour generer automatiquement la preview.
+              </p>
+            </div>
+            <button
+              className="inline-flex h-10 items-center justify-center rounded-full border border-black px-4 text-sm font-medium text-black disabled:cursor-not-allowed disabled:border-black/20 disabled:text-black/35"
+              disabled={licenses.length >= MAX_LICENSES}
+              onClick={addLicense}
+              type="button"
+            >
+              Ajouter une licence
+            </button>
+          </div>
+
+          <div className="grid gap-3">
+            {licenses.map((license, index) => (
+              <div
+                className="grid gap-3 border border-black/10 p-4 md:grid-cols-[220px_160px_1fr_auto]"
+                key={license.id}
+              >
+                <label className={labelClass}>
+                  Type de licence
+                  <select
+                    className={`mt-2 ${inputClass}`}
+                    onChange={(event) => {
+                      const scope = event.target.value as LicenseScope;
+                      updateLicense(license.id, {
+                        scope,
+                        customTitle: scope === "CUSTOM" ? license.customTitle : "",
+                      });
+                    }}
+                    value={license.scope}
+                  >
+                    {licenseScopes.map((scope) => (
+                      <option
+                        disabled={scope !== license.scope && usedScopes.has(scope)}
+                        key={scope}
+                        value={scope}
+                      >
+                        {licenseLabels[scope]}
+                      </option>
+                    ))}
+                  </select>
+                  {license.scope === "CUSTOM" ? (
+                    <input
+                      className={`mt-2 ${inputClass}`}
+                      maxLength={80}
+                      onChange={(event) =>
+                        updateLicense(license.id, { customTitle: event.target.value })
+                      }
+                      placeholder="Nom de la licence"
+                      required
+                      value={license.customTitle}
+                    />
+                  ) : null}
+                </label>
+
+                <label className={labelClass}>
+                  Prix EUR
+                  <input
+                    className={`mt-2 ${inputClass}`}
+                    min="0"
+                    onChange={(event) =>
+                      updateLicense(license.id, { priceAmount: event.target.value })
+                    }
+                    placeholder="19.99"
+                    required
+                    step="0.01"
+                    type="number"
+                    value={license.priceAmount}
+                  />
+                </label>
+
+                <label className={labelClass}>
+                  Fichier
+                  <input
+                    accept={
+                      index === 0
+                        ? "audio/mpeg,audio/mp3,audio/wav,audio/x-wav"
+                        : "audio/mpeg,audio/mp3,audio/wav,audio/x-wav,application/zip,application/x-rar-compressed,application/vnd.rar,.zip,.rar"
+                    }
+                    className={`mt-2 ${fileClass}`}
+                    onChange={(event) =>
+                      updateLicense(license.id, { file: event.target.files?.[0] ?? null })
+                    }
+                    required
+                    type="file"
+                  />
+                  <p className={helperClass}>
+                    {index === 0
+                      ? "MP3 ou WAV requis pour la preview. Maximum API: 250 Mo."
+                      : "MP3, WAV, ZIP ou RAR. Maximum API: 250 Mo."}
+                  </p>
+                </label>
+
+                <div className="flex items-end">
+                  <button
+                    className="h-10 rounded-full border border-black/15 px-4 text-sm font-medium text-black disabled:cursor-not-allowed disabled:text-black/30"
+                    disabled={licenses.length === 1}
+                    onClick={() => removeLicense(license.id)}
+                    type="button"
+                  >
+                    Retirer
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
           <label className={labelClass}>
             Image
             <input
@@ -377,15 +621,6 @@ export function BeatUploadTester() {
               type="checkbox"
             />
             Publier directement
-          </label>
-          <label className="inline-flex items-center gap-2">
-            <input
-              checked={isFree}
-              className="h-4 w-4 accent-black"
-              onChange={(event) => setIsFree(event.target.checked)}
-              type="checkbox"
-            />
-            Gratuit
           </label>
         </div>
 

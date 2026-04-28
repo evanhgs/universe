@@ -136,8 +136,8 @@ function licenseTemplateDefaults(scope: LicenseScope) {
     case "BASIC":
       return {
         code: DEFAULT_BASIC_LICENSE_CODE,
-        name: "Basic",
-        description: "Licence de base pour une vente V1.",
+        name: "MP3",
+        description: "Licence avec fichier MP3.",
         allowCommercialUse: true,
         allowDistribution: false,
         allowStemsDownload: false,
@@ -145,8 +145,8 @@ function licenseTemplateDefaults(scope: LicenseScope) {
     case "PREMIUM":
       return {
         code: "premium",
-        name: "Premium",
-        description: "Licence premium avec fichier haute qualite.",
+        name: "WAV",
+        description: "Licence avec fichier WAV haute qualite.",
         allowCommercialUse: true,
         allowDistribution: true,
         allowStemsDownload: false,
@@ -154,8 +154,8 @@ function licenseTemplateDefaults(scope: LicenseScope) {
     case "UNLIMITED":
       return {
         code: "unlimited",
-        name: "Unlimited",
-        description: "Licence illimitee pour une vente V1.",
+        name: "Pistes separees",
+        description: "Licence avec pack de pistes separees.",
         allowCommercialUse: true,
         allowDistribution: true,
         allowStemsDownload: true,

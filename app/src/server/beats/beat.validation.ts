@@ -23,6 +23,14 @@ const allowedSorts = new Set<BeatListQuery["sort"]>([
   "bpm_asc",
   "bpm_desc",
 ]);
+const MAX_LICENSE_OFFERINGS = 3;
+const defaultLicenseTitles: Record<LicenseScope, string> = {
+  BASIC: "MP3",
+  PREMIUM: "WAV",
+  UNLIMITED: "Pistes separees",
+  EXCLUSIVE: "Exclusive",
+  CUSTOM: "Personnalisee",
+};
 
 function normalizeOptionalString(value: unknown) {
   if (value === undefined) {
@@ -98,6 +106,10 @@ function parseCurrency(value: unknown) {
   }
 
   return currency.toUpperCase();
+}
+
+function normalizeLicenseTitleKey(value: string) {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 function parseTags(value: unknown) {
@@ -226,6 +238,20 @@ function parseAsset(value: unknown, field: string): BeatAssetInput {
   };
 }
 
+function isAudioPreviewSourceAsset(asset: BeatAssetInput) {
+  const mimeType = asset.mimeType?.toLowerCase();
+  const extension = asset.extension?.toLowerCase() ?? asset.originalFilename?.split(".").pop()?.toLowerCase();
+
+  return (
+    mimeType === "audio/mpeg" ||
+    mimeType === "audio/mp3" ||
+    mimeType === "audio/wav" ||
+    mimeType === "audio/x-wav" ||
+    extension === "mp3" ||
+    extension === "wav"
+  );
+}
+
 function parseLicenseScope(value: unknown, field: string) {
   const scope = requireString(value, field).toUpperCase() as LicenseScope;
 
@@ -245,7 +271,7 @@ function parseLicenseOfferings(value: unknown, fallback: {
     return [
       {
         scope: "BASIC" as LicenseScope,
-        title: "Basic",
+        title: defaultLicenseTitles.BASIC,
         description: null,
         priceAmount: fallback.priceAmount,
         currency: fallback.currency,
@@ -260,7 +286,12 @@ function parseLicenseOfferings(value: unknown, fallback: {
     throw new Error("licenseOfferings must be a non-empty array.");
   }
 
+  if (value.length > MAX_LICENSE_OFFERINGS) {
+    throw new Error(`licenseOfferings cannot contain more than ${MAX_LICENSE_OFFERINGS} values.`);
+  }
+
   const seenScopes = new Set<LicenseScope>();
+  const seenTitles = new Set<string>();
   let defaultCount = 0;
 
   const offerings = value.map((item, index) => {
@@ -277,6 +308,21 @@ function parseLicenseOfferings(value: unknown, fallback: {
 
     seenScopes.add(scope);
 
+    const title = normalizeOptionalString(body.title);
+
+    if (scope === "CUSTOM" && !title) {
+      throw new Error(`licenseOfferings.${index}.title is required for custom licenses.`);
+    }
+
+    const publicTitle = title ?? defaultLicenseTitles[scope];
+    const titleKey = normalizeLicenseTitleKey(publicTitle);
+
+    if (seenTitles.has(titleKey)) {
+      throw new Error("licenseOfferings cannot contain duplicate license titles.");
+    }
+
+    seenTitles.add(titleKey);
+
     const assetsValue = body.assets;
 
     if (!Array.isArray(assetsValue) || assetsValue.length === 0) {
@@ -291,7 +337,7 @@ function parseLicenseOfferings(value: unknown, fallback: {
 
     return {
       scope,
-      title: normalizeOptionalString(body.title),
+      title: publicTitle,
       description: normalizeOptionalString(body.description),
       priceAmount: parsePrice(body.priceAmount),
       currency: parseCurrency(body.currency),
@@ -333,6 +379,23 @@ export function parseCreateBeatInput(payload: unknown): CreateBeatInput {
 
   const currency = parseCurrency(body.currency);
   const audioAsset = parseAsset(body.audioAsset, "audioAsset");
+  const licenseOfferings = parseLicenseOfferings(body.licenseOfferings, {
+    priceAmount: isFree ? 0 : priceAmount,
+    currency,
+    audioAsset,
+  });
+  const defaultOffering = licenseOfferings.find((offering) => offering.isDefault);
+
+  if (!isAudioPreviewSourceAsset(audioAsset)) {
+    throw new Error("audioAsset must be an MP3 or WAV file.");
+  }
+
+  if (
+    !defaultOffering ||
+    !defaultOffering.assets.some((asset) => asset.objectKey === audioAsset.objectKey)
+  ) {
+    throw new Error("audioAsset must be attached to the default license offering.");
+  }
 
   return {
     title,
@@ -353,11 +416,7 @@ export function parseCreateBeatInput(payload: unknown): CreateBeatInput {
       body.thumbnailAsset === undefined || body.thumbnailAsset === null
         ? null
         : parseAsset(body.thumbnailAsset, "thumbnailAsset"),
-    licenseOfferings: parseLicenseOfferings(body.licenseOfferings, {
-      priceAmount: isFree ? 0 : priceAmount,
-      currency,
-      audioAsset,
-    }),
+    licenseOfferings,
   };
 }
 
