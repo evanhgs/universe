@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useMemo, useState } from "react";
 
-type UploadKind = "audio-source" | "audio-preview" | "image-thumbnail";
+type UploadKind = "audio-source" | "image-thumbnail";
 
 type PresignedAsset = {
   bucket: string;
@@ -145,9 +145,7 @@ export function BeatUploadTester() {
   const [musicalKey, setMusicalKey] = useState("");
   const [isFree, setIsFree] = useState(false);
   const [publish, setPublish] = useState(true);
-  const [reuseSourceAsPreview, setReuseSourceAsPreview] = useState(true);
   const [sourceFile, setSourceFile] = useState<File | null>(null);
-  const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -177,14 +175,6 @@ export function BeatUploadTester() {
     try {
       setStatus("Presign et upload audio source vers S3...");
       const audioAsset = await uploadToStorage("audio-source", sourceFile);
-
-      let previewAsset: PresignedAsset | null = null;
-      const selectedPreview = reuseSourceAsPreview ? sourceFile : previewFile;
-
-      if (selectedPreview) {
-        setStatus("Presign et upload preview audio vers S3...");
-        previewAsset = await uploadToStorage("audio-preview", selectedPreview);
-      }
 
       let thumbnailAsset: PresignedAsset | null = null;
 
@@ -216,7 +206,6 @@ export function BeatUploadTester() {
           isFree,
           brandingRequired: isFree,
           audioAsset,
-          previewAsset,
           thumbnailAsset,
         }),
       });
@@ -355,7 +344,7 @@ export function BeatUploadTester() {
           />
         </label>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           <label className={labelClass}>
             Audio source
             <input
@@ -366,17 +355,6 @@ export function BeatUploadTester() {
               type="file"
             />
             <p className={helperClass}>MP3 ou WAV. Maximum API: 250 Mo.</p>
-          </label>
-          <label className={labelClass}>
-            Preview audio
-            <input
-              accept="audio/mpeg,audio/mp3,audio/wav,audio/x-wav"
-              className={`mt-2 ${fileClass}`}
-              disabled={reuseSourceAsPreview}
-              onChange={(event) => setPreviewFile(event.target.files?.[0] ?? null)}
-              type="file"
-            />
-            <p className={helperClass}>Optionnel si le fichier source est reutilise.</p>
           </label>
           <label className={labelClass}>
             Image
@@ -408,15 +386,6 @@ export function BeatUploadTester() {
               type="checkbox"
             />
             Gratuit
-          </label>
-          <label className="inline-flex items-center gap-2">
-            <input
-              checked={reuseSourceAsPreview}
-              className="h-4 w-4 accent-black"
-              onChange={(event) => setReuseSourceAsPreview(event.target.checked)}
-              type="checkbox"
-            />
-            Reutiliser la source comme preview
           </label>
         </div>
 

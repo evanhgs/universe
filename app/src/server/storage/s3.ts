@@ -12,7 +12,11 @@ type PresignOptions = {
   expiresIn?: number;
 };
 
-type UploadKind = "audio-source" | "audio-preview" | "image-thumbnail";
+type UploadKind =
+  | "audio-source"
+  | "audio-preview"
+  | "audio-licensed-archive"
+  | "image-thumbnail";
 
 type StorageConfig = {
   endpoint: string;
@@ -30,6 +34,7 @@ const DEFAULT_READ_EXPIRES_IN = 900;
 const uploadKindPrefixes: Record<UploadKind, string> = {
   "audio-source": "beats/source",
   "audio-preview": "beats/preview",
+  "audio-licensed-archive": "beats/licensed",
   "image-thumbnail": "beats/images",
 };
 
@@ -222,4 +227,22 @@ export async function getPublicAssetUrl(asset: {
     objectKey: asset.objectKey,
     expiresIn: DEFAULT_READ_EXPIRES_IN,
   }).then((result) => result.url);
+}
+
+export async function createProtectedAssetUrl(asset: {
+  bucket: string;
+  objectKey: string;
+  expiresIn?: number;
+}) {
+  const result = await createPresignedStorageUrl({
+    method: "GET",
+    bucket: asset.bucket,
+    objectKey: asset.objectKey,
+    expiresIn: asset.expiresIn ?? DEFAULT_READ_EXPIRES_IN,
+  });
+
+  return {
+    url: result.url,
+    expiresIn: result.expiresIn,
+  };
 }

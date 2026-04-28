@@ -226,6 +226,93 @@ function parseAsset(value: unknown, field: string): BeatAssetInput {
   };
 }
 
+function parseLicenseScope(value: unknown, field: string) {
+  const scope = requireString(value, field).toUpperCase() as LicenseScope;
+
+  if (!allowedLicenseScopes.has(scope)) {
+    throw new Error(`${field} is invalid.`);
+  }
+
+  return scope;
+}
+
+function parseLicenseOfferings(value: unknown, fallback: {
+  priceAmount: number;
+  currency: string;
+  audioAsset: BeatAssetInput;
+}) {
+  if (value === undefined || value === null) {
+    return [
+      {
+        scope: "BASIC" as LicenseScope,
+        title: "Basic",
+        description: null,
+        priceAmount: fallback.priceAmount,
+        currency: fallback.currency,
+        isDefault: true,
+        deliveryNotes: null,
+        assets: [fallback.audioAsset],
+      },
+    ];
+  }
+
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error("licenseOfferings must be a non-empty array.");
+  }
+
+  const seenScopes = new Set<LicenseScope>();
+  let defaultCount = 0;
+
+  const offerings = value.map((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new Error(`licenseOfferings.${index} must be an object.`);
+    }
+
+    const body = item as Record<string, unknown>;
+    const scope = parseLicenseScope(body.scope, `licenseOfferings.${index}.scope`);
+
+    if (seenScopes.has(scope)) {
+      throw new Error("licenseOfferings cannot contain duplicate scopes.");
+    }
+
+    seenScopes.add(scope);
+
+    const assetsValue = body.assets;
+
+    if (!Array.isArray(assetsValue) || assetsValue.length === 0) {
+      throw new Error(`licenseOfferings.${index}.assets must be a non-empty array.`);
+    }
+
+    const isDefault = parseBoolean(body.isDefault, index === 0);
+
+    if (isDefault) {
+      defaultCount += 1;
+    }
+
+    return {
+      scope,
+      title: normalizeOptionalString(body.title),
+      description: normalizeOptionalString(body.description),
+      priceAmount: parsePrice(body.priceAmount),
+      currency: parseCurrency(body.currency),
+      isDefault,
+      deliveryNotes: normalizeOptionalString(body.deliveryNotes),
+      assets: assetsValue.map((asset, assetIndex) =>
+        parseAsset(asset, `licenseOfferings.${index}.assets.${assetIndex}`),
+      ),
+    };
+  });
+
+  if (defaultCount > 1) {
+    throw new Error("licenseOfferings can contain only one default offering.");
+  }
+
+  return offerings.map((offering) => ({
+    ...offering,
+    isDefault: defaultCount === 0 ? offering === offerings[0] : offering.isDefault,
+  }));
+}
+
 export function parseCreateBeatInput(payload: unknown): CreateBeatInput {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error("Invalid beat payload.");
@@ -240,11 +327,18 @@ export function parseCreateBeatInput(payload: unknown): CreateBeatInput {
     throw new Error("title is too long.");
   }
 
+  if (body.previewAsset !== undefined && body.previewAsset !== null) {
+    throw new Error("previewAsset is generated automatically.");
+  }
+
+  const currency = parseCurrency(body.currency);
+  const audioAsset = parseAsset(body.audioAsset, "audioAsset");
+
   return {
     title,
     description: normalizeOptionalString(body.description),
     priceAmount: isFree ? 0 : priceAmount,
-    currency: parseCurrency(body.currency),
+    currency,
     primaryGenre: normalizeOptionalString(body.primaryGenre),
     primaryMood: normalizeOptionalString(body.primaryMood),
     tags: parseTags(body.tags),
@@ -254,15 +348,16 @@ export function parseCreateBeatInput(payload: unknown): CreateBeatInput {
     publish: parseBoolean(body.publish, false),
     isFree,
     brandingRequired: parseBoolean(body.brandingRequired, isFree),
-    audioAsset: parseAsset(body.audioAsset, "audioAsset"),
-    previewAsset:
-      body.previewAsset === undefined || body.previewAsset === null
-        ? null
-        : parseAsset(body.previewAsset, "previewAsset"),
+    audioAsset,
     thumbnailAsset:
       body.thumbnailAsset === undefined || body.thumbnailAsset === null
         ? null
         : parseAsset(body.thumbnailAsset, "thumbnailAsset"),
+    licenseOfferings: parseLicenseOfferings(body.licenseOfferings, {
+      priceAmount: isFree ? 0 : priceAmount,
+      currency,
+      audioAsset,
+    }),
   };
 }
 
@@ -282,6 +377,10 @@ export function parseUpdateBeatInput(payload: unknown): UpdateBeatInput {
     throw new Error("title is too long.");
   }
 
+  if (body.previewAsset !== undefined) {
+    throw new Error("previewAsset is generated automatically.");
+  }
+
   return {
     ...(title !== undefined ? { title } : {}),
     ...(body.description !== undefined ? { description: normalizeOptionalString(body.description) } : {}),
@@ -297,12 +396,6 @@ export function parseUpdateBeatInput(payload: unknown): UpdateBeatInput {
     ...(body.isFree !== undefined ? { isFree: parseBoolean(body.isFree, false) } : {}),
     ...(body.brandingRequired !== undefined ? { brandingRequired: parseBoolean(body.brandingRequired, false) } : {}),
     ...(body.audioAsset !== undefined ? { audioAsset: parseAsset(body.audioAsset, "audioAsset") } : {}),
-    ...(body.previewAsset !== undefined
-      ? {
-          previewAsset:
-            body.previewAsset === null ? null : parseAsset(body.previewAsset, "previewAsset"),
-        }
-      : {}),
     ...(body.thumbnailAsset !== undefined
       ? {
           thumbnailAsset:

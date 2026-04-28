@@ -27,8 +27,8 @@ export type CreateBeatInput = {
   isFree: boolean;
   brandingRequired: boolean;
   audioAsset: BeatAssetInput;
-  previewAsset?: BeatAssetInput | null;
   thumbnailAsset?: BeatAssetInput | null;
+  licenseOfferings: BeatLicenseOfferingInput[];
 };
 
 export type UpdateBeatInput = Partial<
@@ -46,7 +46,6 @@ export type UpdateBeatInput = Partial<
     | "visibility"
     | "isFree"
     | "brandingRequired"
-    | "previewAsset"
   >
 > & {
   status?: BeatStatus;
@@ -57,12 +56,21 @@ export type UpdateBeatInput = Partial<
 export type BeatAssetPayload = {
   id: string;
   role: AssetType;
-  bucket: string;
-  objectKey: string;
   url: string | null;
   originalFilename: string | null;
   mimeType: string | null;
   sizeBytes: number | null;
+};
+
+export type BeatLicenseOfferingInput = {
+  scope: LicenseScope;
+  title?: string | null;
+  description?: string | null;
+  priceAmount: number;
+  currency: string;
+  isDefault: boolean;
+  deliveryNotes?: string | null;
+  assets: BeatAssetInput[];
 };
 
 export type BeatApiPayload = {

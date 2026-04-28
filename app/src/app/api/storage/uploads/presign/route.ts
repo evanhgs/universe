@@ -9,10 +9,25 @@ import {
   getBeatStorageBucket,
 } from "@/server/storage/s3";
 
-type UploadKind = "audio-source" | "audio-preview" | "image-thumbnail";
+type UploadKind =
+  | "audio-source"
+  | "audio-licensed-archive"
+  | "image-thumbnail";
 
-const allowedKinds = new Set<UploadKind>(["audio-source", "audio-preview", "image-thumbnail"]);
-const allowedAudioTypes = new Set(["audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav"]);
+const allowedKinds = new Set<UploadKind>([
+  "audio-source",
+  "audio-licensed-archive",
+  "image-thumbnail",
+]);
+const allowedAudioTypes = new Set([
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/wav",
+  "audio/x-wav",
+  "application/zip",
+  "application/x-rar-compressed",
+  "application/vnd.rar",
+]);
 const allowedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const maxAudioBytes = 250 * 1024 * 1024;
 const maxImageBytes = 10 * 1024 * 1024;
@@ -52,7 +67,9 @@ function parseUploadRequest(payload: unknown) {
     throw new Error("upload_kind_invalid");
   }
 
-  const isAudio = kind === "audio-source" || kind === "audio-preview";
+  const isAudio =
+    kind === "audio-source" ||
+    kind === "audio-licensed-archive";
   const allowedMimeTypes = isAudio ? allowedAudioTypes : allowedImageTypes;
   const maxBytes = isAudio ? maxAudioBytes : maxImageBytes;
 

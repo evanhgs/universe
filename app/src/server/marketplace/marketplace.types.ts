@@ -23,8 +23,8 @@ export type StripeConfirmationInput = {
 export type MarketplaceAssetPayload = {
   id: string;
   role: string;
-  bucket: string;
-  objectKey: string;
+  url: string;
+  expiresIn: number;
   originalFilename: string | null;
   mimeType: string | null;
   sizeBytes: number | null;

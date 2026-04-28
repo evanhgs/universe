@@ -32,7 +32,27 @@ function bigintToNumber(value: bigint | number | null) {
   return typeof value === "number" ? value : Number(value);
 }
 
+function isWorkerGeneratedPreview(asset: { metadataJson: unknown }) {
+  return (
+    typeof asset.metadataJson === "object" &&
+    asset.metadataJson !== null &&
+    "generatedBy" in asset.metadataJson &&
+    asset.metadataJson.generatedBy === "universe-audio-worker"
+  );
+}
+
 async function serializeBeat(beat: BeatRecord): Promise<BeatApiPayload> {
+  const publicAssets = beat.assets.filter(({ role, asset }) => {
+    if (!asset.isPublic || asset.processingStatus !== "READY") {
+      return false;
+    }
+
+    return (
+      role === "IMAGE_THUMBNAIL" ||
+      (role === "AUDIO_PREVIEW" && isWorkerGeneratedPreview(asset))
+    );
+  });
+
   return {
     id: beat.id,
     slug: beat.slug,
@@ -60,11 +80,9 @@ async function serializeBeat(beat: BeatRecord): Promise<BeatApiPayload> {
       displayName: beat.owner.profile?.displayName ?? null,
     },
     assets: await Promise.all(
-      beat.assets.map(async ({ role, asset }) => ({
+      publicAssets.map(async ({ role, asset }) => ({
         id: asset.id,
         role: role as AssetType,
-        bucket: asset.bucket,
-        objectKey: asset.objectKey,
         url: await getPublicAssetUrl({
           bucket: asset.bucket,
           objectKey: asset.objectKey,
@@ -122,7 +140,9 @@ export async function getBeatPayloadBySlug(slug: string, viewerClerkUserId: stri
     },
     licenseOfferings: result.beat.licenseOfferings.map((offering) => ({
       id: offering.id,
-      title: offering.title,
+      title: offering.title ?? offering.licenseTemplate.name,
+      description: offering.description,
+      scope: offering.licenseTemplate.scope,
       priceAmount: decimalToNumber(offering.priceAmount),
       currency: offering.currency,
     })),
@@ -133,7 +153,7 @@ export async function getBeatPreviewPayloadBySlug(slug: string) {
   const beat = await findPublishedBeatPreviewBySlug(slug);
   const preview = beat?.assets[0]?.asset;
 
-  if (!beat || !preview) {
+  if (!beat || !preview || !isWorkerGeneratedPreview(preview)) {
     return null;
   }
 
@@ -145,8 +165,6 @@ export async function getBeatPreviewPayloadBySlug(slug: string) {
     },
     preview: {
       id: preview.id,
-      bucket: preview.bucket,
-      objectKey: preview.objectKey,
       url: await getPublicAssetUrl({
         bucket: preview.bucket,
         objectKey: preview.objectKey,

@@ -75,6 +75,10 @@ prisma-migrate:
 	$(call require_env_file,$(DEV_ENV_FILE))
 	$(DEV_COMPOSE) exec nextjs npx prisma migrate dev
 
+prisma-push:
+	$(call require_env_file,$(DEV_ENV_FILE))
+	$(DEV_COMPOSE) exec nextjs npx prisma db push
+
 prisma-studio:
 	$(call require_env_file,$(DEV_ENV_FILE))
 	$(DEV_COMPOSE) exec nextjs npx prisma studio --hostname 0.0.0.0 --port 5555

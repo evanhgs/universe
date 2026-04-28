@@ -1,9 +1,10 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
+import { createStorageObjectKey } from "@/server/storage/s3";
 
 import { Prisma } from "../../../generated/prisma/client";
-import type { AssetType } from "../../../generated/prisma/enums";
+import type { AssetType, LicenseScope, ProcessingStatus } from "../../../generated/prisma/enums";
 import {
   BEAT_SLUG_PATTERN,
   DEFAULT_BASIC_LICENSE_CODE,
@@ -69,7 +70,16 @@ async function buildUniqueBeatSlug(title: string) {
   return `${base}-${Date.now()}`;
 }
 
-function mediaAssetCreate(ownerId: string, asset: BeatAssetInput, assetType: AssetType) {
+function mediaAssetCreate(
+  ownerId: string,
+  asset: BeatAssetInput,
+  assetType: AssetType,
+  options?: {
+    processingStatus?: ProcessingStatus;
+    isPublic?: boolean;
+    metadataJson?: Prisma.InputJsonValue;
+  },
+) {
   return {
     ownerId,
     provider: "S3" as const,
@@ -84,8 +94,10 @@ function mediaAssetCreate(ownerId: string, asset: BeatAssetInput, assetType: Ass
         : BigInt(asset.sizeBytes),
     checksumSha256: asset.checksumSha256,
     assetType,
-    processingStatus: "READY" as const,
-    isPublic: assetType === "IMAGE_THUMBNAIL" || assetType === "AUDIO_PREVIEW",
+    processingStatus: options?.processingStatus ?? ("READY" as const),
+    isPublic:
+      options?.isPublic ?? (assetType === "IMAGE_THUMBNAIL" || assetType === "AUDIO_PREVIEW"),
+    metadataJson: options?.metadataJson,
   };
 }
 
@@ -105,10 +117,6 @@ async function assertMediaObjectKeysAvailable(assets: Array<BeatAssetInput | nul
     .filter((objectKey): objectKey is string => Boolean(objectKey));
   const uniqueObjectKeys = new Set(objectKeys);
 
-  if (uniqueObjectKeys.size !== objectKeys.length) {
-    throw new Error(DUPLICATE_BEAT_ASSET_ERROR);
-  }
-
   if (uniqueObjectKeys.size === 0) {
     return;
   }
@@ -123,17 +131,72 @@ async function assertMediaObjectKeysAvailable(assets: Array<BeatAssetInput | nul
   }
 }
 
-async function ensureBasicLicenseTemplate() {
+function licenseTemplateDefaults(scope: LicenseScope) {
+  switch (scope) {
+    case "BASIC":
+      return {
+        code: DEFAULT_BASIC_LICENSE_CODE,
+        name: "Basic",
+        description: "Licence de base pour une vente V1.",
+        allowCommercialUse: true,
+        allowDistribution: false,
+        allowStemsDownload: false,
+      };
+    case "PREMIUM":
+      return {
+        code: "premium",
+        name: "Premium",
+        description: "Licence premium avec fichier haute qualite.",
+        allowCommercialUse: true,
+        allowDistribution: true,
+        allowStemsDownload: false,
+      };
+    case "UNLIMITED":
+      return {
+        code: "unlimited",
+        name: "Unlimited",
+        description: "Licence illimitee pour une vente V1.",
+        allowCommercialUse: true,
+        allowDistribution: true,
+        allowStemsDownload: true,
+      };
+    case "EXCLUSIVE":
+      return {
+        code: "exclusive",
+        name: "Exclusive",
+        description: "Licence exclusive avec transfert et pack complet.",
+        allowCommercialUse: true,
+        allowDistribution: true,
+        allowStemsDownload: true,
+      };
+    case "CUSTOM":
+      return {
+        code: "custom",
+        name: "Custom",
+        description: "Licence personnalisee par le vendeur.",
+        allowCommercialUse: true,
+        allowDistribution: false,
+        allowStemsDownload: false,
+      };
+  }
+}
+
+async function ensureLicenseTemplate(scope: LicenseScope) {
+  const defaults = licenseTemplateDefaults(scope);
+
   return getPrisma().licenseTemplate.upsert({
-    where: { code: DEFAULT_BASIC_LICENSE_CODE },
+    where: { code: defaults.code },
     update: { isActive: true },
     create: {
-      code: DEFAULT_BASIC_LICENSE_CODE,
-      name: "Basic",
-      scope: "BASIC",
-      description: "Licence de base pour une vente V1.",
+      code: defaults.code,
+      name: defaults.name,
+      scope,
+      description: defaults.description,
       allowStreaming: true,
-      allowCommercialUse: true,
+      allowCommercialUse: defaults.allowCommercialUse,
+      allowDistribution: defaults.allowDistribution,
+      allowStemsDownload: defaults.allowStemsDownload,
+      allowExclusiveTransfer: scope === "EXCLUSIVE",
       isSystem: true,
       isActive: true,
     },
@@ -159,15 +222,22 @@ async function refreshSellerBeatCount(userId: string) {
 
 export async function createBeat(ownerId: string, input: CreateBeatInput) {
   const prisma = getPrisma();
+  const licenseAssets = input.licenseOfferings.flatMap((offering) => offering.assets);
   await assertMediaObjectKeysAvailable([
     input.audioAsset,
-    input.previewAsset,
     input.thumbnailAsset,
+    ...licenseAssets.filter((asset) => asset.objectKey !== input.audioAsset.objectKey),
   ]);
 
   const slug = await buildUniqueBeatSlug(input.title);
-  const licenseTemplate = await ensureBasicLicenseTemplate();
-  const publishedAt = input.publish ? new Date() : null;
+  const licenseTemplateByScope = new Map(
+    await Promise.all(
+      Array.from(new Set(input.licenseOfferings.map((offering) => offering.scope))).map(
+        async (scope) => [scope, await ensureLicenseTemplate(scope)] as const,
+      ),
+    ),
+  );
+  const createdStatus = input.publish ? "PROCESSING" : "DRAFT";
 
   const beat = await prisma.$transaction(async (tx) => {
     const createdBeat = await tx.beat.create({
@@ -183,58 +253,133 @@ export async function createBeat(ownerId: string, input: CreateBeatInput) {
         primaryGenre: input.primaryGenre,
         primaryMood: input.primaryMood,
         tags: input.tags,
-        status: input.publish ? "PUBLISHED" : "DRAFT",
+        status: createdStatus,
         visibility: input.visibility,
         isFree: input.isFree,
         brandingRequired: input.brandingRequired,
-        firstPublishedAt: publishedAt,
-        publishedAt,
-      },
-      select: { id: true },
-    });
-
-    const offering = await tx.beatLicenseOffering.create({
-      data: {
-        beatId: createdBeat.id,
-        licenseTemplateId: licenseTemplate.id,
-        sellerId: ownerId,
-        title: "Basic",
-        priceAmount: input.priceAmount,
-        currency: input.currency,
-        isDefault: true,
+        firstPublishedAt: null,
+        publishedAt: null,
       },
       select: { id: true },
     });
 
     const audioAsset = await tx.mediaAsset.create({
-      data: mediaAssetCreate(ownerId, input.audioAsset, "AUDIO_SOURCE"),
+      data: mediaAssetCreate(ownerId, input.audioAsset, "AUDIO_SOURCE", {
+        isPublic: false,
+      }),
+      select: { id: true, objectKey: true },
+    });
+
+    const assetByObjectKey = new Map([[audioAsset.objectKey, audioAsset]]);
+
+    for (const offeringInput of input.licenseOfferings) {
+      const licenseTemplate = licenseTemplateByScope.get(offeringInput.scope);
+
+      if (!licenseTemplate) {
+        throw new Error("license_template_not_found");
+      }
+
+      const offering = await tx.beatLicenseOffering.create({
+        data: {
+          beatId: createdBeat.id,
+          licenseTemplateId: licenseTemplate.id,
+          sellerId: ownerId,
+          title: offeringInput.title ?? licenseTemplateDefaults(offeringInput.scope).name,
+          description: offeringInput.description,
+          priceAmount: offeringInput.priceAmount,
+          currency: offeringInput.currency,
+          isDefault: offeringInput.isDefault,
+          deliveryNotes: offeringInput.deliveryNotes,
+        },
+        select: { id: true },
+      });
+
+      for (const [index, deliveryAssetInput] of offeringInput.assets.entries()) {
+        let deliveryAsset = assetByObjectKey.get(deliveryAssetInput.objectKey);
+        const role: AssetType =
+          deliveryAssetInput.objectKey === input.audioAsset.objectKey
+            ? "AUDIO_SOURCE"
+            : "AUDIO_LICENSED_ARCHIVE";
+
+        if (!deliveryAsset) {
+          deliveryAsset = await tx.mediaAsset.create({
+            data: mediaAssetCreate(ownerId, deliveryAssetInput, "AUDIO_LICENSED_ARCHIVE", {
+              isPublic: false,
+            }),
+            select: { id: true, objectKey: true },
+          });
+          assetByObjectKey.set(deliveryAsset.objectKey, deliveryAsset);
+        }
+
+        await tx.beatAssetLink.create({
+          data: {
+            beatId: createdBeat.id,
+            assetId: deliveryAsset.id,
+            role,
+            licenseOfferingId: offering.id,
+            sortOrder: index,
+          },
+        });
+      }
+    }
+
+    const previewObjectKey = createStorageObjectKey(
+      "audio-preview",
+      ownerId,
+      `${slug}-preview.mp3`,
+    );
+    const previewAsset = await tx.mediaAsset.create({
+      data: mediaAssetCreate(
+        ownerId,
+        {
+          bucket: input.audioAsset.bucket,
+          objectKey: previewObjectKey,
+          originalFilename: `${slug}-preview.mp3`,
+          mimeType: "audio/mpeg",
+          extension: "mp3",
+          sizeBytes: null,
+        },
+        "AUDIO_PREVIEW",
+        {
+          processingStatus: "PENDING",
+          isPublic: true,
+          metadataJson: {
+            generatedFromAssetId: audioAsset.id,
+            publishWhenReady: input.publish,
+          },
+        },
+      ),
       select: { id: true },
     });
 
     await tx.beatAssetLink.create({
       data: {
         beatId: createdBeat.id,
-        assetId: audioAsset.id,
-        role: "AUDIO_SOURCE",
-        licenseOfferingId: offering.id,
+        assetId: previewAsset.id,
+        role: "AUDIO_PREVIEW",
+        sortOrder: 1,
       },
     });
 
-    if (input.previewAsset) {
-      const previewAsset = await tx.mediaAsset.create({
-        data: mediaAssetCreate(ownerId, input.previewAsset, "AUDIO_PREVIEW"),
-        select: { id: true },
-      });
-
-      await tx.beatAssetLink.create({
-        data: {
-          beatId: createdBeat.id,
-          assetId: previewAsset.id,
-          role: "AUDIO_PREVIEW",
-          sortOrder: 1,
+    await tx.audioProcessingJob.create({
+      data: {
+        beatId: createdBeat.id,
+        sourceAssetId: audioAsset.id,
+        outputAssetId: previewAsset.id,
+        type: "PREVIEW_GENERATION",
+        status: "PENDING",
+        payloadJson: {
+          publishWhenReady: input.publish,
+          previewPolicy: {
+            longSourceThresholdSec: 60,
+            longPreviewSec: 30,
+            shortPreviewSec: 10,
+            bitrateKbps: 96,
+            fadeSec: 1,
+          },
         },
-      });
-    }
+      },
+    });
 
     if (input.thumbnailAsset) {
       const thumbnailAsset = await tx.mediaAsset.create({
@@ -402,8 +547,15 @@ export async function findVisibleBeatBySlug(slug: string, viewerClerkUserId: str
         select: {
           id: true,
           title: true,
+          description: true,
           priceAmount: true,
           currency: true,
+          licenseTemplate: {
+            select: {
+              scope: true,
+              name: true,
+            },
+          },
         },
       },
     },
@@ -443,7 +595,6 @@ export async function updateBeatBySlug(ownerId: string, slug: string, input: Upd
   const priceAmount = input.isFree ? 0 : input.priceAmount;
   await assertMediaObjectKeysAvailable([
     input.audioAsset,
-    input.previewAsset,
     input.thumbnailAsset,
   ]);
 
@@ -496,7 +647,16 @@ export async function updateBeatBySlug(ownerId: string, slug: string, input: Upd
 
     if (input.audioAsset) {
       const audioAsset = await tx.mediaAsset.create({
-        data: mediaAssetCreate(ownerId, input.audioAsset, "AUDIO_SOURCE"),
+        data: mediaAssetCreate(ownerId, input.audioAsset, "AUDIO_SOURCE", {
+          isPublic: false,
+        }),
+        select: { id: true },
+      });
+      const defaultOffering = await tx.beatLicenseOffering.findFirst({
+        where: {
+          beatId: updated.id,
+          isDefault: true,
+        },
         select: { id: true },
       });
 
@@ -504,30 +664,13 @@ export async function updateBeatBySlug(ownerId: string, slug: string, input: Upd
         where: { beatId: updated.id, role: "AUDIO_SOURCE" },
       });
       await tx.beatAssetLink.create({
-        data: { beatId: updated.id, assetId: audioAsset.id, role: "AUDIO_SOURCE" },
+        data: {
+          beatId: updated.id,
+          assetId: audioAsset.id,
+          role: "AUDIO_SOURCE",
+          licenseOfferingId: defaultOffering?.id,
+        },
       });
-    }
-
-    if (input.previewAsset !== undefined) {
-      await tx.beatAssetLink.deleteMany({
-        where: { beatId: updated.id, role: "AUDIO_PREVIEW" },
-      });
-
-      if (input.previewAsset) {
-        const previewAsset = await tx.mediaAsset.create({
-          data: mediaAssetCreate(ownerId, input.previewAsset, "AUDIO_PREVIEW"),
-          select: { id: true },
-        });
-
-        await tx.beatAssetLink.create({
-          data: {
-            beatId: updated.id,
-            assetId: previewAsset.id,
-            role: "AUDIO_PREVIEW",
-            sortOrder: 1,
-          },
-        });
-      }
     }
 
     if (input.thumbnailAsset !== undefined) {

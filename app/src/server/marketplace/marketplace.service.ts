@@ -1,6 +1,7 @@
 import "server-only";
 
 import { syncCurrentAccountFromClerk } from "@/server/account/account.sync";
+import { createProtectedAssetUrl } from "@/server/storage/s3";
 import type Stripe from "stripe";
 
 import { Prisma } from "../../../generated/prisma/client";
@@ -388,21 +389,32 @@ function selectDownloadAsset(
   const licensedArchive = entitlement.beat?.assets.find(
     (link) =>
       link.role === "AUDIO_LICENSED_ARCHIVE" &&
-      (!link.licenseOfferingId ||
-        link.licenseOfferingId === entitlement.beatLicenseOfferingId),
+      link.licenseOfferingId === entitlement.beatLicenseOfferingId,
   );
 
-  return licensedArchive ?? entitlement.beat?.assets.find((link) => link.role === "AUDIO_SOURCE");
+  return (
+    licensedArchive ??
+    entitlement.beat?.assets.find(
+      (link) =>
+        link.role === "AUDIO_SOURCE" &&
+        link.licenseOfferingId === entitlement.beatLicenseOfferingId,
+    )
+  );
 }
 
-function serializeDownloadAsset(
+async function serializeDownloadAsset(
   link: NonNullable<ReturnType<typeof selectDownloadAsset>>,
-): MarketplaceAssetPayload {
+): Promise<MarketplaceAssetPayload> {
+  const signedUrl = await createProtectedAssetUrl({
+    bucket: link.asset.bucket,
+    objectKey: link.asset.objectKey,
+  });
+
   return {
     id: link.asset.id,
     role: link.role,
-    bucket: link.asset.bucket,
-    objectKey: link.asset.objectKey,
+    url: signedUrl.url,
+    expiresIn: signedUrl.expiresIn,
     originalFilename: link.asset.originalFilename,
     mimeType: link.asset.mimeType,
     sizeBytes: bigintToNumber(link.asset.sizeBytes),
@@ -440,6 +452,8 @@ export async function getDownloadAccessForCurrentBuyer(
     throw new Error("download_asset_not_found");
   }
 
+  const downloadAsset = await serializeDownloadAsset(assetLink);
+
   await incrementEntitlementDownloadCount(entitlement.id);
 
   return {
@@ -458,7 +472,7 @@ export async function getDownloadAccessForCurrentBuyer(
     },
     download: {
       delivery: "protected_storage_reference" as const,
-      asset: serializeDownloadAsset(assetLink),
+      asset: downloadAsset,
     },
   };
 }

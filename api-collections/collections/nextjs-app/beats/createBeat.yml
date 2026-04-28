@@ -32,14 +32,6 @@ http:
           "extension": "mp3",
           "sizeBytes": 1234567
         },
-        "previewAsset": {
-          "bucket": "local-dev",
-          "objectKey": "demo/midnight-bounce-preview.mp3",
-          "originalFilename": "midnight-bounce-preview.mp3",
-          "mimeType": "audio/mpeg",
-          "extension": "mp3",
-          "sizeBytes": 345678
-        },
         "thumbnailAsset": {
           "bucket": "local-dev",
           "objectKey": "demo/midnight-bounce.jpg",

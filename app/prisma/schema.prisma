@@ -67,6 +67,10 @@ enum ProcessingStatus {
   FAILED
 }
 
+enum AudioProcessingJobType {
+  PREVIEW_GENERATION
+}
+
 enum LicenseScope {
   BASIC
   PREMIUM
@@ -297,6 +301,8 @@ model MediaAsset {
   avatarProfiles    UserProfile[]    @relation("AvatarAsset")
   bannerProfiles    UserProfile[]    @relation("BannerAsset")
   linkedBeats       BeatAssetLink[]
+  sourceAudioJobs   AudioProcessingJob[] @relation("AudioJobSourceAsset")
+  outputAudioJobs   AudioProcessingJob[] @relation("AudioJobOutputAsset")
 }
 
 model BeatAssetLink {
@@ -355,10 +361,38 @@ model Beat {
   scoreSnapshots       BeatScoreSnapshot[]
   rightsRegistrations  BeatRightsRegistration[]
   contracts            GeneratedContract[]
+  audioProcessingJobs  AudioProcessingJob[]
 
   @@index([ownerId, status, publishedAt])
   @@index([status, visibility, publishedAt])
   @@index([primaryGenre, publishedAt])
+}
+
+model AudioProcessingJob {
+  id              String                 @id @default(cuid())
+  type            AudioProcessingJobType @default(PREVIEW_GENERATION)
+  status          ProcessingStatus       @default(PENDING)
+  beatId          String
+  sourceAssetId   String
+  outputAssetId   String
+  attempts        Int                    @default(0)
+  maxAttempts     Int                    @default(3)
+  lockedAt        DateTime?
+  lockedBy        String?
+  completedAt     DateTime?
+  failedAt        DateTime?
+  errorMessage    String?
+  payloadJson     Json?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  beat            Beat       @relation(fields: [beatId], references: [id], onDelete: Cascade)
+  sourceAsset     MediaAsset @relation("AudioJobSourceAsset", fields: [sourceAssetId], references: [id], onDelete: Cascade)
+  outputAsset     MediaAsset @relation("AudioJobOutputAsset", fields: [outputAssetId], references: [id], onDelete: Cascade)
+
+  @@index([status, type, createdAt])
+  @@index([beatId, status])
+  @@index([lockedAt])
 }
 
 model LicenseTemplate {

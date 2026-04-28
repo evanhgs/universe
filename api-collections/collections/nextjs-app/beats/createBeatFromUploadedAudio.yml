@@ -36,7 +36,6 @@ http:
           "extension": "{{audioExtension}}",
           "sizeBytes": "{{audioAssetSizeBytes}}"
         },
-        "previewAsset": null,
         "thumbnailAsset": null
       }
   auth: inherit
