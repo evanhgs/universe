@@ -10,6 +10,10 @@ const globalForPrisma = globalThis as typeof globalThis & {
   prismaPool?: Pool;
 };
 
+/**
+ * Lit l'URL PostgreSQL obligatoire pour Prisma.
+ * @returns DATABASE_URL non vide.
+ */
 function getDatabaseUrl() {
   const databaseUrl = process.env.DATABASE_URL;
 
@@ -20,6 +24,10 @@ function getDatabaseUrl() {
   return databaseUrl;
 }
 
+/**
+ * Cree ou reutilise le pool PostgreSQL Prisma en developpement.
+ * @returns Pool pg utilise par l'adapter Prisma.
+ */
 function getPrismaPool() {
   if (globalForPrisma.prismaPool) {
     return globalForPrisma.prismaPool;
@@ -36,6 +44,10 @@ function getPrismaPool() {
   return pool;
 }
 
+/**
+ * Retourne le client Prisma singleton de l'application.
+ * @returns PrismaClient configure avec adapter PostgreSQL.
+ */
 export function getPrisma() {
   if (globalForPrisma.prisma) {
     return globalForPrisma.prisma;

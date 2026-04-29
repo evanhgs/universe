@@ -32,6 +32,11 @@ type BeatPurchasePanelProps = {
   licenseOfferings: LicenseOffering[];
 };
 
+/**
+ * Formate le prix hors taxe d'une offre de licence.
+ * @param priceAmount Montant decimal de l'offre.
+ * @param currency Code devise ISO.
+ */
 function formatPriceHT(priceAmount: number, currency: string) {
   if (priceAmount === 0) {
     return "Gratuit";
@@ -43,6 +48,10 @@ function formatPriceHT(priceAmount: number, currency: string) {
   }).format(priceAmount)} HT`;
 }
 
+/**
+ * Parse une reponse JSON fetch et leve une erreur lisible si le statut HTTP echoue.
+ * @param response Reponse HTTP a lire.
+ */
 async function readJsonResponse<T>(response: Response): Promise<T> {
   const text = await response.text();
   const body = text ? JSON.parse(text) : null;
@@ -61,6 +70,10 @@ async function readJsonResponse<T>(response: Response): Promise<T> {
   return body as T;
 }
 
+/**
+ * Traduit une erreur API d'achat en message utilisateur.
+ * @param error Code ou message brut.
+ */
 function userMessage(error: string) {
   if (error === "already_purchased") {
     return "Tu as deja achete cette licence. Retrouve-la dans Mes achats.";
@@ -81,6 +94,10 @@ function userMessage(error: string) {
   return error;
 }
 
+/**
+ * Affiche les offres de licence d'un beat et demarre le checkout Stripe.
+ * @param props Beat cible, statut proprietaire et offres disponibles.
+ */
 export function BeatPurchasePanel({
   beatSlug,
   isOwner,
@@ -93,6 +110,10 @@ export function BeatPurchasePanel({
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Cree la commande puis redirige vers Stripe Checkout.
+   * @param licenseOfferingId Identifiant de l'offre de licence choisie.
+   */
   async function startPurchase(licenseOfferingId: string) {
     setError(null);
 

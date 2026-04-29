@@ -5,6 +5,10 @@ import {
   syncAccountFromClerkWebhookPayload,
 } from "@/server/account/account.service";
 
+/**
+ * Recoit les webhooks Clerk, verifie leur signature et synchronise les comptes locaux.
+ * @param request Requete HTTP contenant le payload webhook Clerk.
+ */
 export async function POST(request: Request) {
   try {
     const event = await verifyWebhook(request, {

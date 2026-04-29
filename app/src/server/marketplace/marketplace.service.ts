@@ -32,6 +32,10 @@ import type {
 
 type OrderRecord = Awaited<ReturnType<typeof createOrderForOffering>>;
 
+/**
+ * Convertit un Decimal Prisma en number nullable pour les payloads JSON.
+ * @param value Montant Decimal, number ou null.
+ */
 function decimalToNumber(value: Prisma.Decimal | number | null) {
   if (value === null) {
     return null;
@@ -40,6 +44,10 @@ function decimalToNumber(value: Prisma.Decimal | number | null) {
   return typeof value === "number" ? value : Number(value.toString());
 }
 
+/**
+ * Convertit un bigint Prisma en number nullable pour les tailles de fichiers.
+ * @param value Taille bigint, number ou null.
+ */
 function bigintToNumber(value: bigint | number | null) {
   if (value === null) {
     return null;
@@ -48,14 +56,26 @@ function bigintToNumber(value: bigint | number | null) {
   return typeof value === "number" ? value : Number(value);
 }
 
+/**
+ * Convertit un montant decimal en centimes Stripe.
+ * @param value Montant dans la devise majeure.
+ */
 function toCents(value: number) {
   return Math.round(value * 100);
 }
 
+/**
+ * Convertit des centimes Stripe vers un montant decimal.
+ * @param value Montant en unite mineure Stripe.
+ */
 function fromCents(value: number) {
   return Math.round(value) / 100;
 }
 
+/**
+ * Extrait l'id d'un objet Stripe qui peut etre une chaine ou un objet expand.
+ * @param value Id Stripe, objet { id }, ou null.
+ */
 function stripeObjectId(value: string | { id: string } | null) {
   if (!value) {
     return null;
@@ -64,10 +84,18 @@ function stripeObjectId(value: string | { id: string } | null) {
   return typeof value === "string" ? value : value.id;
 }
 
+/**
+ * Convertit un payload Stripe en JSON compatible Prisma.
+ * @param value Payload fournisseur a persister.
+ */
 function stripePayloadJson(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 }
 
+/**
+ * Transforme une commande Prisma en payload API marketplace.
+ * @param order Commande chargee avec items, paiements et entitlements.
+ */
 function serializeOrder(order: OrderRecord): MarketplaceOrderPayload {
   return {
     id: order.id,
@@ -127,10 +155,19 @@ function serializeOrder(order: OrderRecord): MarketplaceOrderPayload {
   };
 }
 
+/**
+ * Construit une URL absolue de checkout a partir d'une origine publique.
+ * @param origin Origine publique de l'application.
+ * @param path Chemin applicatif cible.
+ */
 function buildCheckoutUrl(origin: string, path: string) {
   return new URL(path, origin).toString();
 }
 
+/**
+ * Determine l'origine publique a utiliser pour les URLs de retour Stripe.
+ * @param requestUrl URL de la requete courante.
+ */
 function getPublicCheckoutOrigin(requestUrl: string) {
   const appUrl = process.env.APP_URL;
 
@@ -147,6 +184,11 @@ function getPublicCheckoutOrigin(requestUrl: string) {
   return requestOrigin;
 }
 
+/**
+ * Cree les URLs success/cancel par defaut pour une commande Stripe.
+ * @param orderId Identifiant commande.
+ * @param requestUrl URL de la requete courante.
+ */
 function buildDefaultCheckoutUrls(orderId: string, requestUrl: string) {
   const origin = getPublicCheckoutOrigin(requestUrl);
 
@@ -162,6 +204,10 @@ function buildDefaultCheckoutUrls(orderId: string, requestUrl: string) {
   };
 }
 
+/**
+ * Synchronise le compte courant et verifie qu'il correspond a l'utilisateur Clerk attendu.
+ * @param clerkUserId Identifiant Clerk issu de auth().
+ */
 async function assertMarketplaceAccount(clerkUserId: string) {
   const account = await syncCurrentAccountFromClerk();
 
@@ -172,6 +218,11 @@ async function assertMarketplaceAccount(clerkUserId: string) {
   return account;
 }
 
+/**
+ * Cree une commande d'achat direct pour l'acheteur authentifie.
+ * @param clerkUserId Identifiant Clerk de l'acheteur.
+ * @param input Beat ou offre de licence demandee.
+ */
 export async function createDirectPurchaseOrderForCurrentBuyer(
   clerkUserId: string,
   input: CreateDirectPurchaseOrderInput,
@@ -199,6 +250,13 @@ export async function createDirectPurchaseOrderForCurrentBuyer(
   return serializeOrder(await createOrderForOffering({ buyerId: account.id, offering }));
 }
 
+/**
+ * Cree ou reutilise une session Stripe Checkout pour une commande de l'acheteur.
+ * @param clerkUserId Identifiant Clerk de l'acheteur.
+ * @param orderId Identifiant commande locale.
+ * @param input URLs success/cancel optionnelles.
+ * @param requestUrl URL de la requete entrante pour construire les URLs par defaut.
+ */
 export async function createStripeCheckoutForCurrentBuyer(
   clerkUserId: string,
   orderId: string,
@@ -276,6 +334,12 @@ export async function createStripeCheckoutForCurrentBuyer(
   };
 }
 
+/**
+ * Confirme un paiement Stripe pour l'acheteur authentifie.
+ * @param clerkUserId Identifiant Clerk de l'acheteur.
+ * @param orderId Identifiant commande.
+ * @param input Session Stripe a confirmer.
+ */
 export async function confirmStripePaymentForCurrentBuyer(
   clerkUserId: string,
   orderId: string,
@@ -295,6 +359,11 @@ export async function confirmStripePaymentForCurrentBuyer(
   return fulfillStripeCheckoutSession(payment.providerSessionId);
 }
 
+/**
+ * Confirme une session Stripe anonyme en verifiant qu'elle correspond a l'ordre demande.
+ * @param orderId Identifiant commande attendu dans l'URL.
+ * @param input Session Stripe retournee par Checkout.
+ */
 export async function confirmStripeCheckoutSessionForOrder(
   orderId: string,
   input: StripeConfirmationInput,
@@ -312,6 +381,10 @@ export async function confirmStripeCheckoutSessionForOrder(
   return order;
 }
 
+/**
+ * Verifie une session Checkout Stripe puis marque la commande payee si montants/devise concordent.
+ * @param sessionId Identifiant Stripe Checkout Session.
+ */
 export async function fulfillStripeCheckoutSession(sessionId: string) {
   const session = await retrieveStripeCheckoutSession(sessionId);
   const sessionOrderId = session.client_reference_id ?? session.metadata?.orderId;
@@ -365,6 +438,10 @@ export async function fulfillStripeCheckoutSession(sessionId: string) {
   );
 }
 
+/**
+ * Route les evenements webhook Stripe Checkout vers fulfillment ou echec de paiement.
+ * @param event Evenement Stripe deja verifie par signature.
+ */
 export async function handleStripeCheckoutWebhookEvent(event: Stripe.Event) {
   switch (event.type) {
     case "checkout.session.completed":
@@ -392,6 +469,10 @@ export async function handleStripeCheckoutWebhookEvent(event: Stripe.Event) {
   }
 }
 
+/**
+ * Liste les achats de l'acheteur authentifie.
+ * @param clerkUserId Identifiant Clerk de l'acheteur.
+ */
 export async function listCurrentBuyerPurchases(clerkUserId: string) {
   const account = await assertMarketplaceAccount(clerkUserId);
   const orders = await listBuyerOrders(account.id);
@@ -399,6 +480,10 @@ export async function listCurrentBuyerPurchases(clerkUserId: string) {
   return orders.map(serializeOrder);
 }
 
+/**
+ * Liste les ventes visibles par le vendeur authentifie.
+ * @param clerkUserId Identifiant Clerk du vendeur.
+ */
 export async function listCurrentSellerSales(clerkUserId: string) {
   const account = await assertMarketplaceAccount(clerkUserId);
   const roles = account.roles.map(({ role }) => role);
@@ -432,6 +517,10 @@ export async function listCurrentSellerSales(clerkUserId: string) {
   }));
 }
 
+/**
+ * Choisit l'asset telechargeable correspondant a l'entitlement et a son offre de licence.
+ * @param entitlement Entitlement charge avec beat et liens d'assets.
+ */
 function selectDownloadAsset(
   entitlement: NonNullable<Awaited<ReturnType<typeof findDownloadEntitlement>>>,
 ) {
@@ -451,6 +540,10 @@ function selectDownloadAsset(
   );
 }
 
+/**
+ * Genere le payload de telechargement protege pour un lien d'asset.
+ * @param link Lien beat-asset selectionne.
+ */
 async function serializeDownloadAsset(
   link: NonNullable<ReturnType<typeof selectDownloadAsset>>,
 ): Promise<MarketplaceAssetPayload> {
@@ -470,6 +563,11 @@ async function serializeDownloadAsset(
   };
 }
 
+/**
+ * Genere un acces de telechargement pour l'acheteur, en appliquant expiration et limite.
+ * @param clerkUserId Identifiant Clerk de l'acheteur.
+ * @param entitlementId Identifiant du droit d'achat.
+ */
 export async function getDownloadAccessForCurrentBuyer(
   clerkUserId: string,
   entitlementId: string,

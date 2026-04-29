@@ -37,6 +37,11 @@ export const accountSelect = {
   },
 } as const;
 
+/**
+ * Charge le compte persistant correspondant a un utilisateur Clerk.
+ * @param clerkUserId Identifiant utilisateur fourni par Clerk.
+ * @returns Le compte, son profil et ses roles, ou null si aucun compte local n'existe.
+ */
 export async function findAccountByClerkUserId(clerkUserId: string) {
   return getPrisma().user.findUnique({
     where: { clerkUserId },
@@ -44,6 +49,11 @@ export async function findAccountByClerkUserId(clerkUserId: string) {
   });
 }
 
+/**
+ * Recherche un compte local par email afin de reutiliser un profil existant pendant la synchronisation Clerk.
+ * @param email Email normalise en base.
+ * @returns L'identifiant du compte et le slug de profil associe, ou null.
+ */
 export async function findAccountByEmail(email: string) {
   return getPrisma().user.findUnique({
     where: { email },
@@ -58,6 +68,11 @@ export async function findAccountByEmail(email: string) {
   });
 }
 
+/**
+ * Verifie si un slug de profil est deja attribue.
+ * @param slug Slug public du profil.
+ * @returns L'identifiant utilisateur proprietaire du profil, ou null.
+ */
 export async function findAccountByProfileSlug(slug: string) {
   return getPrisma().userProfile.findUnique({
     where: { slug },
@@ -67,6 +82,11 @@ export async function findAccountByProfileSlug(slug: string) {
   });
 }
 
+/**
+ * Cree ou met a jour l'identite locale depuis Clerk, cree le role par defaut et le profil si besoin.
+ * @param args Donnees Clerk normalisees, valeurs de profil par defaut et role initial.
+ * @returns Le compte complet apres transaction.
+ */
 export async function upsertAccountIdentity(args: {
   clerkUserId: string;
   email: string;
@@ -134,6 +154,12 @@ export async function upsertAccountIdentity(args: {
   });
 }
 
+/**
+ * Applique les changements de profil autorises pour l'utilisateur Clerk donne.
+ * @param args.clerkUserId Identifiant Clerk du compte a modifier.
+ * @param args.profile Champs de profil deja valides par la couche validation.
+ * @returns Le compte complet mis a jour.
+ */
 export async function updateAccountProfileByClerkUserId(args: {
   clerkUserId: string;
   profile: UpdateAccountProfileInput;
@@ -188,6 +214,13 @@ export async function updateAccountProfileByClerkUserId(args: {
   });
 }
 
+/**
+ * Remplace uniquement les roles self-service d'un compte, sans toucher aux roles administratifs.
+ * @param args.clerkUserId Identifiant Clerk du compte cible.
+ * @param args.allowedRoles Roles que l'utilisateur peut gerer lui-meme.
+ * @param args.replaceWith Nouvelle liste de roles self-service valides.
+ * @returns Le compte complet apres remplacement transactionnel.
+ */
 export async function replaceSelfServiceRolesByClerkUserId(args: {
   clerkUserId: string;
   allowedRoles: RoleCode[];
@@ -221,6 +254,11 @@ export async function replaceSelfServiceRolesByClerkUserId(args: {
   });
 }
 
+/**
+ * Marque un compte comme supprime apres reception d'un webhook Clerk.
+ * @param clerkUserId Identifiant Clerk a detacher du compte local.
+ * @returns Le resultat Prisma updateMany pour permettre un traitement idempotent.
+ */
 export async function markAccountDeletedByClerkUserId(clerkUserId: string) {
   return getPrisma().user.updateMany({
     where: { clerkUserId },

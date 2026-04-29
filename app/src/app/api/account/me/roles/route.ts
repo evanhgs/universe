@@ -8,6 +8,10 @@ import {
 } from "@/server/account/account.service";
 import { parseSelfServiceRoles } from "@/server/account/account.validation";
 
+/**
+ * Retourne les roles du compte authentifie.
+ * @returns Reponse JSON privee contenant roles.
+ */
 export async function GET() {
   const { isAuthenticated } = await auth();
 
@@ -29,6 +33,10 @@ export async function GET() {
   );
 }
 
+/**
+ * Remplace les roles self-service du compte authentifie.
+ * @param request Requete HTTP contenant roles: string[].
+ */
 export async function PUT(request: Request) {
   const { isAuthenticated, userId } = await auth();
 

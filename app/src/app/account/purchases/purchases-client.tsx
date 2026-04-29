@@ -86,6 +86,11 @@ const buttonClass =
 const secondaryButtonClass =
   "inline-flex h-10 items-center justify-center rounded-full border border-black/15 px-4 text-sm font-medium text-black disabled:cursor-not-allowed disabled:text-black/35";
 
+/**
+ * Formate un montant de commande dans la devise fournie.
+ * @param value Montant decimal.
+ * @param currency Code devise ISO.
+ */
 function formatMoney(value: number, currency: string) {
   return new Intl.NumberFormat("fr-FR", {
     style: "currency",
@@ -93,6 +98,10 @@ function formatMoney(value: number, currency: string) {
   }).format(value);
 }
 
+/**
+ * Formate une date ISO nullable pour l'interface achats.
+ * @param value Date ISO ou null.
+ */
 function formatDate(value: string | null) {
   if (!value) {
     return "Non renseigne";
@@ -104,6 +113,10 @@ function formatDate(value: string | null) {
   }).format(new Date(value));
 }
 
+/**
+ * Lit une reponse JSON et transforme les erreurs HTTP en Error.
+ * @param response Reponse fetch a parser.
+ */
 async function readJsonResponse<T>(response: Response): Promise<T> {
   const text = await response.text();
   const body = text ? JSON.parse(text) : null;
@@ -122,6 +135,10 @@ async function readJsonResponse<T>(response: Response): Promise<T> {
   return body as T;
 }
 
+/**
+ * Traduit un statut de commande en libelle utilisateur.
+ * @param status Statut marketplace de la commande.
+ */
 function statusLabel(status: OrderStatus) {
   switch (status) {
     case "PAID":
@@ -141,6 +158,11 @@ function statusLabel(status: OrderStatus) {
   }
 }
 
+/**
+ * Retrouve l'entitlement associe a une ligne de commande.
+ * @param order Commande contenant entitlements et items.
+ * @param item Ligne de commande cible.
+ */
 function findEntitlement(
   order: PurchaseOrder,
   item: PurchaseOrder["items"][number],
@@ -156,6 +178,10 @@ function findEntitlement(
   );
 }
 
+/**
+ * Convertit un code erreur API en message affiche dans la page achats.
+ * @param error Code ou message d'erreur brut.
+ */
 function errorMessage(error: string) {
   if (error === "stripe_session_not_paid") {
     return "Stripe n a pas encore confirme le paiement.";
@@ -180,6 +206,10 @@ function errorMessage(error: string) {
   return error;
 }
 
+/**
+ * Composant client qui liste les achats, confirme un retour Stripe et lance les telechargements.
+ * @returns Interface "Mes achats" connectee a Clerk et aux API marketplace.
+ */
 export function PurchasesClient() {
   const { openSignIn } = useClerk();
   const { getToken } = useAuth();
@@ -226,6 +256,9 @@ export function PurchasesClient() {
 
     let isCancelled = false;
 
+    /**
+     * Orchestre la confirmation Stripe eventuelle puis recharge les achats.
+     */
     async function run() {
       setIsLoading(true);
       setError(null);
@@ -272,6 +305,10 @@ export function PurchasesClient() {
     };
   }, [buildAuthHeaders, checkout, isLoaded, isSignedIn, loadPurchases, orderId, router, stripeSessionId]);
 
+  /**
+   * Demande une URL de telechargement protegee puis ouvre le fichier.
+   * @param entitlementId Identifiant du droit d'achat a telecharger.
+   */
   async function download(entitlementId: string) {
     setDownloadingId(entitlementId);
     setError(null);

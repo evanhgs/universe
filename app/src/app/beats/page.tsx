@@ -13,6 +13,12 @@ type BeatsPageProps = {
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Formate le prix hors taxe affiche sur les cartes catalogue.
+ * @param priceAmount Prix decimal nullable.
+ * @param currency Code devise ISO.
+ * @param isFree Indique si le beat est gratuit.
+ */
 function formatPriceHT(priceAmount: number | null, currency: string, isFree: boolean) {
   if (isFree || priceAmount === 0) {
     return "Gratuit";
@@ -28,6 +34,11 @@ function formatPriceHT(priceAmount: number | null, currency: string, isFree: boo
   }).format(priceAmount)} HT`;
 }
 
+/**
+ * Page catalogue serveur affichant les beats publics et le formulaire d'upload test.
+ * @param props.searchParams Filtres search, genre et sellerSlug fournis par Next.js.
+ * @returns Markup du catalogue beats.
+ */
 export default async function BeatsPage({ searchParams }: BeatsPageProps) {
   const params = await searchParams;
   const beats = await listPublishedBeatsPayload({

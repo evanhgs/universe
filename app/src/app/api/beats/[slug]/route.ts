@@ -16,6 +16,10 @@ type RouteContext = {
   }>;
 };
 
+/**
+ * Reponse standard pour un slug de beat invalide.
+ * @returns JSON public avec statut 400.
+ */
 function invalidSlugResponse() {
   return NextResponse.json(
     {
@@ -28,6 +32,10 @@ function invalidSlugResponse() {
   );
 }
 
+/**
+ * Transforme une erreur de mutation beat en reponse HTTP lisible.
+ * @param error Erreur issue du service ou repository beat.
+ */
 function mutationErrorResponse(error: unknown) {
   const code = error instanceof Error ? error.message : "Unknown error.";
   const status =
@@ -59,6 +67,11 @@ function mutationErrorResponse(error: unknown) {
   );
 }
 
+/**
+ * Retourne le detail d'un beat visible par le visiteur.
+ * @param _request Requete HTTP non utilisee.
+ * @param context Parametres de route contenant slug.
+ */
 export async function GET(_request: Request, context: RouteContext) {
   const { slug } = await context.params;
 
@@ -82,6 +95,11 @@ export async function GET(_request: Request, context: RouteContext) {
   });
 }
 
+/**
+ * Modifie un beat appartenant au vendeur authentifie.
+ * @param request Requete HTTP contenant le patch beat brut.
+ * @param context Parametres de route contenant slug.
+ */
 export async function PATCH(request: Request, context: RouteContext) {
   const { slug } = await context.params;
   const { userId } = await auth();
@@ -117,6 +135,11 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 }
 
+/**
+ * Supprime logiquement un beat appartenant au vendeur authentifie.
+ * @param _request Requete HTTP non utilisee.
+ * @param context Parametres de route contenant slug.
+ */
 export async function DELETE(_request: Request, context: RouteContext) {
   const { slug } = await context.params;
   const { isAuthenticated, userId } = await auth();

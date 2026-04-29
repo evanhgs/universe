@@ -9,10 +9,21 @@ import { listProfileBeatPayloads } from "../beats/beat.service";
 
 const profileSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+/**
+ * Valide le format public d'un slug de profil.
+ * @param value Slug a tester.
+ * @returns true si longueur et caracteres sont acceptes.
+ */
 export function isValidProfileSlug(value: string) {
   return value.length >= 3 && value.length <= 64 && profileSlugPattern.test(value);
 }
 
+/**
+ * Retourne un profil detaille si le visiteur a le droit de le voir.
+ * @param slug Slug public du profil.
+ * @param viewerClerkUserId Identifiant Clerk du visiteur ou null.
+ * @returns Payload profil avec beats publics, ou null si absent/non autorise.
+ */
 export async function getProfilePayloadBySlug(
   slug: string,
   viewerClerkUserId: string | null,
@@ -57,6 +68,10 @@ export async function getProfilePayloadBySlug(
   };
 }
 
+/**
+ * Liste les profils sous forme de payload API.
+ * @returns Profils serialises pour l'API /profiles.
+ */
 export async function listProfilesPayload(): Promise<ProfileListItemApiPayload[]> {
   const profiles = await findAllProfiles();
 

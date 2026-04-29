@@ -8,6 +8,11 @@ import {
 } from "./account.constants";
 import type { UpdateAccountProfileInput } from "./account.types";
 
+/**
+ * Normalise une valeur texte optionnelle provenant d'un payload JSON.
+ * @param value Valeur inconnue a accepter comme undefined, null ou string.
+ * @returns Chaine trimmee, null si vide, ou undefined si absente.
+ */
 function normalizeOptionalString(value: unknown) {
   if (value === undefined) {
     return undefined;
@@ -26,6 +31,12 @@ function normalizeOptionalString(value: unknown) {
   return normalized.length > 0 ? normalized : null;
 }
 
+/**
+ * Refuse explicitement les champs requis envoyes vides.
+ * @param value Valeur deja normalisee.
+ * @param field Nom du champ utilise dans le message d'erreur.
+ * @returns La valeur si elle est absente ou non vide.
+ */
 function requireNonEmptyString(value: string | null | undefined, field: string) {
   if (value === undefined) {
     return undefined;
@@ -38,6 +49,11 @@ function requireNonEmptyString(value: string | null | undefined, field: string) 
   return value;
 }
 
+/**
+ * Valide et normalise le payload de mise a jour du profil courant.
+ * @param payload Corps JSON brut recu par l'API account/me/profile.
+ * @returns Champs de profil autorises, tailles controlees et formats normalises.
+ */
 export function parseProfileUpdateInput(payload: unknown): UpdateAccountProfileInput {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error("Invalid profile payload.");
@@ -124,6 +140,11 @@ export function parseProfileUpdateInput(payload: unknown): UpdateAccountProfileI
   };
 }
 
+/**
+ * Valide la liste des roles que l'utilisateur peut s'assigner lui-meme.
+ * @param payload Corps JSON contenant roles: string[].
+ * @returns Roles dedoublonnes, uppercases et limites a SELF_SERVICE_ROLE_CODES.
+ */
 export function parseSelfServiceRoles(payload: unknown): SelfServiceRoleCode[] {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error("Invalid roles payload.");

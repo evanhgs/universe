@@ -12,6 +12,11 @@ type RouteContext = {
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Retourne l'URL de preview audio publique d'un beat.
+ * @param _request Requete HTTP non utilisee.
+ * @param context Parametres de route contenant slug.
+ */
 export async function GET(_request: Request, context: RouteContext) {
   const { slug } = await context.params;
 

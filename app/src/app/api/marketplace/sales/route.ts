@@ -7,6 +7,10 @@ import { listCurrentSellerSales } from "@/server/marketplace/marketplace.service
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Liste les ventes du vendeur authentifie.
+ * @returns Reponse JSON privee avec lignes de commandes vendeur.
+ */
 export async function GET() {
   const { isAuthenticated, userId } = await auth();
 

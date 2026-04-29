@@ -32,6 +32,11 @@ const textareaClass =
 const preClass =
   "mt-3 overflow-x-auto rounded-2xl border border-slate-200 bg-slate-950 p-4 text-sm leading-6 text-slate-100";
 
+/**
+ * Appelle une route API locale avec headers JSON par defaut.
+ * @param path Chemin API relatif.
+ * @param init Options fetch optionnelles.
+ */
 async function request(path: string, init?: RequestInit) {
   const response = await fetch(path, {
     ...init,
@@ -51,6 +56,10 @@ async function request(path: string, init?: RequestInit) {
   };
 }
 
+/**
+ * Page outil pour tester les endpoints account depuis le navigateur.
+ * @returns Interface de diagnostic Clerk/account.
+ */
 export default function AccountTestPage() {
   const { getToken, isLoaded, userId } = useAuth();
   const [me, setMe] = useState<ApiState>(initialState);
@@ -82,6 +91,10 @@ export default function AccountTestPage() {
   const [error, setError] = useState<string | null>(null);
   const [tokenStatus, setTokenStatus] = useState<string | null>(null);
 
+  /**
+   * Execute une action async de test et capture son erreur.
+   * @param action Operation API a lancer.
+   */
   async function run(action: () => Promise<void>) {
     setError(null);
 
@@ -92,6 +105,9 @@ export default function AccountTestPage() {
     }
   }
 
+  /**
+   * Charge le session token Clerk courant pour tests API externes.
+   */
   async function loadSessionToken() {
     setTokenStatus(null);
     setError(null);
@@ -113,6 +129,9 @@ export default function AccountTestPage() {
     }
   }
 
+  /**
+   * Copie le token Clerk charge dans le presse-papiers.
+   */
   async function copySessionToken() {
     if (!sessionToken) {
       setTokenStatus("Charge d'abord un session token.");
@@ -123,6 +142,10 @@ export default function AccountTestPage() {
     setTokenStatus("Session token copie dans le presse-papiers.");
   }
 
+  /**
+   * Affiche un badge de statut HTTP pour un appel de test.
+   * @param status Code HTTP retourne ou null si non appele.
+   */
   function renderStatus(status: number | null) {
     if (status === null) {
       return (

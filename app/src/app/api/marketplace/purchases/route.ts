@@ -7,6 +7,10 @@ import { listCurrentBuyerPurchases } from "@/server/marketplace/marketplace.serv
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Liste les achats de l'acheteur authentifie.
+ * @returns Reponse JSON privee avec commandes et entitlements.
+ */
 export async function GET() {
   const { isAuthenticated, userId } = await auth();
 

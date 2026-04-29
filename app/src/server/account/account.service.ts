@@ -22,6 +22,11 @@ import type { AccountSnapshot, UpdateAccountProfileInput } from "./account.types
 
 type PersistedAccount = Awaited<ReturnType<typeof findAccountByClerkUserId>>;
 
+/**
+ * Convertit un compte Prisma en payload API stable pour le frontend.
+ * @param account Compte persistant avec profil et roles deja charges.
+ * @returns Snapshot serialise avec dates ISO et roles aplatis.
+ */
 function serializeAccount(account: NonNullable<PersistedAccount>): AccountSnapshot {
   if (!account.profile) {
     throw new Error("The account profile is missing.");
@@ -53,10 +58,20 @@ function serializeAccount(account: NonNullable<PersistedAccount>): AccountSnapsh
   };
 }
 
+/**
+ * Synchronise l'utilisateur Clerk courant puis retourne son snapshot local.
+ * @returns Compte local de l'utilisateur authentifie.
+ */
 export async function getCurrentAccountSnapshot() {
   return serializeAccount(await syncCurrentAccountFromClerk());
 }
 
+/**
+ * Met a jour les champs de profil du compte courant et les champs Clerk associes.
+ * @param clerkUserId Identifiant Clerk de l'utilisateur authentifie.
+ * @param input Champs de profil valides par parseProfileUpdateInput.
+ * @returns Snapshot du compte apres ecriture locale et Clerk.
+ */
 export async function updateCurrentAccountProfile(
   clerkUserId: string,
   input: UpdateAccountProfileInput,
@@ -87,6 +102,12 @@ export async function updateCurrentAccountProfile(
   return serializeAccount(account);
 }
 
+/**
+ * Remplace les roles self-service du compte courant et les publie dans les metadata Clerk.
+ * @param clerkUserId Identifiant Clerk de l'utilisateur authentifie.
+ * @param roles Roles self-service autorises, typiquement BUYER et/ou SELLER.
+ * @returns Snapshot du compte avec la liste finale des roles.
+ */
 export async function updateCurrentAccountRoles(
   clerkUserId: string,
   roles: SelfServiceRoleCode[],
@@ -107,6 +128,11 @@ export async function updateCurrentAccountRoles(
   return serializeAccount(account);
 }
 
+/**
+ * Normalise un payload webhook Clerk user.created/user.updated puis synchronise le compte local.
+ * @param payload Donnees utilisateur Clerk en format snake_case ou camelCase.
+ * @returns Compte persistant synchronise.
+ */
 export async function syncAccountFromClerkWebhookPayload(payload: {
   id: string;
   username: string | null;
@@ -151,6 +177,10 @@ export async function syncAccountFromClerkWebhookPayload(payload: {
   return syncAccountFromNormalizedClerkData(normalized);
 }
 
+/**
+ * Traite un webhook Clerk user.deleted en detachant l'identite Clerk du compte local.
+ * @param clerkUserId Identifiant Clerk supprime.
+ */
 export async function deleteAccountFromClerkWebhook(clerkUserId: string) {
   await markAccountDeletedByClerkUserId(clerkUserId);
 }

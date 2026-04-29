@@ -6,6 +6,10 @@ import { listProfilesPayload } from "@/server/profiles/profile.service";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Liste les profils disponibles pour un utilisateur authentifie.
+ * @returns Reponse JSON privee avec items et count.
+ */
 export async function GET() {
   const { isAuthenticated } = await auth();
 

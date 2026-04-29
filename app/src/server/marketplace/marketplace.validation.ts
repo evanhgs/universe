@@ -6,6 +6,11 @@ import type {
   StripeConfirmationInput,
 } from "./marketplace.types";
 
+/**
+ * Normalise une chaine optionnelle pour les payloads marketplace.
+ * @param value Valeur brute issue du JSON.
+ * @returns Chaine trimmee ou undefined si absente/vide.
+ */
 function normalizeOptionalString(value: unknown) {
   if (value === undefined || value === null) {
     return undefined;
@@ -20,6 +25,11 @@ function normalizeOptionalString(value: unknown) {
   return normalized.length > 0 ? normalized : undefined;
 }
 
+/**
+ * Verifie que le payload recu est un objet JSON simple.
+ * @param payload Corps JSON brut.
+ * @returns Payload caste en dictionnaire.
+ */
 function assertPayloadObject(payload: unknown) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error("Invalid marketplace payload.");
@@ -28,6 +38,11 @@ function assertPayloadObject(payload: unknown) {
   return payload as Record<string, unknown>;
 }
 
+/**
+ * Valide une URL absolue http(s) optionnelle.
+ * @param value Valeur brute a parser.
+ * @param field Nom du champ utilise dans l'erreur.
+ */
 function parseAbsoluteUrl(value: unknown, field: string) {
   const normalized = normalizeOptionalString(value);
 
@@ -48,6 +63,11 @@ function parseAbsoluteUrl(value: unknown, field: string) {
   }
 }
 
+/**
+ * Valide la demande de creation de commande marketplace.
+ * @param payload Corps JSON contenant beatSlug ou licenseOfferingId.
+ * @returns Criteres d'achat normalises.
+ */
 export function parseCreateDirectPurchaseOrderInput(
   payload: unknown,
 ): CreateDirectPurchaseOrderInput {
@@ -65,6 +85,11 @@ export function parseCreateDirectPurchaseOrderInput(
   };
 }
 
+/**
+ * Valide les options facultatives de creation Stripe Checkout.
+ * @param payload Corps JSON optionnel contenant successUrl/cancelUrl.
+ * @returns URLs absolues normalisees ou objet vide.
+ */
 export function parseStripeCheckoutInput(payload: unknown): StripeCheckoutInput {
   if (payload === undefined || payload === null || payload === "") {
     return {};
@@ -78,6 +103,11 @@ export function parseStripeCheckoutInput(payload: unknown): StripeCheckoutInput 
   };
 }
 
+/**
+ * Valide le payload de confirmation Stripe Checkout.
+ * @param payload Corps JSON optionnel contenant sessionId.
+ * @returns Identifiant session normalise si fourni.
+ */
 export function parseStripeConfirmationInput(payload: unknown): StripeConfirmationInput {
   if (payload === undefined || payload === null || payload === "") {
     return {};

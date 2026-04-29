@@ -4,6 +4,11 @@ import { NextResponse } from "next/server";
 
 import { PRIVATE_JSON_HEADERS } from "@/server/http/response-headers";
 
+/**
+ * Convertit une erreur marketplace en reponse JSON HTTP coherente.
+ * @param error Erreur levee par les services marketplace ou Stripe.
+ * @returns NextResponse avec code applicatif, message et statut HTTP adapte.
+ */
 export function marketplaceErrorResponse(error: unknown) {
   const message = error instanceof Error ? error.message : "Unknown error.";
   const code = message.startsWith("stripe_error:") ? "stripe_error" : message;

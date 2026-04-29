@@ -8,6 +8,10 @@ import {
 } from "@/server/account/account.service";
 import { parseProfileUpdateInput } from "@/server/account/account.validation";
 
+/**
+ * Retourne le profil du compte authentifie.
+ * @returns Reponse JSON privee contenant le profil courant.
+ */
 export async function GET() {
   const { isAuthenticated } = await auth();
 
@@ -26,6 +30,10 @@ export async function GET() {
   });
 }
 
+/**
+ * Met a jour le profil du compte authentifie.
+ * @param request Requete HTTP contenant le payload de profil brut.
+ */
 export async function PATCH(request: Request) {
   const { isAuthenticated, userId } = await auth();
 

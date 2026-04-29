@@ -41,6 +41,11 @@ const beatInclude = {
 
 const DUPLICATE_BEAT_ASSET_ERROR = "beat_asset_duplicate";
 
+/**
+ * Transforme un titre en slug beat compatible avec BEAT_SLUG_PATTERN.
+ * @param value Titre libre fourni par le vendeur.
+ * @returns Slug base, ou "beat" si le titre ne contient aucun caractere valide.
+ */
 function slugify(value: string) {
   const normalized = value
     .trim()
@@ -51,6 +56,11 @@ function slugify(value: string) {
   return BEAT_SLUG_PATTERN.test(normalized) ? normalized : "beat";
 }
 
+/**
+ * Genere un slug beat disponible en base a partir du titre.
+ * @param title Titre public du beat.
+ * @returns Slug unique, avec suffixe si necessaire.
+ */
 async function buildUniqueBeatSlug(title: string) {
   const prisma = getPrisma();
   const base = slugify(title);
@@ -70,6 +80,13 @@ async function buildUniqueBeatSlug(title: string) {
   return `${base}-${Date.now()}`;
 }
 
+/**
+ * Prepare les donnees Prisma de creation d'un media asset.
+ * @param ownerId Identifiant utilisateur interne proprietaire.
+ * @param asset Asset valide par la couche validation.
+ * @param assetType Type metier de l'asset.
+ * @param options Statut de traitement, visibilite et metadata optionnels.
+ */
 function mediaAssetCreate(
   ownerId: string,
   asset: BeatAssetInput,
@@ -101,6 +118,10 @@ function mediaAssetCreate(
   };
 }
 
+/**
+ * Detecte les collisions Prisma sur la cle unique objectKey.
+ * @param error Erreur inconnue renvoyee par Prisma.
+ */
 function isObjectKeyUniqueConstraintError(error: unknown) {
   if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
     return false;
@@ -111,6 +132,10 @@ function isObjectKeyUniqueConstraintError(error: unknown) {
   return Array.isArray(target) && target.includes("objectKey");
 }
 
+/**
+ * Refuse l'association d'objectKeys deja presents en base pour eviter la reutilisation d'uploads.
+ * @param assets Assets candidats, nullables ou optionnels.
+ */
 async function assertMediaObjectKeysAvailable(assets: Array<BeatAssetInput | null | undefined>) {
   const objectKeys = assets
     .map((asset) => asset?.objectKey)
@@ -131,6 +156,10 @@ async function assertMediaObjectKeysAvailable(assets: Array<BeatAssetInput | nul
   }
 }
 
+/**
+ * Retourne les valeurs par defaut d'un template de licence systeme.
+ * @param scope Scope de licence demande.
+ */
 function licenseTemplateDefaults(scope: LicenseScope) {
   switch (scope) {
     case "BASIC":
@@ -181,6 +210,11 @@ function licenseTemplateDefaults(scope: LicenseScope) {
   }
 }
 
+/**
+ * Cree ou reactive le template de licence systeme associe a un scope.
+ * @param scope Scope de licence a garantir en base.
+ * @returns Identifiant du template actif.
+ */
 async function ensureLicenseTemplate(scope: LicenseScope) {
   const defaults = licenseTemplateDefaults(scope);
 
@@ -204,6 +238,10 @@ async function ensureLicenseTemplate(scope: LicenseScope) {
   });
 }
 
+/**
+ * Recalcule le compteur de beats publics d'un vendeur.
+ * @param userId Identifiant utilisateur interne du vendeur.
+ */
 async function refreshSellerBeatCount(userId: string) {
   const prisma = getPrisma();
   const beatCount = await prisma.beat.count({
@@ -220,6 +258,12 @@ async function refreshSellerBeatCount(userId: string) {
   });
 }
 
+/**
+ * Cree un beat, ses assets, offres de licence et job de generation de preview dans une transaction.
+ * @param ownerId Identifiant utilisateur interne du vendeur.
+ * @param input Donnees de creation validees.
+ * @returns Beat cree avec owner et assets charges.
+ */
 export async function createBeat(ownerId: string, input: CreateBeatInput) {
   const prisma = getPrisma();
   const licenseAssets = input.licenseOfferings.flatMap((offering) => offering.assets);
@@ -414,6 +458,11 @@ export async function createBeat(ownerId: string, input: CreateBeatInput) {
   return beat;
 }
 
+/**
+ * Liste les beats publics en appliquant les filtres de catalogue.
+ * @param query Filtres et tri deja valides par parseBeatListQuery.
+ * @returns Beats publics visibles et propres moderation.
+ */
 export async function findPublishedBeats(query: BeatListQuery) {
   const ownerProfileFilters: Prisma.UserProfileWhereInput[] = [];
 
@@ -504,6 +553,11 @@ export async function findPublishedBeats(query: BeatListQuery) {
   });
 }
 
+/**
+ * Charge la preview audio publique d'un beat publie.
+ * @param slug Slug public du beat.
+ * @returns Beat minimal avec asset preview pret, ou null.
+ */
 export async function findPublishedBeatPreviewBySlug(slug: string) {
   return getPrisma().beat.findFirst({
     where: {
@@ -536,6 +590,12 @@ export async function findPublishedBeatPreviewBySlug(slug: string) {
   });
 }
 
+/**
+ * Charge un beat visible pour le visiteur, en autorisant le proprietaire a voir ses brouillons.
+ * @param slug Slug public du beat.
+ * @param viewerClerkUserId Identifiant Clerk du visiteur, ou null pour anonyme.
+ * @returns Beat et droit edition du visiteur, ou null si inaccessible.
+ */
 export async function findVisibleBeatBySlug(slug: string, viewerClerkUserId: string | null) {
   const beat = await getPrisma().beat.findUnique({
     where: { slug },
@@ -575,6 +635,13 @@ export async function findVisibleBeatBySlug(slug: string, viewerClerkUserId: str
   return { beat, viewerCanEdit };
 }
 
+/**
+ * Modifie un beat appartenant au vendeur et remplace certains assets si demandes.
+ * @param ownerId Identifiant utilisateur interne du vendeur.
+ * @param slug Slug du beat a modifier.
+ * @param input Patch valide par parseUpdateBeatInput.
+ * @returns Beat mis a jour, null si inexistant.
+ */
 export async function updateBeatBySlug(ownerId: string, slug: string, input: UpdateBeatInput) {
   const prisma = getPrisma();
 
@@ -712,6 +779,12 @@ export async function updateBeatBySlug(ownerId: string, slug: string, input: Upd
   return beat;
 }
 
+/**
+ * Supprime logiquement un beat en le rendant prive et DELETED.
+ * @param ownerId Identifiant utilisateur interne du vendeur.
+ * @param slug Slug du beat a supprimer.
+ * @returns true si une suppression a ete appliquee, false si le beat est absent/deja supprime.
+ */
 export async function softDeleteBeatBySlug(ownerId: string, slug: string) {
   const prisma = getPrisma();
 

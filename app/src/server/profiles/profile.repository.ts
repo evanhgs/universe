@@ -4,6 +4,11 @@ import { getPrisma } from "@/lib/prisma";
 
 import type { ProfileListItemRecord, ProfileRecord } from "./profile.types";
 
+/**
+ * Charge un profil public/interne par slug avec ses roles utilisateur.
+ * @param slug Slug de profil a rechercher.
+ * @returns Profil enrichi ou null.
+ */
 export async function findProfileBySlug(slug: string): Promise<ProfileRecord | null> {
   const prisma = getPrisma();
 
@@ -48,6 +53,10 @@ export async function findProfileBySlug(slug: string): Promise<ProfileRecord | n
   };
 }
 
+/**
+ * Liste les profils pour l'API de decouverte.
+ * @returns Profils avec roles, tries du plus recent au plus ancien.
+ */
 export async function findAllProfiles(): Promise<ProfileListItemRecord[]> {
   const prisma = getPrisma();
 

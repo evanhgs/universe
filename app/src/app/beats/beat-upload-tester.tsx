@@ -56,10 +56,19 @@ const fileClass =
 const labelClass = "text-sm font-medium text-black";
 const helperClass = "mt-1 text-xs leading-5 text-black/50";
 
+/**
+ * Extrait l'extension lowercase d'un nom de fichier.
+ * @param filename Nom du fichier selectionne.
+ */
 function extensionOf(filename: string) {
   return filename.split(".").pop()?.toLowerCase() ?? "";
 }
 
+/**
+ * Devine le type MIME d'un fichier quand le navigateur ne le fournit pas.
+ * @param file Fichier choisi par l'utilisateur.
+ * @param kind Type d'upload attendu.
+ */
 function mimeTypeFor(file: File, kind: UploadKind) {
   if (file.type) {
     return file.type.toLowerCase();
@@ -98,6 +107,10 @@ function mimeTypeFor(file: File, kind: UploadKind) {
   return kind === "image-thumbnail" ? "image/jpeg" : "audio/mpeg";
 }
 
+/**
+ * Parse une reponse JSON et leve une erreur en cas de statut HTTP non OK.
+ * @param response Reponse fetch a lire.
+ */
 async function readJsonResponse<T>(response: Response): Promise<T> {
   const text = await response.text();
   const body = text ? JSON.parse(text) : null;
@@ -114,6 +127,11 @@ async function readJsonResponse<T>(response: Response): Promise<T> {
   return body as T;
 }
 
+/**
+ * Demande une URL presignee pour uploader un fichier.
+ * @param kind Famille d'asset a uploader.
+ * @param file Fichier local selectionne.
+ */
 async function presignUpload(kind: UploadKind, file: File) {
   const response = await fetch("/api/storage/uploads/presign", {
     method: "POST",
@@ -133,6 +151,11 @@ async function presignUpload(kind: UploadKind, file: File) {
   return readJsonResponse<PresignResponse>(response);
 }
 
+/**
+ * Upload un fichier vers le stockage via URL presignee puis retourne l'asset.
+ * @param kind Famille d'asset a uploader.
+ * @param file Fichier local selectionne.
+ */
 async function uploadToStorage(kind: UploadKind, file: File) {
   const presigned = await presignUpload(kind, file);
   const response = await fetch(presigned.upload.url, {
@@ -149,6 +172,10 @@ async function uploadToStorage(kind: UploadKind, file: File) {
   return presigned.asset;
 }
 
+/**
+ * Transforme une saisie de tags separes par virgules en liste dedoublonnee.
+ * @param value Texte saisi dans le formulaire.
+ */
 function splitTags(value: string) {
   return Array.from(
     new Set(
@@ -160,6 +187,10 @@ function splitTags(value: string) {
   );
 }
 
+/**
+ * Cree un identifiant client stable pour une ligne de licence non persistee.
+ * @returns UUID navigateur ou fallback pseudo-aleatoire.
+ */
 function createClientId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -168,6 +199,11 @@ function createClientId() {
   return `license-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+/**
+ * Initialise une ligne de licence du formulaire d'upload.
+ * @param scope Scope de licence.
+ * @param priceAmount Prix texte initial.
+ */
 function createLicenseDraft(scope: LicenseScope, priceAmount = "19.99"): LicenseDraft {
   return {
     id: createClientId(),
@@ -178,20 +214,36 @@ function createLicenseDraft(scope: LicenseScope, priceAmount = "19.99"): License
   };
 }
 
+/**
+ * Normalise un titre de licence pour affichage et comparaison.
+ * @param value Titre brut.
+ */
 function normalizeLicenseTitle(value: string) {
   return value.trim().replace(/\s+/g, " ");
 }
 
+/**
+ * Retourne le titre public d'une licence draft.
+ * @param license Licence en cours d'edition.
+ */
 function licenseTitle(license: LicenseDraft) {
   return license.scope === "CUSTOM"
     ? normalizeLicenseTitle(license.customTitle)
     : licenseLabels[license.scope];
 }
 
+/**
+ * Cree une cle de comparaison pour detecter les doublons de titres.
+ * @param value Titre public.
+ */
 function licenseTitleKey(value: string) {
   return normalizeLicenseTitle(value).toLowerCase();
 }
 
+/**
+ * Parse un prix saisi en texte.
+ * @param value Valeur du champ prix.
+ */
 function parsePriceAmount(value: string) {
   const parsed = Number(value);
 
@@ -202,6 +254,10 @@ function parsePriceAmount(value: string) {
   return Math.round(parsed * 100) / 100;
 }
 
+/**
+ * Verifie qu'un fichier peut servir de source de preview audio.
+ * @param file Fichier audio selectionne.
+ */
 function isPreviewSourceFile(file: File) {
   const mimeType = mimeTypeFor(file, "audio-source");
   const extension = extensionOf(file.name);
@@ -216,6 +272,10 @@ function isPreviewSourceFile(file: File) {
   );
 }
 
+/**
+ * Composant client de test permettant d'uploader les assets puis de creer un beat.
+ * @returns Formulaire vendeur de creation beat.
+ */
 export function BeatUploadTester() {
   const router = useRouter();
   const [title, setTitle] = useState("");
@@ -245,12 +305,20 @@ export function BeatUploadTester() {
 
   const usedScopes = useMemo(() => new Set(licenses.map((license) => license.scope)), [licenses]);
 
+  /**
+   * Met a jour une ligne de licence locale.
+   * @param id Identifiant client de la ligne.
+   * @param changes Patch partiel de la licence.
+   */
   function updateLicense(id: string, changes: Partial<LicenseDraft>) {
     setLicenses((current) =>
       current.map((license) => (license.id === id ? { ...license, ...changes } : license)),
     );
   }
 
+  /**
+   * Ajoute une licence avec le prochain scope disponible.
+   */
   function addLicense() {
     const nextScope = licenseScopes.find((scope) => !usedScopes.has(scope));
 
@@ -261,12 +329,20 @@ export function BeatUploadTester() {
     setLicenses((current) => [...current, createLicenseDraft(nextScope, "49.99")]);
   }
 
+  /**
+   * Supprime une licence locale en gardant au moins une offre.
+   * @param id Identifiant client de la ligne.
+   */
   function removeLicense(id: string) {
     setLicenses((current) =>
       current.length > 1 ? current.filter((license) => license.id !== id) : current,
     );
   }
 
+  /**
+   * Valide le formulaire, upload les fichiers puis appelle POST /api/beats.
+   * @param event Evenement submit du formulaire.
+   */
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 

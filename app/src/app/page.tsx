@@ -1,6 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 
+/**
+ * Page d'accueil serveur affichant l'etat d'authentification Clerk et les liens principaux.
+ * @returns Markup de la page home.
+ */
 export default async function Home() {
   const { isAuthenticated, userId } = await auth();
 

@@ -12,6 +12,11 @@ type ProfilePageProps = {
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Page serveur affichant un profil vendeur et un extrait de son catalogue.
+ * @param props.params Parametres de route contenant le slug profil.
+ * @returns Markup de detail profil ou notFound si inaccessible.
+ */
 export default async function ProfilePage({ params }: ProfilePageProps) {
   const { slug } = await params;
   const { userId } = await auth();

@@ -16,6 +16,10 @@ import type { BeatApiPayload, BeatListQuery, CreateBeatInput, UpdateBeatInput } 
 
 type BeatRecord = Awaited<ReturnType<typeof createBeat>>;
 
+/**
+ * Convertit un Decimal Prisma ou number en number nullable pour les payloads API.
+ * @param value Montant Decimal, number ou null.
+ */
 function decimalToNumber(value: { toString(): string } | number | null) {
   if (value === null) {
     return null;
@@ -24,6 +28,10 @@ function decimalToNumber(value: { toString(): string } | number | null) {
   return typeof value === "number" ? value : Number(value.toString());
 }
 
+/**
+ * Convertit un bigint Prisma en number nullable pour serialisation JSON.
+ * @param value Taille ou compteur bigint, number ou null.
+ */
 function bigintToNumber(value: bigint | number | null) {
   if (value === null) {
     return null;
@@ -32,6 +40,10 @@ function bigintToNumber(value: bigint | number | null) {
   return typeof value === "number" ? value : Number(value);
 }
 
+/**
+ * Verifie qu'une preview audio a bien ete produite par le worker interne.
+ * @param asset Asset contenant metadataJson.
+ */
 function isWorkerGeneratedPreview(asset: { metadataJson: unknown }) {
   return (
     typeof asset.metadataJson === "object" &&
@@ -41,6 +53,11 @@ function isWorkerGeneratedPreview(asset: { metadataJson: unknown }) {
   );
 }
 
+/**
+ * Transforme un beat Prisma en payload public avec URLs d'assets signees.
+ * @param beat Beat charge avec owner et assets.
+ * @returns Payload API consommable par les pages et clients.
+ */
 async function serializeBeat(beat: BeatRecord): Promise<BeatApiPayload> {
   const publicAssets = beat.assets.filter(({ role, asset }) => {
     if (!asset.isPublic || asset.processingStatus !== "READY") {
@@ -96,6 +113,11 @@ async function serializeBeat(beat: BeatRecord): Promise<BeatApiPayload> {
   };
 }
 
+/**
+ * Synchronise le compte courant et verifie qu'il correspond au Clerk user vendeur.
+ * @param clerkUserId Identifiant Clerk attendu depuis auth().
+ * @returns Compte local vendeur.
+ */
 async function assertSellerAccount(clerkUserId: string) {
   const account = await syncCurrentAccountFromClerk();
 
@@ -112,18 +134,32 @@ async function assertSellerAccount(clerkUserId: string) {
   return account;
 }
 
+/**
+ * Cree un beat pour le vendeur authentifie.
+ * @param clerkUserId Identifiant Clerk de la session.
+ * @param input Donnees de creation validees.
+ */
 export async function createBeatForCurrentSeller(clerkUserId: string, input: CreateBeatInput) {
   const account = await assertSellerAccount(clerkUserId);
 
   return serializeBeat(await createBeat(account.id, input));
 }
 
+/**
+ * Liste les beats publics sous forme de payloads API.
+ * @param query Filtres catalogue valides.
+ */
 export async function listPublishedBeatsPayload(query: BeatListQuery) {
   const beats = await findPublishedBeats(query);
 
   return Promise.all(beats.map(serializeBeat));
 }
 
+/**
+ * Retourne le detail d'un beat visible pour un visiteur donne.
+ * @param slug Slug du beat.
+ * @param viewerClerkUserId Identifiant Clerk du visiteur ou null.
+ */
 export async function getBeatPayloadBySlug(slug: string, viewerClerkUserId: string | null) {
   const result = await findVisibleBeatBySlug(slug, viewerClerkUserId);
 
@@ -149,6 +185,10 @@ export async function getBeatPayloadBySlug(slug: string, viewerClerkUserId: stri
   };
 }
 
+/**
+ * Retourne uniquement les informations necessaires a la lecture de preview.
+ * @param slug Slug du beat public.
+ */
 export async function getBeatPreviewPayloadBySlug(slug: string) {
   const beat = await findPublishedBeatPreviewBySlug(slug);
   const preview = beat?.assets[0]?.asset;
@@ -178,6 +218,12 @@ export async function getBeatPreviewPayloadBySlug(slug: string) {
   };
 }
 
+/**
+ * Modifie un beat pour le vendeur authentifie.
+ * @param clerkUserId Identifiant Clerk de la session.
+ * @param slug Slug du beat a modifier.
+ * @param input Patch valide.
+ */
 export async function updateBeatForCurrentSeller(
   clerkUserId: string,
   slug: string,
@@ -189,12 +235,21 @@ export async function updateBeatForCurrentSeller(
   return beat ? serializeBeat(beat) : null;
 }
 
+/**
+ * Supprime logiquement un beat appartenant au vendeur authentifie.
+ * @param clerkUserId Identifiant Clerk de la session.
+ * @param slug Slug du beat.
+ */
 export async function deleteBeatForCurrentSeller(clerkUserId: string, slug: string) {
   const account = await assertSellerAccount(clerkUserId);
 
   return softDeleteBeatBySlug(account.id, slug);
 }
 
+/**
+ * Liste un echantillon de beats publics pour une page profil.
+ * @param profileSlug Slug du profil vendeur.
+ */
 export async function listProfileBeatPayloads(profileSlug: string) {
   const beats = await findPublishedBeats({
     sellerSlug: profileSlug,

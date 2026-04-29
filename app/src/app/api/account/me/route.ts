@@ -4,6 +4,10 @@ import { NextResponse } from "next/server";
 import { PRIVATE_JSON_HEADERS } from "@/server/http/response-headers";
 import { getCurrentAccountSnapshot } from "@/server/account/account.service";
 
+/**
+ * Retourne le snapshot complet du compte authentifie.
+ * @returns Reponse JSON privee avec user, profile et roles.
+ */
 export async function GET() {
   const { isAuthenticated } = await auth();
 

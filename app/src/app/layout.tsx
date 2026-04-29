@@ -9,6 +9,11 @@ export const metadata: Metadata = {
   description: "Universe authentication",
 };
 
+/**
+ * Layout racine qui installe ClerkProvider et l'en-tete global.
+ * @param props.children Contenu de la route Next.js active.
+ * @returns Structure HTML globale de l'application.
+ */
 export default function RootLayout({
   children,
 }: Readonly<{

@@ -1,5 +1,10 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 
+/**
+ * Decoupe une variable d'environnement listee par virgules.
+ * @param value Valeur brute optionnelle.
+ * @returns Elements trimmes non vides.
+ */
 const splitEnvList = (value: string | undefined) =>
   value
     ?.split(",")

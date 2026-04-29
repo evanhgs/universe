@@ -32,6 +32,11 @@ const defaultLicenseTitles: Record<LicenseScope, string> = {
   CUSTOM: "Personnalisee",
 };
 
+/**
+ * Normalise une chaine optionnelle depuis un payload beat.
+ * @param value Valeur brute a accepter comme undefined, null ou string.
+ * @returns Chaine trimmee, null si vide, ou undefined si absente.
+ */
 function normalizeOptionalString(value: unknown) {
   if (value === undefined) {
     return undefined;
@@ -50,6 +55,11 @@ function normalizeOptionalString(value: unknown) {
   return normalized.length > 0 ? normalized : null;
 }
 
+/**
+ * Exige une chaine non vide pour un champ obligatoire.
+ * @param value Valeur brute du payload.
+ * @param field Nom du champ utilise dans les erreurs.
+ */
 function requireString(value: unknown, field: string) {
   const normalized = normalizeOptionalString(value);
 
@@ -60,6 +70,13 @@ function requireString(value: unknown, field: string) {
   return normalized;
 }
 
+/**
+ * Parse un entier optionnel borne.
+ * @param value Valeur brute.
+ * @param field Nom du champ.
+ * @param min Valeur minimale incluse.
+ * @param max Valeur maximale incluse.
+ */
 function parseOptionalInteger(value: unknown, field: string, min: number, max: number) {
   if (value === undefined || value === null || value === "") {
     return null;
@@ -74,6 +91,10 @@ function parseOptionalInteger(value: unknown, field: string, min: number, max: n
   return parsed;
 }
 
+/**
+ * Valide un prix obligatoire en euros ou autre devise, limite a deux decimales.
+ * @param value Valeur numerique brute.
+ */
 function parsePrice(value: unknown) {
   const parsed = Number(value);
 
@@ -84,6 +105,11 @@ function parsePrice(value: unknown) {
   return Math.round(parsed * 100) / 100;
 }
 
+/**
+ * Valide un prix optionnel borne et arrondi a deux decimales.
+ * @param value Valeur brute.
+ * @param field Nom du champ.
+ */
 function parseOptionalPrice(value: unknown, field: string) {
   if (value === undefined || value === null || value === "") {
     return undefined;
@@ -98,6 +124,10 @@ function parseOptionalPrice(value: unknown, field: string) {
   return Math.round(parsed * 100) / 100;
 }
 
+/**
+ * Valide une devise ISO 4217 ou applique la devise par defaut.
+ * @param value Devise brute.
+ */
 function parseCurrency(value: unknown) {
   const currency = normalizeOptionalString(value) ?? DEFAULT_BEAT_CURRENCY;
 
@@ -108,10 +138,18 @@ function parseCurrency(value: unknown) {
   return currency.toUpperCase();
 }
 
+/**
+ * Cree une cle de comparaison stable pour detecter les titres de licence dupliques.
+ * @param value Titre public de licence.
+ */
 function normalizeLicenseTitleKey(value: string) {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+/**
+ * Valide et dedoublonne la liste de tags d'un beat.
+ * @param value Tableau de tags du payload JSON.
+ */
 function parseTags(value: unknown) {
   if (value === undefined || value === null) {
     return [];
@@ -140,6 +178,10 @@ function parseTags(value: unknown) {
   return tags;
 }
 
+/**
+ * Parse le parametre query tags sous forme de liste separee par virgules.
+ * @param value Parametre URL brut.
+ */
 function parseTagListParam(value: string | null) {
   if (!value) {
     return undefined;
@@ -157,6 +199,10 @@ function parseTagListParam(value: string | null) {
   return tags.length > 0 ? tags.slice(0, MAX_BEAT_TAGS) : undefined;
 }
 
+/**
+ * Valide la visibilite demandee pour un beat.
+ * @param value Valeur brute, PUBLIC par defaut.
+ */
 function parseVisibility(value: unknown) {
   const visibility = (normalizeOptionalString(value) ?? "PUBLIC").toUpperCase() as Visibility;
 
@@ -167,6 +213,10 @@ function parseVisibility(value: unknown) {
   return visibility;
 }
 
+/**
+ * Valide le statut editable d'un beat.
+ * @param value Valeur brute optionnelle.
+ */
 function parseStatus(value: unknown) {
   if (value === undefined || value === null) {
     return undefined;
@@ -181,6 +231,10 @@ function parseStatus(value: unknown) {
   return status;
 }
 
+/**
+ * Valide un filtre de type de licence dans les query params.
+ * @param value Parametre URL licenseType.
+ */
 function parseLicenseType(value: string | null) {
   const licenseType = normalizeOptionalString(value)?.toUpperCase() as
     | LicenseScope
@@ -197,6 +251,10 @@ function parseLicenseType(value: string | null) {
   return licenseType;
 }
 
+/**
+ * Valide l'ordre de tri public des beats.
+ * @param value Parametre URL sort.
+ */
 function parseSort(value: string | null): BeatListQuery["sort"] {
   const sort = (normalizeOptionalString(value) ?? "newest").toLowerCase() as BeatListQuery["sort"];
 
@@ -207,6 +265,11 @@ function parseSort(value: string | null): BeatListQuery["sort"] {
   return sort;
 }
 
+/**
+ * Parse un booleen strict avec valeur par defaut.
+ * @param value Valeur brute.
+ * @param defaultValue Valeur retournee quand le champ est absent.
+ */
 function parseBoolean(value: unknown, defaultValue: boolean) {
   if (value === undefined || value === null) {
     return defaultValue;
@@ -219,6 +282,11 @@ function parseBoolean(value: unknown, defaultValue: boolean) {
   return value;
 }
 
+/**
+ * Valide la description d'un asset deja uploade avant association a un beat.
+ * @param value Objet asset brut.
+ * @param field Prefixe de champ pour les erreurs.
+ */
 function parseAsset(value: unknown, field: string): BeatAssetInput {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`${field} must be an object.`);
@@ -238,6 +306,10 @@ function parseAsset(value: unknown, field: string): BeatAssetInput {
   };
 }
 
+/**
+ * Verifie que l'asset source peut servir a generer une preview audio.
+ * @param asset Asset audio normalise.
+ */
 function isAudioPreviewSourceAsset(asset: BeatAssetInput) {
   const mimeType = asset.mimeType?.toLowerCase();
   const extension = asset.extension?.toLowerCase() ?? asset.originalFilename?.split(".").pop()?.toLowerCase();
@@ -252,6 +324,11 @@ function isAudioPreviewSourceAsset(asset: BeatAssetInput) {
   );
 }
 
+/**
+ * Valide le scope d'une licence.
+ * @param value Valeur brute.
+ * @param field Nom du champ pour les erreurs.
+ */
 function parseLicenseScope(value: unknown, field: string) {
   const scope = requireString(value, field).toUpperCase() as LicenseScope;
 
@@ -262,6 +339,11 @@ function parseLicenseScope(value: unknown, field: string) {
   return scope;
 }
 
+/**
+ * Valide les offres de licence et cree une offre BASIC par defaut si elles sont absentes.
+ * @param value Tableau brut licenseOfferings.
+ * @param fallback Prix, devise et asset audio de repli.
+ */
 function parseLicenseOfferings(value: unknown, fallback: {
   priceAmount: number;
   currency: string;
@@ -359,6 +441,11 @@ function parseLicenseOfferings(value: unknown, fallback: {
   }));
 }
 
+/**
+ * Valide le payload de creation d'un beat vendeur.
+ * @param payload Corps JSON brut recu par POST /api/beats.
+ * @returns Donnees normalisees pretes pour le repository.
+ */
 export function parseCreateBeatInput(payload: unknown): CreateBeatInput {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error("Invalid beat payload.");
@@ -420,6 +507,11 @@ export function parseCreateBeatInput(payload: unknown): CreateBeatInput {
   };
 }
 
+/**
+ * Valide le payload de modification partielle d'un beat.
+ * @param payload Corps JSON brut recu par PATCH /api/beats/[slug].
+ * @returns Patch normalise contenant uniquement les champs envoyes.
+ */
 export function parseUpdateBeatInput(payload: unknown): UpdateBeatInput {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error("Invalid beat payload.");
@@ -464,6 +556,11 @@ export function parseUpdateBeatInput(payload: unknown): UpdateBeatInput {
   };
 }
 
+/**
+ * Parse les filtres publics de listing des beats.
+ * @param url URL complete de la requete entrante.
+ * @returns Query normalisee avec limites et tri bornes.
+ */
 export function parseBeatListQuery(url: URL): BeatListQuery {
   const limit = Number(url.searchParams.get("limit") ?? 24);
   const bpm = parseOptionalInteger(url.searchParams.get("bpm"), "bpm", 20, 300);

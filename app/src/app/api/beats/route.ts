@@ -10,6 +10,10 @@ import { parseBeatListQuery, parseCreateBeatInput } from "@/server/beats/beat.va
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Transforme une erreur beat en reponse JSON privee.
+ * @param error Erreur issue de la validation ou du service beat.
+ */
 function beatErrorResponse(error: unknown) {
   const message = error instanceof Error ? error.message : "Unknown error.";
   const status =
@@ -31,6 +35,10 @@ function beatErrorResponse(error: unknown) {
   );
 }
 
+/**
+ * Liste les beats publics du catalogue.
+ * @param request Requete HTTP contenant les filtres de recherche en query string.
+ */
 export async function GET(request: Request) {
   const beats = await listPublishedBeatsPayload(parseBeatListQuery(new URL(request.url)));
 
@@ -46,6 +54,10 @@ export async function GET(request: Request) {
   );
 }
 
+/**
+ * Cree un beat pour le vendeur authentifie.
+ * @param request Requete HTTP contenant le payload CreateBeatInput brut.
+ */
 export async function POST(request: Request) {
   const { isAuthenticated, userId } = await auth();
 

@@ -13,6 +13,11 @@ type RouteContext = {
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Genere une URL de telechargement protegee pour un entitlement de l'acheteur.
+ * @param _request Requete HTTP non utilisee.
+ * @param context Parametres de route contenant entitlementId.
+ */
 export async function GET(_request: Request, context: RouteContext) {
   const { isAuthenticated, userId } = await auth();
 

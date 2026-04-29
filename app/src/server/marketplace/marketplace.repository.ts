@@ -44,10 +44,18 @@ const orderInclude = {
   },
 } as const;
 
+/**
+ * Arrondit un montant metier a deux decimales.
+ * @param value Montant numerique.
+ */
 function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
 }
 
+/**
+ * Convertit un Decimal Prisma en number nullable.
+ * @param value Montant Decimal, number ou null.
+ */
 function decimalToNumber(value: Prisma.Decimal | number | null) {
   if (value === null) {
     return null;
@@ -56,6 +64,11 @@ function decimalToNumber(value: Prisma.Decimal | number | null) {
   return typeof value === "number" ? value : Number(value.toString());
 }
 
+/**
+ * Capture les droits de licence au moment de l'achat pour figer le contrat.
+ * @param offering Offre purchasable chargee avec son template.
+ * @returns Snapshot JSON des droits et conditions.
+ */
 function buildRightsSnapshot(offering: Awaited<ReturnType<typeof findPurchasableOffering>>) {
   if (!offering) {
     return {};
@@ -81,6 +94,11 @@ function buildRightsSnapshot(offering: Awaited<ReturnType<typeof findPurchasable
   };
 }
 
+/**
+ * Recherche une offre de licence achetable depuis un slug beat ou un id d'offre.
+ * @param input Criteres publics fournis par le client.
+ * @returns Offre active d'un beat publie, ou null.
+ */
 export async function findPurchasableOffering(input: CreateDirectPurchaseOrderInput) {
   return getPrisma().beatLicenseOffering.findFirst({
     where: {
@@ -113,6 +131,11 @@ export async function findPurchasableOffering(input: CreateDirectPurchaseOrderIn
   });
 }
 
+/**
+ * Verifie si l'acheteur possede deja une licence active pour cette offre.
+ * @param args.buyerId Identifiant utilisateur interne de l'acheteur.
+ * @param args.beatLicenseOfferingId Identifiant d'offre de licence.
+ */
 export async function findActiveEntitlementForOffering(args: {
   buyerId: string;
   beatLicenseOfferingId: string;
@@ -132,6 +155,12 @@ export async function findActiveEntitlementForOffering(args: {
   });
 }
 
+/**
+ * Cree une commande en attente pour une offre de licence.
+ * @param args.buyerId Identifiant utilisateur interne acheteur.
+ * @param args.offering Offre active selectionnee.
+ * @returns Commande avec lignes, paiements et entitlements charges.
+ */
 export async function createOrderForOffering(args: {
   buyerId: string;
   offering: NonNullable<Awaited<ReturnType<typeof findPurchasableOffering>>>;
@@ -168,6 +197,11 @@ export async function createOrderForOffering(args: {
   });
 }
 
+/**
+ * Charge une commande appartenant a un acheteur.
+ * @param orderId Identifiant commande.
+ * @param buyerId Identifiant utilisateur interne acheteur.
+ */
 export async function findBuyerOrder(orderId: string, buyerId: string) {
   return getPrisma().order.findFirst({
     where: {
@@ -178,6 +212,10 @@ export async function findBuyerOrder(orderId: string, buyerId: string) {
   });
 }
 
+/**
+ * Cree un paiement Stripe en attente pour une commande.
+ * @param args Identifiants commande/acheteur, montant et devise.
+ */
 export async function createPendingStripePayment(args: {
   orderId: string;
   buyerId: string;
@@ -196,6 +234,10 @@ export async function createPendingStripePayment(args: {
   });
 }
 
+/**
+ * Recupere la derniere session Stripe ouverte/en attente reutilisable.
+ * @param args Identifiants commande et acheteur.
+ */
 export async function findLatestPendingStripePayment(args: {
   orderId: string;
   buyerId: string;
@@ -216,6 +258,10 @@ export async function findLatestPendingStripePayment(args: {
   });
 }
 
+/**
+ * Attache les identifiants Stripe et le payload fournisseur au paiement local.
+ * @param args Identifiant paiement, session Stripe, payment intent et payload JSON.
+ */
 export async function attachStripeSessionToPayment(args: {
   paymentId: string;
   providerSessionId: string;
@@ -234,6 +280,10 @@ export async function attachStripeSessionToPayment(args: {
   });
 }
 
+/**
+ * Recherche un paiement Stripe confirmable pour une commande et un acheteur.
+ * @param args Identifiants commande/acheteur et session optionnelle.
+ */
 export async function findStripePaymentForConfirmation(args: {
   orderId: string;
   buyerId: string;
@@ -259,6 +309,11 @@ export async function findStripePaymentForConfirmation(args: {
   });
 }
 
+/**
+ * Marque une commande comme payee depuis Stripe et cree les droits de telechargement.
+ * @param args Commande, paiement, montant fiscal/total et payload Stripe verifie.
+ * @returns Commande payee avec donnees associees.
+ */
 export async function markOrderPaidFromStripe(args: {
   orderId: string;
   paymentId: string;
@@ -340,7 +395,7 @@ export async function markOrderPaidFromStripe(args: {
 
       if (item.sellerId) {
         const lineTotal = decimalToNumber(item.lineTotalAmount) ?? 0;
-        const commission = roundMoney(lineTotal * PLATFORM_COMMISSION_RATE);
+        const commission = roundMoney(lineTotal * PLATFORM_COMMISSION_RATE); //! varier la commission en fonction de l'abonnement de l'utilisateur
         const sellerEarning = roundMoney(lineTotal - commission);
 
         await tx.payoutLedgerEntry.createMany({
@@ -411,6 +466,10 @@ export async function markOrderPaidFromStripe(args: {
   return order;
 }
 
+/**
+ * Marque un paiement Stripe en echec ou annule depuis un evenement webhook.
+ * @param args Session Stripe, statut final, message et payload fournisseur.
+ */
 export async function markStripePaymentFailedBySession(args: {
   providerSessionId: string;
   status: "FAILED" | "CANCELED";
@@ -433,6 +492,10 @@ export async function markStripePaymentFailedBySession(args: {
   });
 }
 
+/**
+ * Liste les commandes d'un acheteur.
+ * @param buyerId Identifiant utilisateur interne acheteur.
+ */
 export async function listBuyerOrders(buyerId: string) {
   return getPrisma().order.findMany({
     where: {
@@ -445,6 +508,10 @@ export async function listBuyerOrders(buyerId: string) {
   });
 }
 
+/**
+ * Liste les lignes de commandes visibles par un vendeur.
+ * @param sellerId Identifiant utilisateur interne vendeur.
+ */
 export async function listSellerOrderItems(sellerId: string) {
   return getPrisma().orderItem.findMany({
     where: {
@@ -479,6 +546,11 @@ export async function listSellerOrderItems(sellerId: string) {
   });
 }
 
+/**
+ * Charge un entitlement actif appartenant a un acheteur avec ses assets telechargeables.
+ * @param args.entitlementId Identifiant du droit d'achat.
+ * @param args.buyerId Identifiant utilisateur interne acheteur.
+ */
 export async function findDownloadEntitlement(args: {
   entitlementId: string;
   buyerId: string;
@@ -521,6 +593,10 @@ export async function findDownloadEntitlement(args: {
   });
 }
 
+/**
+ * Incremente le compteur de telechargements d'un entitlement.
+ * @param entitlementId Identifiant du droit d'achat.
+ */
 export async function incrementEntitlementDownloadCount(entitlementId: string) {
   return getPrisma().purchaseEntitlement.update({
     where: {

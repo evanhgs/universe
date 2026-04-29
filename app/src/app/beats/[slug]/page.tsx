@@ -16,6 +16,12 @@ type BeatDetailPageProps = {
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Formate le prix hors taxe affiche dans le detail beat.
+ * @param priceAmount Prix decimal nullable.
+ * @param currency Code devise ISO.
+ * @param isFree Indique si le beat est gratuit.
+ */
 function formatPriceHT(priceAmount: number | null, currency: string, isFree: boolean) {
   if (isFree || priceAmount === 0) {
     return "Gratuit";
@@ -31,6 +37,12 @@ function formatPriceHT(priceAmount: number | null, currency: string, isFree: boo
   }).format(priceAmount)} HT`;
 }
 
+/**
+ * Page serveur de detail beat, avec preview, metadonnees et panneau d'achat.
+ * @param props.params Parametres de route contenant slug.
+ * @param props.searchParams Query string contenant l'etat de checkout.
+ * @returns Markup de detail beat ou notFound si inaccessible.
+ */
 export default async function BeatDetailPage({ params, searchParams }: BeatDetailPageProps) {
   const [{ slug }, query] = await Promise.all([params, searchParams]);
   const { userId } = await auth();

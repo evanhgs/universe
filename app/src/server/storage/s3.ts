@@ -38,6 +38,11 @@ const uploadKindPrefixes: Record<UploadKind, string> = {
   "image-thumbnail": "beats/images",
 };
 
+/**
+ * Lit une variable d'environnement obligatoire de configuration S3.
+ * @param name Nom exact de la variable d'environnement.
+ * @returns Valeur trimmee non vide.
+ */
 function requireEnv(name: string) {
   const value = process.env[name]?.trim();
 
@@ -48,6 +53,10 @@ function requireEnv(name: string) {
   return value;
 }
 
+/**
+ * Construit la configuration S3 seulement si toutes les variables publiques/secret sont disponibles.
+ * @returns Configuration utilisable, ou null pour permettre un repli local.
+ */
 function optionalStorageConfig(): StorageConfig | null {
   const endpoint = process.env.S3_PUBLIC_ENDPOINT?.trim();
   const bucket = process.env.S3_BUCKET_BEATS?.trim();
@@ -68,6 +77,10 @@ function optionalStorageConfig(): StorageConfig | null {
   };
 }
 
+/**
+ * Charge la configuration S3 obligatoire pour signer les URLs.
+ * @returns Configuration S3 complete.
+ */
 function getStorageConfig(): StorageConfig {
   return {
     endpoint: requireEnv("S3_PUBLIC_ENDPOINT"),
@@ -79,24 +92,46 @@ function getStorageConfig(): StorageConfig {
   };
 }
 
+/**
+ * Calcule un HMAC SHA-256 binaire pour la signature AWS v4.
+ * @param key Cle de signature.
+ * @param value Valeur a signer.
+ */
 function hmac(key: Buffer | string, value: string) {
   return createHmac("sha256", key).update(value).digest();
 }
 
+/**
+ * Calcule un HMAC SHA-256 en hexadecimal pour la signature finale.
+ * @param key Cle de signature.
+ * @param value Valeur a signer.
+ */
 function hmacHex(key: Buffer | string, value: string) {
   return createHmac("sha256", key).update(value).digest("hex");
 }
 
+/**
+ * Calcule le hash SHA-256 hexadecimal d'une chaine canonique.
+ * @param value Chaine a hasher.
+ */
 function sha256Hex(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+/**
+ * Encode une valeur selon RFC 3986 pour les chemins et query strings signees.
+ * @param value Segment ou parametre a encoder.
+ */
 function encodeRfc3986(value: string) {
   return encodeURIComponent(value).replace(/[!'()*]/g, (char) =>
     `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
   );
 }
 
+/**
+ * Encode chaque segment d'un chemin objet sans supprimer les separateurs.
+ * @param value Chemin objet ou bucket.
+ */
 function encodePath(value: string) {
   return value
     .split("/")
@@ -104,10 +139,20 @@ function encodePath(value: string) {
     .join("/");
 }
 
+/**
+ * Formate une date au format compact attendu par AWS SigV4.
+ * @param date Date de reference de la signature.
+ */
 function formatAmzDate(date: Date) {
   return date.toISOString().replace(/[:-]|\.\d{3}/g, "");
 }
 
+/**
+ * Derive la cle de signature AWS SigV4 pour S3.
+ * @param secretAccessKey Secret S3.
+ * @param date Date AAAAMMJJ.
+ * @param region Region S3.
+ */
 function getSigningKey(secretAccessKey: string, date: string, region: string) {
   const dateKey = hmac(`AWS4${secretAccessKey}`, date);
   const dateRegionKey = hmac(dateKey, region);
@@ -116,6 +161,12 @@ function getSigningKey(secretAccessKey: string, date: string, region: string) {
   return hmac(dateRegionServiceKey, "aws4_request");
 }
 
+/**
+ * Construit l'URL objet en mode path-style ou virtual-hosted-style.
+ * @param config Configuration S3.
+ * @param bucket Bucket cible.
+ * @param objectKey Cle objet S3.
+ */
 function buildObjectUrl(config: StorageConfig, bucket: string, objectKey: string) {
   const endpoint = new URL(config.endpoint);
 
@@ -129,6 +180,10 @@ function buildObjectUrl(config: StorageConfig, bucket: string, objectKey: string
   return endpoint;
 }
 
+/**
+ * Canonicalise les parametres de query pour la signature AWS.
+ * @param params Parametres d'URL a trier et encoder.
+ */
 function canonicalQuery(params: URLSearchParams) {
   return [...params.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
@@ -136,16 +191,31 @@ function canonicalQuery(params: URLSearchParams) {
     .join("&");
 }
 
+/**
+ * Retourne le bucket beat configure cote serveur.
+ * @returns Nom du bucket S3 dedie aux assets beats.
+ */
 export function getBeatStorageBucket() {
   return getStorageConfig().bucket;
 }
 
+/**
+ * Cree une cle objet non previsible pour un upload utilisateur.
+ * @param kind Famille d'asset a stocker.
+ * @param ownerId Identifiant utilisateur interne proprietaire.
+ * @param filename Nom original utilise uniquement pour conserver l'extension.
+ */
 export function createStorageObjectKey(kind: UploadKind, ownerId: string, filename: string) {
   const extension = filename.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
 
   return `${uploadKindPrefixes[kind]}/${ownerId}/${randomUUID()}.${extension}`;
 }
 
+/**
+ * Genere une URL presignee S3 compatible SigV4 pour lire ou ecrire un objet.
+ * @param options Methode, bucket optionnel, cle objet, type MIME et duree d'expiration.
+ * @returns URL signee, expiration et headers a envoyer avec un PUT.
+ */
 export async function createPresignedStorageUrl(options: PresignOptions) {
   const config = getStorageConfig();
   const bucket = options.bucket ?? config.bucket;
@@ -204,6 +274,11 @@ export async function createPresignedStorageUrl(options: PresignOptions) {
   };
 }
 
+/**
+ * Retourne une URL de lecture pour un asset public, avec repli local si S3 n'est pas configure.
+ * @param asset Bucket, cle objet et indicateur isPublic de l'asset.
+ * @returns URL temporaire, chemin local, ou null si l'asset n'est pas public.
+ */
 export async function getPublicAssetUrl(asset: {
   bucket: string;
   objectKey: string;
@@ -229,6 +304,11 @@ export async function getPublicAssetUrl(asset: {
   }).then((result) => result.url);
 }
 
+/**
+ * Cree une URL temporaire de telechargement pour un asset protege.
+ * @param asset Bucket, cle objet et expiration optionnelle.
+ * @returns URL signee et duree de validite en secondes.
+ */
 export async function createProtectedAssetUrl(asset: {
   bucket: string;
   objectKey: string;

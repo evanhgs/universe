@@ -4,6 +4,10 @@ import Stripe from "stripe";
 
 let stripeClient: Stripe | null = null;
 
+/**
+ * Lit la cle secrete Stripe obligatoire.
+ * @returns Cle secrete Stripe.
+ */
 function getStripeSecretKey() {
   const secretKey = process.env.STRIPE_SECRET_KEY;
 
@@ -14,6 +18,10 @@ function getStripeSecretKey() {
   return secretKey;
 }
 
+/**
+ * Lit le secret webhook Stripe obligatoire pour verifier les signatures.
+ * @returns Secret de signature webhook.
+ */
 function getStripeWebhookSecret() {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -24,10 +32,18 @@ function getStripeWebhookSecret() {
   return webhookSecret;
 }
 
+/**
+ * Determine si Stripe Automatic Tax doit etre active.
+ * @returns true si STRIPE_AUTOMATIC_TAX_ENABLED vaut "true".
+ */
 function getStripeAutomaticTaxEnabled() {
   return process.env.STRIPE_AUTOMATIC_TAX_ENABLED === "true";
 }
 
+/**
+ * Retourne un client Stripe singleton configure pour le serveur Next.js.
+ * @returns Instance Stripe reutilisee en developpement et production.
+ */
 export function getStripeClient() {
   if (!stripeClient) {
     stripeClient = new Stripe(getStripeSecretKey(), {
@@ -42,6 +58,11 @@ export function getStripeClient() {
   return stripeClient;
 }
 
+/**
+ * Cree une session Stripe Checkout pour une commande marketplace.
+ * @param args Identifiants locaux, montant en centimes, devise, libelle et URLs de retour.
+ * @returns Session Checkout Stripe.
+ */
 export async function createStripeCheckoutSession(args: {
   orderId: string;
   paymentId: string;
@@ -87,12 +108,23 @@ export async function createStripeCheckoutSession(args: {
   });
 }
 
+/**
+ * Recupere une session Stripe Checkout existante.
+ * @param sessionId Identifiant Stripe Checkout Session.
+ * @returns Session Stripe avec line_items expand.
+ */
 export async function retrieveStripeCheckoutSession(sessionId: string) {
   return getStripeClient().checkout.sessions.retrieve(sessionId, {
     expand: ["line_items"],
   });
 }
 
+/**
+ * Verifie et construit un evenement webhook Stripe depuis le payload brut.
+ * @param payload Corps texte exact recu par Stripe.
+ * @param signature Header stripe-signature.
+ * @returns Evenement Stripe authentifie.
+ */
 export function constructStripeWebhookEvent(payload: string, signature: string | null) {
   if (!signature) {
     throw new Error("stripe_signature_missing");

@@ -34,6 +34,11 @@ const maxImageBytes = 10 * 1024 * 1024;
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Exige une chaine non vide dans le payload de presign.
+ * @param value Valeur brute.
+ * @param field Nom logique du champ.
+ */
 function requireString(value: unknown, field: string) {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new Error(`${field}_required`);
@@ -42,6 +47,10 @@ function requireString(value: unknown, field: string) {
   return value.trim();
 }
 
+/**
+ * Valide la taille annoncee du fichier.
+ * @param value Taille brute en octets.
+ */
 function requireSizeBytes(value: unknown) {
   const parsed = Number(value);
 
@@ -52,6 +61,10 @@ function requireSizeBytes(value: unknown) {
   return parsed;
 }
 
+/**
+ * Valide une demande d'URL presignee d'upload vendeur.
+ * @param payload Corps JSON brut contenant kind, filename, mimeType et sizeBytes.
+ */
 function parseUploadRequest(payload: unknown) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error("invalid_upload_payload");
@@ -84,10 +97,18 @@ function parseUploadRequest(payload: unknown) {
   return { kind, filename, mimeType, sizeBytes };
 }
 
+/**
+ * Extrait une extension de fichier normalisee.
+ * @param filename Nom original du fichier.
+ */
 function extensionFromFilename(filename: string) {
   return filename.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || null;
 }
 
+/**
+ * Convertit une erreur d'upload en reponse JSON privee.
+ * @param error Erreur issue de validation ou d'autorisation.
+ */
 function errorResponse(error: unknown) {
   const message = error instanceof Error ? error.message : "Unknown error.";
   const status =
@@ -109,6 +130,10 @@ function errorResponse(error: unknown) {
   );
 }
 
+/**
+ * Cree une URL S3 presignee pour un upload de vendeur authentifie.
+ * @param request Requete HTTP contenant les metadonnees du fichier a envoyer.
+ */
 export async function POST(request: Request) {
   const { isAuthenticated, userId } = await auth();
 

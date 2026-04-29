@@ -14,12 +14,22 @@ type RouteContext = {
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Lit un body JSON optionnel sans forcer les clients a envoyer un objet vide.
+ * @param request Requete HTTP entrante.
+ * @returns Payload parse ou undefined si le body est vide.
+ */
 async function readOptionalJson(request: Request) {
   const text = await request.text();
 
   return text ? JSON.parse(text) : undefined;
 }
 
+/**
+ * Cree une session Stripe Checkout pour une commande de l'acheteur courant.
+ * @param request Requete HTTP avec URLs de retour optionnelles.
+ * @param context Parametres de route contenant orderId.
+ */
 export async function POST(request: Request, context: RouteContext) {
   const { isAuthenticated, userId } = await auth();
 

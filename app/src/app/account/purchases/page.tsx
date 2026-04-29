@@ -4,6 +4,10 @@ import { PurchasesClient } from "./purchases-client";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Page serveur qui encapsule le client d'achats dans un Suspense.
+ * @returns Page "Mes achats".
+ */
 export default function PurchasesPage() {
   return (
     <Suspense

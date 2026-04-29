@@ -8,6 +8,10 @@ import { PRIVATE_JSON_HEADERS } from "@/server/http/response-headers";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Cree une commande marketplace pour l'acheteur authentifie.
+ * @param request Requete HTTP contenant beatSlug ou licenseOfferingId.
+ */
 export async function POST(request: Request) {
   const { isAuthenticated, userId } = await auth();
 
