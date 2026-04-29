@@ -101,32 +101,90 @@ export async function upsertAccountIdentity(args: {
   defaultRole: RoleCode;
 }) {
   return getPrisma().$transaction(async (tx) => {
-    const user = await tx.user.upsert({
+    const buildIdentityData = async (targetUserId?: string) => {
+      let username = args.username;
+
+      if (username) {
+        const existingByUsername = await tx.user.findUnique({
+          where: { username },
+          select: { id: true },
+        });
+
+        if (existingByUsername && existingByUsername.id !== targetUserId) {
+          username = null;
+        }
+      }
+
+      return {
+        email: args.email,
+        username,
+        firstName: args.firstName,
+        lastName: args.lastName,
+        emailVerifiedAt: args.emailVerifiedAt,
+        status: "ACTIVE" as const,
+        deletedAt: null,
+      };
+    };
+    const existingByClerkId = await tx.user.findUnique({
       where: {
         clerkUserId: args.clerkUserId,
-      },
-      update: {
-        email: args.email,
-        username: args.username,
-        firstName: args.firstName,
-        lastName: args.lastName,
-        emailVerifiedAt: args.emailVerifiedAt,
-        status: "ACTIVE",
-        deletedAt: null,
-      },
-      create: {
-        clerkUserId: args.clerkUserId,
-        email: args.email,
-        username: args.username,
-        firstName: args.firstName,
-        lastName: args.lastName,
-        emailVerifiedAt: args.emailVerifiedAt,
-        status: "ACTIVE",
       },
       select: {
         id: true,
       },
     });
+    const existingByEmail = existingByClerkId
+      ? null
+      : await tx.user.findUnique({
+          where: {
+            email: args.email,
+          },
+          select: {
+            id: true,
+            clerkUserId: true,
+          },
+        });
+
+    if (
+      existingByEmail?.clerkUserId &&
+      existingByEmail.clerkUserId !== args.clerkUserId &&
+      !args.emailVerifiedAt
+    ) {
+      throw new Error("email_already_linked_to_another_clerk_user");
+    }
+
+    const user = existingByClerkId
+      ? await tx.user.update({
+          where: {
+            id: existingByClerkId.id,
+          },
+          data: await buildIdentityData(existingByClerkId.id),
+          select: {
+            id: true,
+          },
+        })
+      : existingByEmail
+        ? await tx.user.update({
+            where: {
+              id: existingByEmail.id,
+            },
+            data: {
+              ...(await buildIdentityData(existingByEmail.id)),
+              clerkUserId: args.clerkUserId,
+            },
+            select: {
+              id: true,
+            },
+          })
+        : await tx.user.create({
+            data: {
+              ...(await buildIdentityData()),
+              clerkUserId: args.clerkUserId,
+            },
+            select: {
+              id: true,
+            },
+          });
 
     await tx.userRoleAssignment.createMany({
       data: [{ userId: user.id, role: args.defaultRole }],
