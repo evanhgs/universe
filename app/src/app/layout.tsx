@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
+import Link from "next/link";
 
 import { AuthActions } from "./auth-buttons";
 import "./globals.css";
@@ -24,9 +25,12 @@ export default function RootLayout({
       <body>
         <ClerkProvider dynamic>
           <header className="flex items-center justify-between border-b border-black/10 px-6 py-4">
-            <div className="text-sm font-semibold tracking-[0.2em] text-black/70 uppercase">
+            <Link
+              className="text-sm font-semibold tracking-[0.2em] text-black/70 uppercase"
+              href="/"
+            >
               Universe
-            </div>
+            </Link>
             <div className="flex items-center gap-3">
               <AuthActions />
             </div>
