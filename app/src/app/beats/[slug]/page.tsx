@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { getBeatPayloadBySlug } from "@/server/beats/beat.service";
+import { BeatPreviewPlayer } from "./beat-preview-player";
 import { BeatPurchasePanel } from "./beat-purchase-panel";
 
 type BeatDetailPageProps = {
@@ -92,9 +93,11 @@ export default async function BeatDetailPage({ params, searchParams }: BeatDetai
             {beat.description ?? "Le vendeur n a pas encore ajoute de description."}
           </p>
         </div>
-        {audio?.url ? (
-          <audio className="mt-6 w-full" controls preload="none" src={audio.url} />
-        ) : null}
+        <BeatPreviewPlayer
+          beatSlug={beat.slug}
+          initialUrl={audio?.url ?? null}
+          shouldPoll={beat.status === "PROCESSING"}
+        />
       </section>
 
       <aside className="h-fit border border-black/10 bg-white p-6">

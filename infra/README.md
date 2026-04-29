@@ -127,13 +127,15 @@ Templates are present for env files and production secret filenames, but real ru
 
 Development and staging can use a RustFS bucket through the S3-compatible API.
 
-- `S3_PUBLIC_ENDPOINT`: browser-reachable S3 endpoint, for example `https://s3.evanhgs.fr`
+- `S3_PUBLIC_ENDPOINT`: S3 endpoint reachable by the browser, Next.js, and the audio worker, for example `https://s3.evanhgs.fr`
 - `S3_REGION`: signing region, defaults to `us-east-1`
 - `S3_BUCKET_BEATS`: bucket used for beat audio and images
 - `S3_FORCE_PATH_STYLE`: keep `true` for RustFS-style URLs such as `/bucket/key`
 - `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY`: development and staging read these from `stack.*.env`; production can keep using Docker secrets
 
 The app does not proxy upload bytes through Next.js. It generates a short-lived presigned `PUT` URL at `/api/storage/uploads/presign`, then the browser uploads directly to RustFS. Public beat thumbnails and audio previews are returned as short-lived presigned `GET` URLs in beat payloads.
+
+For local Compose stacks, avoid `http://localhost:9000` unless the S3 server runs inside the same container as the caller. Use a host LAN IP such as `http://192.168.1.23:9000`, or a real local/public DNS name reachable by both the browser and Docker containers.
 
 ## Clerk and forwarded headers
 

@@ -164,12 +164,17 @@ async fn main() -> Result<()> {
 }
 
 fn load_storage_config() -> Result<StorageConfig> {
-    Ok(StorageConfig {
-        endpoint: env::var("S3_INTERNAL_ENDPOINT")
-            .ok()
-            .filter(|value| !value.trim().is_empty())
-            .or_else(|| env::var("S3_PUBLIC_ENDPOINT").ok())
-            .context("S3_INTERNAL_ENDPOINT or S3_PUBLIC_ENDPOINT is required")?,
+    let endpoint = env::var("S3_PUBLIC_ENDPOINT")
+        .context("S3_PUBLIC_ENDPOINT is required")?
+        .trim()
+        .to_string();
+
+    if endpoint.is_empty() {
+        return Err(anyhow!("S3_PUBLIC_ENDPOINT cannot be empty"));
+    }
+
+    let config = StorageConfig {
+        endpoint,
         region: env::var("S3_REGION").unwrap_or_else(|_| "us-east-1".into()),
         access_key_id: env::var("S3_ACCESS_KEY_ID").context("S3_ACCESS_KEY_ID is required")?,
         secret_access_key: env::var("S3_SECRET_ACCESS_KEY")
@@ -177,7 +182,23 @@ fn load_storage_config() -> Result<StorageConfig> {
         force_path_style: env::var("S3_FORCE_PATH_STYLE")
             .map(|value| value != "false")
             .unwrap_or(true),
-    })
+    };
+
+    info!(
+        endpoint = %config.endpoint,
+        region = %config.region,
+        force_path_style = config.force_path_style,
+        "s3 storage configured"
+    );
+
+    if config.endpoint.contains("://localhost") || config.endpoint.contains("://127.0.0.1") {
+        warn!(
+            endpoint = %config.endpoint,
+            "S3_PUBLIC_ENDPOINT uses loopback; this only works if S3 is inside the audio-worker container"
+        );
+    }
+
+    Ok(config)
 }
 
 async fn claim_job(pool: &PgPool, worker_id: &str) -> Result<Option<Job>> {
@@ -264,6 +285,14 @@ async fn process_job(
     config: &WorkerConfig,
     job: Job,
 ) -> Result<()> {
+    info!(
+        job_id = %job.id,
+        beat_id = %job.beat_id,
+        attempt = job.attempts,
+        max_attempts = job.max_attempts,
+        "processing preview job"
+    );
+
     let source = fetch_asset(pool, &job.source_asset_id).await?;
     let output = fetch_asset(pool, &job.output_asset_id).await?;
     let source_path = config.tmp_dir.join(format!("{}-source", job.id));
@@ -272,6 +301,14 @@ async fn process_job(
     download_asset(storage, &source, &source_path).await?;
     let duration = probe_duration(&source_path).await?;
     let preview_seconds = preview_length(duration, &job.preview_policy);
+
+    info!(
+        job_id = %job.id,
+        duration_sec = duration,
+        preview_sec = preview_seconds,
+        "audio source probed"
+    );
+
     generate_preview(
         &source_path,
         &preview_path,
@@ -279,6 +316,7 @@ async fn process_job(
         &job.preview_policy,
     )
     .await?;
+
     let size_bytes = fs::metadata(&preview_path).await?.len() as i64;
     upload_preview(storage, &output, &preview_path).await?;
     mark_job_ready(pool, &job, duration, preview_seconds, size_bytes).await?;
@@ -292,6 +330,13 @@ async fn process_job(
 
 async fn download_asset(storage: &StorageConfig, asset: &Asset, path: &Path) -> Result<()> {
     let url = presigned_s3_url(storage, "GET", &asset.bucket, &asset.object_key, None)?;
+    info!(
+        bucket = %asset.bucket,
+        object_key = %asset.object_key,
+        target = %path.display(),
+        "downloading source asset"
+    );
+
     let status = Command::new("curl")
         .arg("--fail")
         .arg("--silent")
@@ -311,6 +356,12 @@ async fn download_asset(storage: &StorageConfig, asset: &Asset, path: &Path) -> 
         ));
     }
 
+    info!(
+        bucket = %asset.bucket,
+        object_key = %asset.object_key,
+        "source asset downloaded"
+    );
+
     Ok(())
 }
 
@@ -322,6 +373,13 @@ async fn upload_preview(storage: &StorageConfig, asset: &Asset, path: &Path) -> 
         &asset.object_key,
         Some("audio/mpeg"),
     )?;
+    info!(
+        bucket = %asset.bucket,
+        object_key = %asset.object_key,
+        source = %path.display(),
+        "uploading generated preview"
+    );
+
     let status = Command::new("curl")
         .arg("--fail")
         .arg("--silent")
@@ -344,6 +402,12 @@ async fn upload_preview(storage: &StorageConfig, asset: &Asset, path: &Path) -> 
             asset.object_key
         ));
     }
+
+    info!(
+        bucket = %asset.bucket,
+        object_key = %asset.object_key,
+        "generated preview uploaded"
+    );
 
     Ok(())
 }
@@ -553,6 +617,15 @@ async fn generate_preview(
     let audio_filter = format!(
         "afade=t=in:st=0:d={fade_seconds},afade=t=out:st={fade_out_start}:d={fade_seconds}"
     );
+    info!(
+        source = %source.display(),
+        output = %output.display(),
+        preview_sec = preview_seconds,
+        bitrate = %bitrate,
+        fade_sec = fade_seconds,
+        "generating audio preview"
+    );
+
     let result = Command::new("ffmpeg")
         .arg("-y")
         .arg("-i")
@@ -578,6 +651,8 @@ async fn generate_preview(
             String::from_utf8_lossy(&result.stderr)
         ));
     }
+
+    info!(output = %output.display(), "audio preview generated");
 
     Ok(())
 }

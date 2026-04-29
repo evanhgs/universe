@@ -9,8 +9,7 @@ uploads it to the output asset key, then marks the preview asset ready.
 Required environment:
 
 - `DATABASE_URL`
-- `S3_PUBLIC_ENDPOINT`: browser-facing endpoint used by Next.js, for example `http://localhost:9000`
-- `S3_INTERNAL_ENDPOINT`: endpoint reachable from the worker container, for example `http://host.docker.internal:9000`
+- `S3_PUBLIC_ENDPOINT`: S3-compatible endpoint used by Next.js and the worker, for example `http://localhost:9000`
 - `S3_REGION`
 - `S3_BUCKET_BEATS`
 - `S3_ACCESS_KEY_ID`

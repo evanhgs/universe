@@ -159,7 +159,6 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-}
-      S3_INTERNAL_ENDPOINT: ${S3_INTERNAL_ENDPOINT:-}
       S3_REGION: ${S3_REGION:-us-east-1}
       S3_BUCKET_BEATS: ${S3_BUCKET_BEATS:-}
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
@@ -167,8 +166,6 @@ services:
       S3_FORCE_PATH_STYLE: "${S3_FORCE_PATH_STYLE:-true}"
       AUDIO_WORKER_POLL_INTERVAL_MS: ${AUDIO_WORKER_POLL_INTERVAL_MS:-2000}
       RUST_LOG: ${AUDIO_WORKER_RUST_LOG:-info}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy
