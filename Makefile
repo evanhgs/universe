@@ -8,7 +8,7 @@ STAGING_COMPOSE := docker compose -f infra/compose.staging.yml --env-file $(STAG
 PROD_COMPOSE := docker compose -f infra/compose.prod.yml --env-file $(PROD_ENV_FILE)
 
 .PHONY: dev dev-down dev-logs dev-ps \
-	staging staging-down staging-logs staging-ps \
+	staging staging-down staging-logs staging-ps staging-prisma-push \
 	prod prod-down prod-logs prod-ps \
 	next-sh prisma-generate prisma-migrate prisma-studio
 
@@ -47,6 +47,20 @@ staging-logs:
 staging-ps:
 	$(call require_env_file,$(STAGING_ENV_FILE))
 	$(STAGING_COMPOSE) ps
+
+staging-prisma-push:
+	$(call require_env_file,$(STAGING_ENV_FILE))
+	project_name=$$(awk -F= '/^COMPOSE_PROJECT_NAME=/{print $$2}' $(STAGING_ENV_FILE)); \
+	project_name=$${project_name:-universe-staging}; \
+	docker run --rm \
+		--network "$${project_name}_internal" \
+		--env-file $(STAGING_ENV_FILE) \
+		-e HOME=/tmp \
+		-e NPM_CONFIG_CACHE=/tmp/.npm \
+		-v "$(CURDIR)/$(APP_DIR):/workspace:ro" \
+		-w /workspace \
+		node:24.12.0 \
+		sh -lc 'npx prisma db push'
 
 prod:
 	$(call require_env_file,$(PROD_ENV_FILE))
