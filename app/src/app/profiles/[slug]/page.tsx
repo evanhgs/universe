@@ -30,13 +30,13 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-6xl px-6 py-10">
       <section className="border-b border-black/10 pb-8">
         <p className="text-sm font-medium uppercase tracking-[0.24em] text-black/45">
-          Profil vendeur
+          {profile.roles.includes('SELLER') ? "profile vendeur" : "profile utilisateur"}
         </p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-black">
           {profile.displayName}
         </h1>
         <p className="mt-4 max-w-3xl text-base leading-7 text-black/65">
-          {profile.bio ?? "Ce vendeur n a pas encore ajoute de description."}
+          {profile.bio ?? "Cet utilisateur n'a pas encore ajoute de description."}
         </p>
         <div className="mt-5 flex flex-wrap gap-4 text-sm text-black/55">
           <span>{profile.stats.beatCount} instrumentales publiees</span>

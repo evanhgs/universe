@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 
 import { getCurrentAccountSnapshot } from "@/server/account/account.service";
+import { SellerRoleButton } from "./seller-role-button";
 
 export const dynamic = "force-dynamic";
 
@@ -127,7 +128,8 @@ export default async function AccountPage() {
 
       <section className="mt-8">
         <h2 className="text-2xl font-semibold text-black">Acces rapides</h2>
-        <div className="mt-5 grid gap-4 md:grid-cols-3">
+        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <SellerRoleButton isSeller={isSeller} />
           <Link className="border border-black/10 bg-white p-5 hover:border-black/25" href="/account/purchases">
             <h3 className="font-semibold text-black">Mes achats</h3>
             <p className="mt-2 text-sm leading-6 text-black/60">
