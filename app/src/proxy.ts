@@ -11,13 +11,23 @@ const splitEnvList = (value: string | undefined) =>
     .map((item) => item.trim())
     .filter(Boolean) ?? [];
 
+const normalizeOrigin = (value: string) => {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return value.replace(/\/+$/, "");
+  }
+};
+
+const normalizeOriginList = (values: string[]) => values.map(normalizeOrigin);
+
 const appUrl = process.env.APP_URL;
 const apiUrl = process.env.AI_SERVICES_URL;
 const s3PublicEndpoint = process.env.S3_PUBLIC_ENDPOINT;
 const authorizedParties = Array.from(
   new Set([
-    ...splitEnvList(process.env.CLERK_AUTHORIZED_PARTIES),
-    ...(appUrl ? [appUrl] : []),
+    ...normalizeOriginList(splitEnvList(process.env.CLERK_AUTHORIZED_PARTIES)),
+    ...(appUrl ? [normalizeOrigin(appUrl)] : []),
   ]),
 );
 
