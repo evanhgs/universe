@@ -140,7 +140,7 @@ The app does not proxy upload bytes through Next.js. It generates a short-lived 
 The Next.js service now expects these runtime variables from `infra/env/stack.*.env`:
 
 - `APP_URL`: public origin of the Next.js app
-- `AI_SERVICES_URL`: public origin of the backend API when browser calls are cross-origin
+- `AI_SERVICES_URL`: optional browser-facing backend origin. Leave empty when the Python service is internal-only.
 - `CLERK_AUTHORIZED_PARTIES`: comma-separated origin allowlist used by Clerk middleware
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`: Clerk publishable key exposed to the browser
 - `CLERK_SECRET_KEY`: Clerk server secret
@@ -156,7 +156,7 @@ Stripe marketplace payments use the same environment split:
 
 The Stripe webhook endpoint is `/api/webhooks/stripe`. In local development, use Stripe CLI forwarding and copy the printed `whsec_...` value into `STRIPE_WEBHOOK_SECRET`.
 
-The reverse proxy is configured to preserve `Host`, `X-Forwarded-Host`, `X-Forwarded-Proto`, and `X-Forwarded-Port` so Clerk and Next.js can reconstruct the original request origin correctly behind Caddy.
+The reverse proxy is configured to preserve the full `Host`, including a local port such as `localhost:3050`, plus `X-Forwarded-Host` and `X-Forwarded-Proto` so Clerk and Next.js can reconstruct the original request origin correctly behind Caddy.
 
 Clerk CSP is enforced in Next.js middleware instead of a static `next.config.ts` header. This keeps Clerk's required domains and per-request nonce generation aligned with the App Router.
 
@@ -167,9 +167,9 @@ In practice, this means `app/.env.local` is no longer required for Clerk when th
 - Development uses one Compose file and one env file for both services.
 - Compose Watch avoids large bind mounts for `node_modules`, and Python development keeps `.venv` inside the image instead of syncing a host virtualenv.
 - Staging and production place a reverse proxy in front of Next.js, which aligns with Next.js self-hosting guidance.
-- The staging stack boots Next.js, FastAPI, Postgres, Caddy, and the Rust audio worker together.
+- The staging stack boots Next.js, internal FastAPI, Postgres, Caddy, and the Rust audio worker together.
 - The production stack boots Next.js, FastAPI, and Caddy together.
-- The FastAPI service still uses Caddy in front of Uvicorn and runs a single Uvicorn process per container.
+- In staging, Caddy is exposed only in front of Next.js; FastAPI is reachable only on the internal Docker network.
 - Each environment now uses one ignored runtime `stack.*.env` file, with a versioned `stack.*.env.example` template kept alongside it.
 - Hardened stacks use a non-root runtime image, read-only root filesystem, dropped Linux capabilities, `no-new-privileges`, `tmpfs`, health checks, and a graceful shutdown window.
 - Runtime config is injected at container start. Staging favors one protected env file for simple VPS operations; production can mount sensitive values as Docker secrets.
@@ -184,3 +184,26 @@ Keep the same pattern per service:
 - proxy publishes ports, app containers do not
 - secrets mounted as files for production, or kept in one protected env file for simpler staging VPS operations
 - health checks on every dependency, then `depends_on.condition: service_healthy`
+
+## Start the staging server (fr)
+
+### Starting setup
+
+Premierement il faut configurer une nouvelle l'app Clerk (dans les prochaines versions ils sortiront un environnement Staging spécialement)
+
+La je vais partir du principe qu'on teste en local avant de déployer sur un serveur pour s'assurer du bon fonctionnement du staging.
+
+Il nous faudra un environnemenet Clerk, un environnement Stripe, Ngrok et Stripe CLI pour les redirection de webhook en local, un S3 en local ou ailleurs le seul changement est l'endpoint. La bdd et les services rust et python sont gérés dans le compose aussi.
+
+La premiere étape est de copier le fichier staging.env.example choisir ses mdp et changer les valeurs par défaut dans les variables et normalement il restera plus que les variables des webhooks
+
+Pour le premier webhook de stripe, hyper simple il suffit de lancer `stripe listen --forward-to localhost:3050/api/webhooks/stripe` et le programme nous retourne un signing secret.
+Une version optimisée pour l'essentiel
+
+```bash
+stripe listen --events checkout.session.completed checkout.session.async_payment_succeeded checkout.session.async_payment_failed checkout.session.expired --forward-to localhost:3050/api/webhooks/stripe
+```
+
+Ensuite pour clerk un peu plus relou car il faut installer ngrok est ouvrir le port 3050 (qui est mon port de test staging) `ngrok http 3050` Ensuite dans clerk il faut configurer l'endpoint du webhook et ajouter le nom de domaine généré par ngrok + le path par ex : `https://festive-climate-pope.ngrok-free.dev/api/webhooks/clerk` et ajouter l'écoute des events u`ser.created user.updated user.deleted`
+
+Oui car le port 3050 est le port de caddy le reverse proxy qui manage les connexions entrantes vers nextjs

@@ -1,9 +1,10 @@
+{
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
 :80 {
-  encode zstd gzip
-  reverse_proxy nextjs:3000 {
-    header_up Host {host}
-    header_up X-Forwarded-Host {host}
-    header_up X-Forwarded-Proto {scheme}
-    header_up X-Forwarded-Port {server_port}
-  }
+	encode zstd gzip
+	reverse_proxy nextjs:3000
 }
