@@ -1,2 +1,7 @@
 .codex
 .idea/
+
+# Runtime configuration and secrets.
+infra/env/*.env
+infra/secrets/**/*.txt
+!infra/secrets/**/*.txt.example

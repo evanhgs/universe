@@ -43,10 +43,8 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-universe_staging}
       POSTGRES_USER: ${POSTGRES_USER:-universe}
-      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in infra/env/stack.staging.env}
       PGDATA: /var/lib/postgresql/data/pgdata
-    secrets:
-      - postgres_password
     volumes:
       - type: volume
         source: postgres_staging_data
@@ -77,11 +75,19 @@ services:
       S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT}
       S3_REGION: ${S3_REGION:-us-east-1}
       S3_BUCKET_BEATS: ${S3_BUCKET_BEATS}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID in infra/env/stack.staging.env}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY in infra/env/stack.staging.env}
       S3_FORCE_PATH_STYLE: "${S3_FORCE_PATH_STYLE:-true}"
       NODE_ENV: ${NEXTJS_NODE_ENV:-production}
       NEXT_TELEMETRY_DISABLED: "${NEXTJS_TELEMETRY_DISABLED:-1}"
       HOSTNAME: ${NEXTJS_HOSTNAME:-0.0.0.0}
       PORT: "${NEXTJS_PORT:-3000}"
+      NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY:?set NEXT_SERVER_ACTIONS_ENCRYPTION_KEY in infra/env/stack.staging.env}
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in infra/env/stack.staging.env}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:?set STRIPE_SECRET_KEY in infra/env/stack.staging.env}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:?set STRIPE_WEBHOOK_SECRET in infra/env/stack.staging.env}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:?set CLERK_SECRET_KEY in infra/env/stack.staging.env}
+      CLERK_WEBHOOK_SIGNING_SECRET: ${CLERK_WEBHOOK_SIGNING_SECRET:?set CLERK_WEBHOOK_SIGNING_SECRET in infra/env/stack.staging.env}
     image: ${NEXTJS_IMAGE:-universe/nextjs}:${NEXTJS_IMAGE_TAG:-staging}
     build:
       context: ${NEXTJS_CONTEXT:-../app}
@@ -92,30 +98,6 @@ services:
         condition: service_healthy
     expose:
       - "${NEXTJS_PORT:-3000}"
-    secrets:
-      - next_server_actions_encryption_key
-      - database_url
-      - stripe_secret_key
-      - stripe_webhook_secret
-      - clerk_secret_key
-      - clerk_webhook_signing_secret
-      - s3_access_key_id
-      - s3_secret_access_key
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-        set -eu
-        NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$$(cat /run/secrets/next_server_actions_encryption_key)"
-        DATABASE_URL="$$(cat /run/secrets/database_url)"
-        STRIPE_SECRET_KEY="$$(cat /run/secrets/stripe_secret_key)"
-        STRIPE_WEBHOOK_SECRET="$$(cat /run/secrets/stripe_webhook_secret)"
-        CLERK_SECRET_KEY="$$(cat /run/secrets/clerk_secret_key)"
-        CLERK_WEBHOOK_SIGNING_SECRET="$$(cat /run/secrets/clerk_webhook_signing_secret)"
-        S3_ACCESS_KEY_ID="$$(cat /run/secrets/s3_access_key_id)"
-        S3_SECRET_ACCESS_KEY="$$(cat /run/secrets/s3_secret_access_key)"
-        export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY DATABASE_URL STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET CLERK_SECRET_KEY CLERK_WEBHOOK_SIGNING_SECRET S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY
-        exec node server.js
 
   ai-services:
     init: true
@@ -159,6 +141,47 @@ services:
       target: runner
     expose:
       - "${AI_SERVICES_PORT:-8000}"
+
+  audio-worker:
+    image: ${AUDIO_WORKER_IMAGE:-universe/audio-worker}:${AUDIO_WORKER_IMAGE_TAG:-staging}
+    build:
+      context: ${AUDIO_WORKER_CONTEXT:-../audio-worker}
+      dockerfile: ${AUDIO_WORKER_DOCKERFILE:-../audio-worker/Dockerfile}
+      target: runtime
+    init: true
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in infra/env/stack.staging.env}
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT}
+      S3_INTERNAL_ENDPOINT: ${S3_INTERNAL_ENDPOINT:-}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET_BEATS: ${S3_BUCKET_BEATS}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID in infra/env/stack.staging.env}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY in infra/env/stack.staging.env}
+      S3_FORCE_PATH_STYLE: "${S3_FORCE_PATH_STYLE:-true}"
+      AUDIO_WORKER_ID: ${AUDIO_WORKER_ID:-staging-audio-worker-1}
+      AUDIO_WORKER_POLL_INTERVAL_MS: ${AUDIO_WORKER_POLL_INTERVAL_MS:-2000}
+      AUDIO_WORKER_TMP_DIR: ${AUDIO_WORKER_TMP_DIR:-/tmp/universe-audio-worker}
+      RUST_LOG: ${AUDIO_WORKER_RUST_LOG:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    stop_signal: SIGTERM
+    stop_grace_period: 30s
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=${AUDIO_WORKER_TMPFS_SIZE:-1g}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - internal
 
   proxy:
     image: caddy:2.10-alpine
@@ -269,23 +292,3 @@ volumes:
   caddy_staging_config:
   caddy_ai_staging_data:
   caddy_ai_staging_config:
-
-secrets:
-  postgres_password:
-    file: ./secrets/staging/postgres_password.txt
-  next_server_actions_encryption_key:
-    file: ./secrets/staging/next_server_actions_encryption_key.txt
-  database_url:
-    file: ./secrets/staging/database_url.txt
-  stripe_secret_key:
-    file: ./secrets/staging/stripe_secret_key.txt
-  stripe_webhook_secret:
-    file: ./secrets/staging/stripe_webhook_secret.txt
-  clerk_secret_key:
-    file: ./secrets/staging/clerk_secret_key.txt
-  clerk_webhook_signing_secret:
-    file: ./secrets/staging/clerk_webhook_signing_secret.txt
-  s3_access_key_id:
-    file: ./secrets/staging/s3_access_key_id.txt
-  s3_secret_access_key:
-    file: ./secrets/staging/s3_secret_access_key.txt

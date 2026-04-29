@@ -11,10 +11,10 @@ It is intentionally split from the application code so you can later add sibling
 ## Layout
 
 - `compose.dev.yml`: local development with Compose Watch
-- `compose.staging.yml`: hardened pre-production stack for Next.js + FastAPI
+- `compose.staging.yml`: hardened pre-production stack for Next.js + FastAPI + Rust audio worker
 - `compose.prod.yml`: hardened production stack for Next.js + FastAPI
 - `env/`: runtime environment files plus versioned templates
-- `secrets/`: example secret files and placeholders
+- `secrets/`: production secret examples and placeholders
 - `proxy/`: Caddy reverse-proxy configs for staging and production
 
 ## Current assumptions
@@ -23,8 +23,9 @@ It is intentionally split from the application code so you can later add sibling
 - The app Dockerfile supports `dev` and `runner` targets
 - Staging and production use the Next.js standalone output
 - The FastAPI service lives at `../ai-services`
+- The Rust audio worker lives at `../audio-worker`
 
-If you later move this folder into a separate Git repository, update the `NEXTJS_*` and `AI_SERVICES_*` build-path variables in the runtime env files or your shell environment.
+If you later move this folder into a separate Git repository, update the `NEXTJS_*`, `AI_SERVICES_*`, and `AUDIO_WORKER_*` build-path variables in the runtime env files or your shell environment.
 
 ## Quick start
 
@@ -79,19 +80,36 @@ docker compose -f infra/compose.dev.yml --env-file infra/env/stack.dev.env exec 
 docker compose -f infra/compose.dev.yml --env-file infra/env/stack.dev.env exec nextjs npx prisma studio --hostname 0.0.0.0 --port 5555
 ```
 
-## Recommended secret setup
+## Runtime config and secrets
 
-Create a real secret file before using staging or production:
+Each environment is started with one ignored runtime env file:
 
-- `secrets/staging/next_server_actions_encryption_key.txt`
-- `secrets/staging/database_url.txt`
-- `secrets/staging/postgres_password.txt`
-- `secrets/staging/clerk_secret_key.txt`
-- `secrets/staging/clerk_webhook_signing_secret.txt`
-- `secrets/staging/stripe_secret_key.txt`
-- `secrets/staging/stripe_webhook_secret.txt`
-- `secrets/staging/s3_access_key_id.txt`
-- `secrets/staging/s3_secret_access_key.txt`
+- `env/stack.dev.env`
+- `env/stack.staging.env`
+- `env/stack.prod.env`
+
+For staging on a VPS, copy `env/stack.staging.env.example` to `env/stack.staging.env`, fill all `replace_me` values, then restrict local permissions:
+
+```bash
+chmod 600 infra/env/stack.staging.env
+```
+
+The staging file contains both regular config and secrets, including:
+
+- `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY`
+- `DATABASE_URL`
+- `POSTGRES_PASSWORD`
+- `CLERK_SECRET_KEY`
+- `CLERK_WEBHOOK_SIGNING_SECRET`
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `S3_ACCESS_KEY_ID`
+- `S3_SECRET_ACCESS_KEY`
+
+Keep `POSTGRES_PASSWORD` aligned with the password embedded in `DATABASE_URL`.
+
+Production still supports Docker secret files:
+
 - `secrets/prod/next_server_actions_encryption_key.txt`
 - `secrets/prod/database_url.txt`
 - `secrets/prod/clerk_secret_key.txt`
@@ -99,12 +117,11 @@ Create a real secret file before using staging or production:
 - `secrets/prod/stripe_secret_key.txt`
 - `secrets/prod/stripe_webhook_secret.txt`
 
-- The Next.js encryption key file must be a base64-encoded AES key as documented by Next.js for multi-instance deployments.
-- The database URL file must contain the full Postgres connection string on a single line.
-- Staging Postgres reads `POSTGRES_PASSWORD_FILE` from `secrets/staging/postgres_password.txt`. Keep this value aligned with the password embedded in `secrets/staging/database_url.txt`.
-- Secret file values are injected by the container entrypoint and are not listed in the Compose `environment` block.
+- The Next.js encryption key must be a base64-encoded AES key as documented by Next.js for multi-instance deployments.
+- The database URL must contain the full Postgres connection string on a single line.
+- In staging, secrets are injected through the Compose environment for operational simplicity. This is easier to manage on a single VPS, but the values are visible to Docker metadata for users with Docker access. Treat Docker group access as root-equivalent.
 
-Templates are present for env files and secret filenames, but real runtime values should live only in ignored `*.env` and `secrets/**/*.txt` files.
+Templates are present for env files and production secret filenames, but real runtime values should live only in ignored `*.env` and `secrets/**/*.txt` files.
 
 ## S3-compatible storage
 
@@ -114,7 +131,7 @@ Development and staging can use a RustFS bucket through the S3-compatible API.
 - `S3_REGION`: signing region, defaults to `us-east-1`
 - `S3_BUCKET_BEATS`: bucket used for beat audio and images
 - `S3_FORCE_PATH_STYLE`: keep `true` for RustFS-style URLs such as `/bucket/key`
-- `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY`: development can read these from `stack.dev.env`; staging reads them from Docker secrets
+- `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY`: development and staging read these from `stack.*.env`; production can keep using Docker secrets
 
 The app does not proxy upload bytes through Next.js. It generates a short-lived presigned `PUT` URL at `/api/storage/uploads/presign`, then the browser uploads directly to RustFS. Public beat thumbnails and audio previews are returned as short-lived presigned `GET` URLs in beat payloads.
 
@@ -126,15 +143,13 @@ The Next.js service now expects these runtime variables from `infra/env/stack.*.
 - `AI_SERVICES_URL`: public origin of the backend API when browser calls are cross-origin
 - `CLERK_AUTHORIZED_PARTIES`: comma-separated origin allowlist used by Clerk middleware
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`: Clerk publishable key exposed to the browser
-- `CLERK_SECRET_KEY`: Clerk server secret read from Docker secrets in staging and production
-- `CLERK_WEBHOOK_SIGNING_SECRET`: Clerk webhook secret read from Docker secrets in staging and production
+- `CLERK_SECRET_KEY`: Clerk server secret
+- `CLERK_WEBHOOK_SIGNING_SECRET`: Clerk webhook secret
 
 Stripe marketplace payments use the same environment split:
 
-- Development reads `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_AUTOMATIC_TAX_ENABLED` from `infra/env/stack.dev.env`.
-- Staging and production read `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` from Docker secrets:
-  - `infra/secrets/staging/stripe_secret_key.txt`
-  - `infra/secrets/staging/stripe_webhook_secret.txt`
+- Development and staging read `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_AUTOMATIC_TAX_ENABLED` from `infra/env/stack.*.env`.
+- Production reads `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` from Docker secrets:
   - `infra/secrets/prod/stripe_secret_key.txt`
   - `infra/secrets/prod/stripe_webhook_secret.txt`
 - `STRIPE_AUTOMATIC_TAX_ENABLED` stays in `stack.*.env` because it is configuration, not a secret.
@@ -152,11 +167,12 @@ In practice, this means `app/.env.local` is no longer required for Clerk when th
 - Development uses one Compose file and one env file for both services.
 - Compose Watch avoids large bind mounts for `node_modules`, and Python development keeps `.venv` inside the image instead of syncing a host virtualenv.
 - Staging and production place a reverse proxy in front of Next.js, which aligns with Next.js self-hosting guidance.
-- The staging and production stacks now boot both Next.js and FastAPI together with one Compose file per environment.
+- The staging stack boots Next.js, FastAPI, Postgres, Caddy, and the Rust audio worker together.
+- The production stack boots Next.js, FastAPI, and Caddy together.
 - The FastAPI service still uses Caddy in front of Uvicorn and runs a single Uvicorn process per container.
 - Each environment now uses one ignored runtime `stack.*.env` file, with a versioned `stack.*.env.example` template kept alongside it.
 - Hardened stacks use a non-root runtime image, read-only root filesystem, dropped Linux capabilities, `no-new-privileges`, `tmpfs`, health checks, and a graceful shutdown window.
-- Runtime config is injected at container start, and sensitive values can be mounted as secrets instead of remaining visible in Compose environment blocks.
+- Runtime config is injected at container start. Staging favors one protected env file for simple VPS operations; production can mount sensitive values as Docker secrets.
 
 ## Notes for future FastAPI and Rust services
 
@@ -166,5 +182,5 @@ Keep the same pattern per service:
 - runtime target for staging/production
 - internal-only service networking
 - proxy publishes ports, app containers do not
-- secrets mounted as files when possible
+- secrets mounted as files for production, or kept in one protected env file for simpler staging VPS operations
 - health checks on every dependency, then `depends_on.condition: service_healthy`
