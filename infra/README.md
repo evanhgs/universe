@@ -207,3 +207,128 @@ stripe listen --events checkout.session.completed checkout.session.async_payment
 Ensuite pour clerk un peu plus relou car il faut installer ngrok est ouvrir le port 3050 (qui est mon port de test staging) `ngrok http 3050` Ensuite dans clerk il faut configurer l'endpoint du webhook et ajouter le nom de domaine généré par ngrok + le path par ex : `https://festive-climate-pope.ngrok-free.dev/api/webhooks/clerk` et ajouter l'écoute des events u`ser.created user.updated user.deleted`
 
 Oui car le port 3050 est le port de caddy le reverse proxy qui manage les connexions entrantes vers nextjs
+
+## Gestion S3 avec création bucket
+
+Les buckets utilises par l'application sont declares dans les fichiers `infra/env/stack.*.env`:
+
+- dev: `S3_BUCKET_BEATS=universe-dev-beats`
+- staging: `S3_BUCKET_BEATS=universe-staging-beats`
+
+Les commandes ci-dessous utilisent AWS CLI contre un endpoint S3-compatible comme RustFS, MinIO, R2 ou AWS S3. Pour RustFS/MinIO, garder `S3_FORCE_PATH_STYLE=true`.
+
+Prerequis:
+
+```bash
+aws --version
+```
+
+### Dev
+
+Depuis la racine du repo:
+
+```bash
+set -a
+. infra/env/stack.dev.env
+set +a
+
+export AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY_ID"
+export AWS_SECRET_ACCESS_KEY="$S3_SECRET_ACCESS_KEY"
+export AWS_DEFAULT_REGION="${S3_REGION:-us-east-1}"
+export S3_ADMIN_ENDPOINT="${S3_PUBLIC_ENDPOINT}"
+
+aws --endpoint-url "$S3_ADMIN_ENDPOINT" s3api create-bucket \
+  --bucket "$S3_BUCKET_BEATS" \
+  --region "$AWS_DEFAULT_REGION"
+
+aws --endpoint-url "$S3_ADMIN_ENDPOINT" s3api head-bucket \
+  --bucket "$S3_BUCKET_BEATS"
+```
+
+Si le bucket existe deja, `create-bucket` peut retourner une erreur `BucketAlreadyOwnedByYou` ou equivalente. Dans ce cas, `head-bucket` suffit pour verifier qu'il est accessible.
+
+Appliquer le CORS necessaire aux uploads directs depuis le navigateur:
+
+```bash
+cat >/tmp/universe-s3-cors-dev.json <<EOF
+{
+  "CORSRules": [
+    {
+      "AllowedOrigins": ["${APP_URL:-http://localhost:3000}"],
+      "AllowedMethods": ["GET", "PUT", "HEAD"],
+      "AllowedHeaders": ["*"],
+      "ExposeHeaders": ["ETag"],
+      "MaxAgeSeconds": 3000
+    }
+  ]
+}
+EOF
+
+aws --endpoint-url "$S3_ADMIN_ENDPOINT" s3api put-bucket-cors \
+  --bucket "$S3_BUCKET_BEATS" \
+  --cors-configuration file:///tmp/universe-s3-cors-dev.json
+```
+
+### Staging
+
+Depuis la racine du repo:
+
+```bash
+set -a
+. infra/env/stack.staging.env
+set +a
+
+export AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY_ID"
+export AWS_SECRET_ACCESS_KEY="$S3_SECRET_ACCESS_KEY"
+export AWS_DEFAULT_REGION="${S3_REGION:-us-east-1}"
+export S3_ADMIN_ENDPOINT="${S3_PUBLIC_ENDPOINT}"
+
+aws --endpoint-url "$S3_ADMIN_ENDPOINT" s3api create-bucket \
+  --bucket "$S3_BUCKET_BEATS" \
+  --region "$AWS_DEFAULT_REGION"
+
+aws --endpoint-url "$S3_ADMIN_ENDPOINT" s3api head-bucket \
+  --bucket "$S3_BUCKET_BEATS"
+```
+
+Appliquer le CORS staging. En local staging, `APP_URL` vaut souvent `http://localhost:3050`; sur VPS, il doit valoir l'origine publique, par exemple `https://universe.evanhgs.fr`.
+
+```bash
+cat >/tmp/universe-s3-cors-staging.json <<EOF
+{
+  "CORSRules": [
+    {
+      "AllowedOrigins": ["$APP_URL"],
+      "AllowedMethods": ["GET", "PUT", "HEAD"],
+      "AllowedHeaders": ["*"],
+      "ExposeHeaders": ["ETag"],
+      "MaxAgeSeconds": 3000
+    }
+  ]
+}
+EOF
+
+aws --endpoint-url "$S3_ADMIN_ENDPOINT" s3api put-bucket-cors \
+  --bucket "$S3_BUCKET_BEATS" \
+  --cors-configuration file:///tmp/universe-s3-cors-staging.json
+```
+
+### Commandes utiles
+
+Lister les buckets:
+
+```bash
+aws --endpoint-url "$S3_ADMIN_ENDPOINT" s3api list-buckets
+```
+
+Lister les objets du bucket configure:
+
+```bash
+aws --endpoint-url "$S3_ADMIN_ENDPOINT" s3 ls "s3://$S3_BUCKET_BEATS" --recursive
+```
+
+Supprimer un objet de test:
+
+```bash
+aws --endpoint-url "$S3_ADMIN_ENDPOINT" s3 rm "s3://$S3_BUCKET_BEATS/path/to/object"
+```
