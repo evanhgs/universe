@@ -52,15 +52,14 @@ staging-prisma-push:
 	$(call require_env_file,$(STAGING_ENV_FILE))
 	project_name=$$(awk -F= '/^COMPOSE_PROJECT_NAME=/{print $$2}' $(STAGING_ENV_FILE)); \
 	project_name=$${project_name:-universe-staging}; \
+	docker build --target tooling -t "$${project_name}-nextjs-prisma" $(APP_DIR); \
 	docker run --rm \
 		--network "$${project_name}_internal" \
 		--env-file $(STAGING_ENV_FILE) \
 		-e HOME=/tmp \
 		-e NPM_CONFIG_CACHE=/tmp/.npm \
-		-v "$(CURDIR)/$(APP_DIR):/workspace:ro" \
-		-w /workspace \
-		node:24.12.0 \
-		sh -lc 'npx prisma db push'
+		"$${project_name}-nextjs-prisma" \
+		./node_modules/.bin/prisma db push
 
 prod:
 	$(call require_env_file,$(PROD_ENV_FILE))

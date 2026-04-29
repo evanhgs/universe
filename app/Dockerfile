@@ -33,6 +33,11 @@ RUN \
   else echo "Lockfile not found." && exit 1; \
   fi
 
+FROM deps AS tooling
+COPY . .
+RUN npx prisma generate
+CMD ["sh"]
+
 FROM base AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1

@@ -73,6 +73,15 @@ make prisma-studio
 
 `make prisma-generate` is the exception: it runs from `app/` on the host so the generated client is written back into the repository at `app/generated/prisma`.
 
+For staging, push the schema after the stack is up:
+
+```bash
+make staging
+make staging-prisma-push
+```
+
+`make staging-prisma-push` builds the Next.js `tooling` Docker stage and runs the local Prisma CLI from that image on the staging Compose network. It does not run `npx prisma` from a blank Node image, so a temporary npm/DNS issue on the VPS does not block schema pushes after the app image dependencies have been built.
+
 Or directly:
 
 ```bash
