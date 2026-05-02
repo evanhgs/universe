@@ -1,0 +1,138 @@
+name: Dev PR CI
+
+on:
+  pull_request:
+    branches:
+      - dev
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-pr-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_URL: http://localhost:3000
+  NEXT_TELEMETRY_DISABLED: "1"
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_dummy
+  CLERK_SECRET_KEY: sk_test_dummy
+  CLERK_WEBHOOK_SIGNING_SECRET: whsec_dummy
+  STRIPE_SECRET_KEY: sk_test_dummy
+  STRIPE_WEBHOOK_SECRET: whsec_dummy
+  DATABASE_URL: postgresql://universe:universe@localhost:5432/universe_ci
+
+jobs:
+  app-checks:
+    name: App checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test:ci
+
+      - name: Build
+        run: npm run build
+
+  ai-services-checks:
+    name: AI services checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ai-services
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ai-services/.python-version
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: ai-services/uv.lock
+
+      - name: Install dependencies
+        run: uv sync --locked --dev
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Compile
+        run: uv run python -m compileall main.py
+
+      - name: Smoke test API
+        run: |
+          uv run python - <<'PY'
+          from main import app, health, root, version
+
+          assert app.title == "ai services"
+          assert app.version == "0.1.0"
+          assert root() == {"api": "ai services"}
+          assert health() == {"status": "ok"}
+          assert version() == {"version": "0.1.0"}
+          PY
+
+      - name: Pytest
+        run: |
+          if find . -path './.venv' -prune -o -name '*test*.py' -print -quit | grep -q .; then
+            uv run pytest -q
+          else
+            echo "No pytest tests found yet."
+          fi
+
+  audio-worker-checks:
+    name: Audio worker checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: audio-worker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: audio-worker -> target
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --locked
