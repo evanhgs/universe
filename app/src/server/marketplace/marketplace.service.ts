@@ -16,7 +16,10 @@ import {
   findPurchasableOffering,
   findStripePaymentForConfirmation,
   incrementEntitlementDownloadCount,
+  countPaidSellerOrderItemsByBeat,
+  listSellerBeats,
   listBuyerOrders,
+  listSellerRevenueLedgerEntries,
   listSellerOrderItems,
   markOrderPaidFromStripe,
   markStripePaymentFailedBySession,
@@ -25,6 +28,7 @@ import { createStripeCheckoutSession, retrieveStripeCheckoutSession } from "./st
 import type {
   CreateDirectPurchaseOrderInput,
   MarketplaceAssetPayload,
+  SellerDashboardPayload,
   MarketplaceOrderPayload,
   StripeCheckoutInput,
   StripeConfirmationInput,
@@ -515,6 +519,112 @@ export async function listCurrentSellerSales(clerkUserId: string) {
         }
       : null,
   }));
+}
+
+/**
+ * Agrege les donnees V1 du dashboard vendeur: ventes, revenus et instrumentales.
+ * @param clerkUserId Identifiant Clerk du vendeur.
+ */
+export async function getCurrentSellerDashboard(
+  clerkUserId: string,
+): Promise<SellerDashboardPayload> {
+  const account = await assertMarketplaceAccount(clerkUserId);
+  const roles = account.roles.map(({ role }) => role);
+
+  if (!roles.includes("SELLER")) {
+    throw new Error("seller_role_required");
+  }
+
+  const [items, beats, paidCounts, ledgerEntries] = await Promise.all([
+    listSellerOrderItems(account.id),
+    listSellerBeats(account.id),
+    countPaidSellerOrderItemsByBeat(account.id),
+    listSellerRevenueLedgerEntries(account.id),
+  ]);
+  const sales = items.map((item) => ({
+    id: item.id,
+    orderId: item.orderId,
+    orderStatus: item.order.status,
+    paymentStatus: item.order.payments[0]?.status ?? null,
+    title: item.titleSnapshot,
+    licenseName: item.licenseNameSnapshot,
+    unitAmount: decimalToNumber(item.unitAmount) ?? 0,
+    quantity: item.quantity,
+    lineTotalAmount: decimalToNumber(item.lineTotalAmount) ?? 0,
+    currency: item.order.currency,
+    createdAt: item.createdAt.toISOString(),
+    paidAt: item.order.paidAt?.toISOString() ?? null,
+    beat: item.beat
+      ? {
+          id: item.beat.id,
+          slug: item.beat.slug,
+          title: item.beat.title,
+        }
+      : null,
+  }));
+  const paidCountByBeatId = new Map(
+    paidCounts
+      .filter((item) => item.beatId)
+      .map((item) => [item.beatId as string, item._count._all]),
+  );
+  const revenueByCurrency = new Map<
+    string,
+    {
+      currency: string;
+      grossPaidAmount: number;
+      platformCommissionAmount: number;
+      sellerEarningAmount: number;
+    }
+  >();
+
+  for (const entry of ledgerEntries) {
+    const current =
+      revenueByCurrency.get(entry.currency) ??
+      {
+        currency: entry.currency,
+        grossPaidAmount: 0,
+        platformCommissionAmount: 0,
+        sellerEarningAmount: 0,
+      };
+    const amount = decimalToNumber(entry.amount) ?? 0;
+
+    if (entry.type === "GROSS_SALE") {
+      current.grossPaidAmount += amount;
+    } else if (entry.type === "PLATFORM_COMMISSION") {
+      current.platformCommissionAmount += Math.abs(amount);
+    } else if (entry.type === "SELLER_EARNING") {
+      current.sellerEarningAmount += amount;
+    }
+
+    revenueByCurrency.set(entry.currency, current);
+  }
+
+  return {
+    items: sales,
+    count: sales.length,
+    summary: {
+      paidSalesCount: sales.filter((sale) => sale.orderStatus === "PAID").length,
+      orderLineCount: sales.length,
+      beatCount: beats.length,
+      publishedBeatCount: beats.filter((beat) => beat.status === "PUBLISHED").length,
+      draftBeatCount: beats.filter((beat) => beat.status === "DRAFT").length,
+      processingBeatCount: beats.filter((beat) => beat.status === "PROCESSING").length,
+      hiddenBeatCount: beats.filter((beat) => beat.status === "HIDDEN").length,
+      revenueByCurrency: Array.from(revenueByCurrency.values()),
+    },
+    beats: beats.map((beat) => ({
+      id: beat.id,
+      slug: beat.slug,
+      title: beat.title,
+      status: beat.status,
+      visibility: beat.visibility,
+      priceAmount: decimalToNumber(beat.basePriceAmount),
+      currency: beat.currency,
+      publishedAt: beat.publishedAt?.toISOString() ?? null,
+      updatedAt: beat.updatedAt.toISOString(),
+      paidSalesCount: paidCountByBeatId.get(beat.id) ?? 0,
+    })),
+  };
 }
 
 /**

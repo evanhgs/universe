@@ -3,13 +3,13 @@ import { NextResponse } from "next/server";
 
 import { PRIVATE_JSON_HEADERS } from "@/server/http/response-headers";
 import { marketplaceErrorResponse } from "@/server/marketplace/marketplace.http";
-import { listCurrentSellerSales } from "@/server/marketplace/marketplace.service";
+import { getCurrentSellerDashboard } from "@/server/marketplace/marketplace.service";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Liste les ventes du vendeur authentifie.
- * @returns Reponse JSON privee avec lignes de commandes vendeur.
+ * Retourne le dashboard vendeur V1.
+ * @returns Reponse JSON privee avec ventes, revenus et instrumentales.
  */
 export async function GET() {
   const { isAuthenticated, userId } = await auth();
@@ -22,18 +22,10 @@ export async function GET() {
   }
 
   try {
-    const sales = await listCurrentSellerSales(userId);
-
-    return NextResponse.json(
-      {
-        items: sales,
-        count: sales.length,
-      },
-      {
-        status: 200,
-        headers: PRIVATE_JSON_HEADERS,
-      },
-    );
+    return NextResponse.json(await getCurrentSellerDashboard(userId), {
+      status: 200,
+      headers: PRIVATE_JSON_HEADERS,
+    });
   } catch (error) {
     return marketplaceErrorResponse(error);
   }

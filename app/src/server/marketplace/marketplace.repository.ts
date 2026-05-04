@@ -547,6 +547,77 @@ export async function listSellerOrderItems(sellerId: string) {
 }
 
 /**
+ * Liste les instrumentales appartenant au vendeur pour son dashboard prive.
+ * @param sellerId Identifiant utilisateur interne vendeur.
+ */
+export async function listSellerBeats(sellerId: string) {
+  return getPrisma().beat.findMany({
+    where: {
+      ownerId: sellerId,
+      status: {
+        not: "DELETED",
+      },
+    },
+    orderBy: {
+      updatedAt: "desc",
+    },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      status: true,
+      visibility: true,
+      basePriceAmount: true,
+      currency: true,
+      publishedAt: true,
+      updatedAt: true,
+    },
+  });
+}
+
+/**
+ * Compte les ventes payees par beat pour un vendeur.
+ * @param sellerId Identifiant utilisateur interne vendeur.
+ */
+export async function countPaidSellerOrderItemsByBeat(sellerId: string) {
+  return getPrisma().orderItem.groupBy({
+    by: ["beatId"],
+    where: {
+      sellerId,
+      beatId: {
+        not: null,
+      },
+      order: {
+        status: "PAID",
+      },
+    },
+    _count: {
+      _all: true,
+    },
+  });
+}
+
+/**
+ * Liste les entrees de ledger utiles au calcul de revenus vendeur.
+ * @param sellerId Identifiant utilisateur interne vendeur.
+ */
+export async function listSellerRevenueLedgerEntries(sellerId: string) {
+  return getPrisma().payoutLedgerEntry.findMany({
+    where: {
+      sellerId,
+      type: {
+        in: ["GROSS_SALE", "PLATFORM_COMMISSION", "SELLER_EARNING"],
+      },
+    },
+    select: {
+      type: true,
+      amount: true,
+      currency: true,
+    },
+  });
+}
+
+/**
  * Charge un entitlement actif appartenant a un acheteur avec ses assets telechargeables.
  * @param args.entitlementId Identifiant du droit d'achat.
  * @param args.buyerId Identifiant utilisateur interne acheteur.

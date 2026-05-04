@@ -82,3 +82,57 @@ export type MarketplaceOrderPayload = {
     expiresAt: string | null;
   }>;
 };
+
+export type SellerRevenueCurrencyPayload = {
+  currency: string;
+  grossPaidAmount: number;
+  platformCommissionAmount: number;
+  sellerEarningAmount: number;
+};
+
+export type SellerBeatPayload = {
+  id: string;
+  slug: string;
+  title: string;
+  status: string;
+  visibility: string;
+  priceAmount: number | null;
+  currency: string;
+  publishedAt: string | null;
+  updatedAt: string;
+  paidSalesCount: number;
+};
+
+export type SellerDashboardPayload = {
+  items: Array<{
+    id: string;
+    orderId: string;
+    orderStatus: string;
+    paymentStatus: string | null;
+    title: string;
+    licenseName: string | null;
+    unitAmount: number;
+    quantity: number;
+    lineTotalAmount: number;
+    currency: string;
+    createdAt: string;
+    paidAt: string | null;
+    beat: {
+      id: string;
+      slug: string;
+      title: string;
+    } | null;
+  }>;
+  count: number;
+  summary: {
+    paidSalesCount: number;
+    orderLineCount: number;
+    beatCount: number;
+    publishedBeatCount: number;
+    draftBeatCount: number;
+    processingBeatCount: number;
+    hiddenBeatCount: number;
+    revenueByCurrency: SellerRevenueCurrencyPayload[];
+  };
+  beats: SellerBeatPayload[];
+};
