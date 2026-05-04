@@ -79,9 +79,11 @@ Objectif : permettre **inscription → publication → achat → paiement → ac
 
 ## **8\. Emails essentiels**
 
-* Email vérification compte  
+* Email vérification compte (géré par clerk)
 * Email confirmation achat  
 * Email confirmation vente
+* Email messagerie (message non lu après 24h)
+* Email confirmation accès vendeur
 
 ---
 

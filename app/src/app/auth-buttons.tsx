@@ -61,6 +61,7 @@ export function SignedInActions() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [account, setAccount] = useState<HeaderAccount | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const displayName =
     account?.profile.displayName ??
@@ -104,6 +105,46 @@ export function SignedInActions() {
   }, [getToken]);
 
   useEffect(() => {
+    let isCancelled = false;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    /**
+     * Charge le compteur de messages non lus pour le badge in-app.
+     */
+    async function refreshUnreadCount() {
+      try {
+        const token = await getToken();
+        const response = await fetch("/api/chat/unread-count", {
+          credentials: "same-origin",
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
+
+        if (!isCancelled && response.ok) {
+          const payload = (await response.json()) as { unreadCount?: unknown };
+          setUnreadCount(
+            typeof payload.unreadCount === "number" ? payload.unreadCount : 0,
+          );
+        }
+      } catch {
+        if (!isCancelled) {
+          setUnreadCount(0);
+        }
+      }
+    }
+
+    void refreshUnreadCount();
+    intervalId = setInterval(() => void refreshUnreadCount(), 30000);
+
+    return () => {
+      isCancelled = true;
+
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [getToken]);
+
+  useEffect(() => {
     if (!isOpen) {
       return;
     }
@@ -140,7 +181,7 @@ export function SignedInActions() {
       <button
         aria-expanded={isOpen}
         aria-haspopup="menu"
-        className="flex h-10 items-center gap-3 rounded-full border border-black/10 bg-white px-2 pr-4 text-left shadow-sm transition hover:border-black/25"
+        className="relative flex h-10 items-center gap-3 rounded-full border border-black/10 bg-white px-2 pr-4 text-left shadow-sm transition hover:border-black/25"
         onClick={() => setIsOpen((value) => !value)}
         type="button"
       >
@@ -159,6 +200,11 @@ export function SignedInActions() {
         <span className="hidden max-w-36 truncate text-sm font-medium text-black md:block">
           {displayName}
         </span>
+        {unreadCount > 0 ? (
+          <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-black px-1.5 py-0.5 text-center text-[10px] font-semibold text-white">
+            {unreadCount}
+          </span>
+        ) : null}
       </button>
 
       {isOpen ? (
@@ -197,6 +243,21 @@ export function SignedInActions() {
               role="menuitem"
             >
               Voir mon profil public
+            </Link>
+            <Link
+              className="px-3 py-2 text-black hover:bg-black/[0.04]"
+              href="/account/messages"
+              onClick={() => setIsOpen(false)}
+              role="menuitem"
+            >
+              <span className="flex items-center justify-between gap-3">
+                <span>Messages</span>
+                {unreadCount > 0 ? (
+                  <span className="min-w-6 rounded-full bg-black px-2 py-0.5 text-center text-xs font-semibold text-white">
+                    {unreadCount}
+                  </span>
+                ) : null}
+              </span>
             </Link>
             <Link
               className="px-3 py-2 text-black hover:bg-black/[0.04]"

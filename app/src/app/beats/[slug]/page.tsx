@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { ChatContactButton } from "@/app/chat-contact-button";
 import { getBeatPayloadBySlug } from "@/server/beats/beat.service";
 import { BeatPreviewPlayer } from "./beat-preview-player";
 import { BeatPurchasePanel } from "./beat-purchase-panel";
@@ -115,6 +116,13 @@ export default async function BeatDetailPage({ params, searchParams }: BeatDetai
           isOwner={beat.viewer.viewerCanEdit}
           licenseOfferings={licenseOfferings}
         />
+        <div className="mt-3">
+          <ChatContactButton
+            beatSlug={beat.slug}
+            disabled={beat.viewer.viewerCanEdit}
+            label={beat.viewer.viewerCanEdit ? "Messagerie indisponible" : "Contacter le vendeur"}
+          />
+        </div>
         <div className="mt-6 border-t border-black/10 pt-5">
           <p className="text-sm font-semibold text-black">Vendeur</p>
           {beat.seller.slug ? (
