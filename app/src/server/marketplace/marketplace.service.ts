@@ -1,5 +1,6 @@
 import "server-only";
 
+import { emailService } from "@/server/email/email.service";
 import { syncCurrentAccountFromClerk } from "@/server/account/account.sync";
 import { createProtectedAssetUrl } from "@/server/storage/s3";
 import type Stripe from "stripe";
@@ -430,7 +431,7 @@ export async function fulfillStripeCheckoutSession(sessionId: string) {
   const taxAmount = fromCents(session.total_details?.amount_tax ?? stripeTotal - stripeSubtotal);
   const totalAmount = fromCents(stripeTotal);
 
-  return serializeOrder(
+  const order = serializeOrder(
     await markOrderPaidFromStripe({
       orderId: payment.orderId,
       paymentId: payment.id,
@@ -440,6 +441,10 @@ export async function fulfillStripeCheckoutSession(sessionId: string) {
       payload: stripePayloadJson(session),
     }),
   );
+
+  await emailService.sendOrderConfirmedEmails(order.id);
+
+  return order;
 }
 
 /**

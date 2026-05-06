@@ -190,6 +190,25 @@ enum KycStatus {
   EXPIRED
 }
 
+enum EmailTemplate {
+  PURCHASE_CONFIRMED
+  SALE_CONFIRMED
+  SELLER_ACCESS_GRANTED
+  CHAT_UNREAD_REMINDER
+}
+
+enum EmailEventStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+enum EmailProvider {
+  POSTMARK
+  SES
+}
+
 /// -------------------------
 /// CORE IDENTITY
 /// -------------------------
@@ -232,6 +251,7 @@ model User {
   kycRecords         KycVerification[]
   createdContracts   GeneratedContract[] @relation("ContractBuyer")
   soldContracts      GeneratedContract[] @relation("ContractSeller")
+  emailEvents        EmailEvent[]
 }
 
 model UserProfile {
@@ -632,6 +652,34 @@ model Message {
 
   @@index([conversationId, createdAt])
   @@index([senderId, createdAt])
+}
+
+/// -------------------------
+/// EMAILS
+/// -------------------------
+
+model EmailEvent {
+  id                 String           @id @default(cuid())
+  recipientUserId    String?
+  toEmail            String
+  fromEmail          String?
+  template           EmailTemplate
+  status             EmailEventStatus @default(PENDING)
+  provider           EmailProvider    @default(POSTMARK)
+  providerMessageId  String?
+  subject            String
+  errorMessage       String?
+  dedupeKey          String?          @unique
+  metadataJson       Json?
+  sentAt             DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  recipientUser      User?            @relation(fields: [recipientUserId], references: [id], onDelete: SetNull)
+
+  @@index([recipientUserId, createdAt])
+  @@index([template, status, createdAt])
+  @@index([providerMessageId])
 }
 
 /// -------------------------
