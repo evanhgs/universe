@@ -27,6 +27,35 @@ type SaleItem = {
 type SalesResponse = {
   items: SaleItem[];
   count: number;
+  summary?: {
+    paidSalesCount: number;
+    orderLineCount: number;
+    beatCount: number;
+    publishedBeatCount: number;
+    draftBeatCount: number;
+    processingBeatCount: number;
+    hiddenBeatCount: number;
+    revenueByCurrency: Array<{
+      currency: string;
+      grossPaidAmount: number;
+      platformCommissionAmount: number;
+      sellerEarningAmount: number;
+    }>;
+  };
+  beats?: SellerBeat[];
+};
+
+type SellerBeat = {
+  id: string;
+  slug: string;
+  title: string;
+  status: string;
+  visibility: string;
+  priceAmount: number | null;
+  currency: string;
+  publishedAt: string | null;
+  updatedAt: string;
+  paidSalesCount: number;
 };
 
 type JsonBody = {
@@ -64,6 +93,34 @@ function formatDate(value: string | null) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+/**
+ * Traduit un statut beat pour un dashboard vendeur lisible.
+ * @param status Statut brut Prisma/API.
+ */
+function beatStatusLabel(status: string) {
+  if (status === "PUBLISHED") {
+    return "Publiee";
+  }
+
+  if (status === "PROCESSING") {
+    return "En traitement";
+  }
+
+  if (status === "DRAFT") {
+    return "Brouillon";
+  }
+
+  if (status === "HIDDEN") {
+    return "Masquee";
+  }
+
+  if (status === "ARCHIVED") {
+    return "Archivee";
+  }
+
+  return status;
 }
 
 /**
@@ -113,17 +170,22 @@ export function SalesClient() {
   const { getToken } = useAuth();
   const { isLoaded, isSignedIn } = useUser();
   const [sales, setSales] = useState<SaleItem[]>([]);
+  const [beats, setBeats] = useState<SellerBeat[]>([]);
+  const [summary, setSummary] = useState<SalesResponse["summary"] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const totalPaid = useMemo(
+  const fallbackGrossPaid = useMemo(
     () =>
       sales
         .filter((sale) => sale.orderStatus === "PAID")
         .reduce((sum, sale) => sum + sale.lineTotalAmount, 0),
     [sales],
   );
-  const currency = sales[0]?.currency ?? "EUR";
+  const primaryRevenue = summary?.revenueByCurrency[0] ?? null;
+  const currency = primaryRevenue?.currency ?? sales[0]?.currency ?? "EUR";
+  const grossPaid = primaryRevenue?.grossPaidAmount ?? fallbackGrossPaid;
+  const sellerEarning = primaryRevenue?.sellerEarningAmount ?? fallbackGrossPaid;
 
   const buildAuthHeaders = useCallback(async (base: HeadersInit = {}) => {
     const headers = new Headers(base);
@@ -162,6 +224,8 @@ export function SalesClient() {
 
         if (!isCancelled) {
           setSales(response.items);
+          setBeats(response.beats ?? []);
+          setSummary(response.summary ?? null);
         }
       } catch (err) {
         if (!isCancelled) {
@@ -204,14 +268,16 @@ export function SalesClient() {
   }
 
   return (
-    <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-5xl px-6 py-10">
+    <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-6xl px-6 py-10">
       <div className="border-b border-black/10 pb-8">
         <p className="text-sm font-medium uppercase tracking-[0.24em] text-black/45">
           Marketplace
         </p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-black">Mes ventes</h1>
+        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-black">
+          Dashboard vendeur
+        </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-black/60">
-          Consulte les commandes contenant tes instrumentales et suis le revenu brut paye.
+          Consulte tes ventes, tes revenus et l&apos;etat de tes instrumentales.
         </p>
       </div>
 
@@ -226,22 +292,57 @@ export function SalesClient() {
         </div>
       ) : null}
 
-      <section className="mt-8 grid gap-4 md:grid-cols-3">
+      <section className="mt-8 grid gap-4 md:grid-cols-4">
         <article className="border border-black/10 bg-white p-5">
           <p className="text-sm text-black/45">Ventes payees</p>
           <p className="mt-2 text-3xl font-semibold text-black">
-            {sales.filter((sale) => sale.orderStatus === "PAID").length}
+            {summary?.paidSalesCount ?? sales.filter((sale) => sale.orderStatus === "PAID").length}
+          </p>
+        </article>
+        <article className="border border-black/10 bg-white p-5">
+          <p className="text-sm text-black/45">Revenu net vendeur</p>
+          <p className="mt-2 text-3xl font-semibold text-black">
+            {formatMoney(sellerEarning, currency)}
           </p>
         </article>
         <article className="border border-black/10 bg-white p-5">
           <p className="text-sm text-black/45">Revenu brut</p>
           <p className="mt-2 text-3xl font-semibold text-black">
-            {formatMoney(totalPaid, currency)}
+            {formatMoney(grossPaid, currency)}
           </p>
         </article>
         <article className="border border-black/10 bg-white p-5">
-          <p className="text-sm text-black/45">Lignes de commande</p>
-          <p className="mt-2 text-3xl font-semibold text-black">{sales.length}</p>
+          <p className="text-sm text-black/45">Instrus</p>
+          <p className="mt-2 text-3xl font-semibold text-black">
+            {summary?.beatCount ?? beats.length}
+          </p>
+        </article>
+      </section>
+
+      <section className="mt-4 grid gap-4 md:grid-cols-4">
+        <article className="border border-black/10 bg-white p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-black/40">Publiees</p>
+          <p className="mt-1 text-xl font-semibold text-black">
+            {summary?.publishedBeatCount ?? beats.filter((beat) => beat.status === "PUBLISHED").length}
+          </p>
+        </article>
+        <article className="border border-black/10 bg-white p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-black/40">Brouillons</p>
+          <p className="mt-1 text-xl font-semibold text-black">
+            {summary?.draftBeatCount ?? beats.filter((beat) => beat.status === "DRAFT").length}
+          </p>
+        </article>
+        <article className="border border-black/10 bg-white p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-black/40">Traitement</p>
+          <p className="mt-1 text-xl font-semibold text-black">
+            {summary?.processingBeatCount ?? beats.filter((beat) => beat.status === "PROCESSING").length}
+          </p>
+        </article>
+        <article className="border border-black/10 bg-white p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-black/40">Masquees</p>
+          <p className="mt-1 text-xl font-semibold text-black">
+            {summary?.hiddenBeatCount ?? beats.filter((beat) => beat.status === "HIDDEN").length}
+          </p>
         </article>
       </section>
 
@@ -257,8 +358,82 @@ export function SalesClient() {
         </div>
       ) : null}
 
+      <section className="mt-8">
+        <div className="flex flex-col gap-3 border-b border-black/10 pb-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold text-black">Mes instrus</h2>
+            <p className="mt-2 text-sm leading-6 text-black/60">
+              Suis la visibilite, le prix et les ventes de chaque publication.
+            </p>
+          </div>
+          <Link className={secondaryButtonClass} href="/beats">
+            Gerer le catalogue
+          </Link>
+        </div>
+
+        {beats.length === 0 && !error ? (
+          <div className="mt-5 border border-dashed border-black/20 p-8">
+            <h3 className="text-xl font-semibold text-black">Aucune instru</h3>
+            <p className="mt-2 text-sm leading-6 text-black/60">
+              Publie ta premiere instrumentale pour commencer a vendre.
+            </p>
+            <Link className={`mt-5 ${secondaryButtonClass}`} href="/beats">
+              Ajouter une instru
+            </Link>
+          </div>
+        ) : null}
+
+        {beats.length > 0 ? (
+          <div className="mt-5 grid gap-4">
+            {beats.map((beat) => (
+              <article className="border border-black/10 bg-white p-5" key={beat.id}>
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-black">{beat.title}</h3>
+                    <p className="mt-1 text-sm text-black/60">
+                      {beatStatusLabel(beat.status)} - {beat.visibility}
+                    </p>
+                    <p className="mt-1 text-xs text-black/45">
+                      Mis a jour le {formatDate(beat.updatedAt)}
+                    </p>
+                  </div>
+                  <dl className="grid min-w-56 gap-1 text-sm text-black/65">
+                    <div className="flex justify-between gap-8">
+                      <dt>Prix</dt>
+                      <dd>
+                        {beat.priceAmount === null
+                          ? "Non renseigne"
+                          : formatMoney(beat.priceAmount, beat.currency)}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between gap-8">
+                      <dt>Ventes payees</dt>
+                      <dd>{beat.paidSalesCount}</dd>
+                    </div>
+                    <div className="flex justify-between gap-8">
+                      <dt>Publiee le</dt>
+                      <dd>{formatDate(beat.publishedAt)}</dd>
+                    </div>
+                  </dl>
+                  <Link
+                    className="inline-flex text-sm font-medium text-black hover:text-black/65"
+                    href={`/beats/${beat.slug}`}
+                  >
+                    Ouvrir
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : null}
+      </section>
+
       {sales.length > 0 ? (
-        <div className="mt-8 grid gap-4">
+        <section className="mt-8">
+          <div className="border-b border-black/10 pb-4">
+            <h2 className="text-2xl font-semibold text-black">Historique des ventes</h2>
+          </div>
+          <div className="mt-5 grid gap-4">
           {sales.map((sale) => (
             <article className="border border-black/10 bg-white p-5" key={sale.id}>
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -300,7 +475,8 @@ export function SalesClient() {
               </div>
             </article>
           ))}
-        </div>
+          </div>
+        </section>
       ) : null}
     </main>
   );

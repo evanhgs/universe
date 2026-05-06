@@ -1,20 +1,19 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
+import { chatErrorResponse } from "@/server/chat/chat.http";
+import { getCurrentUserUnreadCount } from "@/server/chat/chat.service";
 import { PRIVATE_JSON_HEADERS } from "@/server/http/response-headers";
-import { marketplaceErrorResponse } from "@/server/marketplace/marketplace.http";
-import { getCurrentSellerDashboard } from "@/server/marketplace/marketplace.service";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Retourne le dashboard vendeur V1.
- * @returns Reponse JSON privee avec ventes, revenus et instrumentales.
+ * Retourne le total des messages non lus pour le badge in-app.
  */
 export async function GET() {
   const { isAuthenticated, userId } = await auth();
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !userId) {
     return NextResponse.json(
       { error: "unauthorized" },
       { status: 401, headers: PRIVATE_JSON_HEADERS },
@@ -22,11 +21,11 @@ export async function GET() {
   }
 
   try {
-    return NextResponse.json(await getCurrentSellerDashboard(userId), {
+    return NextResponse.json(await getCurrentUserUnreadCount(userId), {
       status: 200,
       headers: PRIVATE_JSON_HEADERS,
     });
   } catch (error) {
-    return marketplaceErrorResponse(error);
+    return chatErrorResponse(error);
   }
 }

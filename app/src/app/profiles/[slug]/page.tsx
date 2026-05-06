@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { ChatContactButton } from "@/app/chat-contact-button";
 import { getProfilePayloadBySlug } from "@/server/profiles/profile.service";
 
 type ProfilePageProps = {
@@ -32,9 +33,17 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
         <p className="text-sm font-medium uppercase tracking-[0.24em] text-black/45">
           {profile.roles.includes('SELLER') ? "profile vendeur" : "profile utilisateur"}
         </p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-black">
-          {profile.displayName}
-        </h1>
+        <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <h1 className="text-4xl font-semibold tracking-tight text-black">
+            {profile.displayName}
+          </h1>
+          {!profile.visibility.viewerCanEdit ? (
+            <ChatContactButton
+              label="Contacter"
+              targetProfileSlug={profile.slug}
+            />
+          ) : null}
+        </div>
         <p className="mt-4 max-w-3xl text-base leading-7 text-black/65">
           {profile.bio ?? "Cet utilisateur n'a pas encore ajoute de description."}
         </p>

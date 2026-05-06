@@ -130,6 +130,12 @@ export default async function AccountPage() {
         <h2 className="text-2xl font-semibold text-black">Acces rapides</h2>
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <SellerRoleButton isSeller={isSeller} />
+          <Link className="border border-black/10 bg-white p-5 hover:border-black/25" href="/account/messages">
+            <h3 className="font-semibold text-black">Messages</h3>
+            <p className="mt-2 text-sm leading-6 text-black/60">
+              Echange avec les vendeurs et les acheteurs depuis Universe.
+            </p>
+          </Link>
           <Link className="border border-black/10 bg-white p-5 hover:border-black/25" href="/account/purchases">
             <h3 className="font-semibold text-black">Mes achats</h3>
             <p className="mt-2 text-sm leading-6 text-black/60">
@@ -142,7 +148,7 @@ export default async function AccountPage() {
               Consulte les lignes de commandes vendues avec ton role vendeur.
             </p>
           </Link>
-          <Link className="border border-black/10 bg-white p-5 hover:border-black/25" href="/beats">
+          <Link className="border border-black/10 bg-white p-5 hover:border-black/25 md:col-span-2 xl:col-span-1" href="/beats">
             <h3 className="font-semibold text-black">{isSeller ? "Catalogue" : "Explorer"}</h3>
             <p className="mt-2 text-sm leading-6 text-black/60">
               {isSeller

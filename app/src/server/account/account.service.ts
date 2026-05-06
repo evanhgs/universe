@@ -2,6 +2,7 @@ import "server-only";
 
 import { clerkClient } from "@clerk/nextjs/server";
 
+import { emailService } from "@/server/email/email.service";
 import {
   SELF_SERVICE_ROLE_CODES,
   USERNAME_PATTERN,
@@ -113,6 +114,9 @@ export async function updateCurrentAccountRoles(
   roles: SelfServiceRoleCode[],
 ) {
   const client = await clerkClient();
+  const previousAccount = await findAccountByClerkUserId(clerkUserId);
+  const hadSellerRole =
+    previousAccount?.roles.some(({ role }) => role === "SELLER") ?? false;
   const account = await replaceSelfServiceRolesByClerkUserId({
     clerkUserId,
     allowedRoles: [...SELF_SERVICE_ROLE_CODES],
@@ -124,6 +128,10 @@ export async function updateCurrentAccountRoles(
       marketplaceRoles: roles,
     },
   });
+
+  if (!hadSellerRole && roles.includes("SELLER")) {
+    await emailService.sendSellerAccessGranted(clerkUserId);
+  }
 
   return serializeAccount(account);
 }
