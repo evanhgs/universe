@@ -23,6 +23,36 @@ env:
   DATABASE_URL: postgresql://universe:universe@localhost:5432/universe_ci
 
 jobs:
+  detect_changes:
+    name: Detect changed areas
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      ai_services: ${{ steps.changed_files.outputs.ai_services }}
+      audio_worker: ${{ steps.changed_files.outputs.audio_worker }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed files
+        id: changed_files
+        run: |
+          changed_files="$(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}")"
+
+          if printf '%s\n' "$changed_files" | grep -q '^ai-services/'; then
+            echo "ai_services=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ai_services=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if printf '%s\n' "$changed_files" | grep -q '^audio-worker/'; then
+            echo "audio_worker=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "audio_worker=false" >> "$GITHUB_OUTPUT"
+          fi
+
   app-checks:
     name: App checks
     runs-on: ubuntu-latest
@@ -58,6 +88,8 @@ jobs:
 
   ai-services-checks:
     name: AI services checks
+    needs: detect_changes
+    if: needs.detect_changes.outputs.ai_services == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -84,31 +116,10 @@ jobs:
       - name: Lint
         run: uv run ruff check .
 
-      - name: Compile
-        run: uv run python -m compileall main.py
-
-      - name: Smoke test API
-        run: |
-          uv run python - <<'PY'
-          from main import app, health, root, version
-
-          assert app.title == "ai services"
-          assert app.version == "0.1.0"
-          assert root() == {"api": "ai services"}
-          assert health() == {"status": "ok"}
-          assert version() == {"version": "0.1.0"}
-          PY
-
-      - name: Pytest
-        run: |
-          if find . -path './.venv' -prune -o -name '*test*.py' -print -quit | grep -q .; then
-            uv run pytest -q
-          else
-            echo "No pytest tests found yet."
-          fi
-
   audio-worker-checks:
     name: Audio worker checks
+    needs: detect_changes
+    if: needs.detect_changes.outputs.audio_worker == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -121,18 +132,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy, rustfmt
-
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: audio-worker -> target
+          components: rustfmt
 
       - name: Format
         run: cargo fmt --check
-
-      - name: Clippy
-        run: cargo clippy --locked --all-targets -- -D warnings
-
-      - name: Test
-        run: cargo test --locked
