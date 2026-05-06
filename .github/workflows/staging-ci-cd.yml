@@ -257,7 +257,6 @@ jobs:
         env:
           STAGING_PROJECT_PATH: ${{ secrets.STAGING_PROJECT_PATH }}
           STAGING_SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
-          STAGING_SSH_KNOWN_HOSTS: ${{ secrets.STAGING_SSH_KNOWN_HOSTS }}
           STAGING_SSH_PORT: ${{ secrets.STAGING_SSH_PORT }}
           STAGING_SSH_PRIVATE_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
           STAGING_SSH_USER: ${{ secrets.STAGING_SSH_USER }}
@@ -267,7 +266,6 @@ jobs:
           for name in \
             STAGING_PROJECT_PATH \
             STAGING_SSH_HOST \
-            STAGING_SSH_KNOWN_HOSTS \
             STAGING_SSH_PORT \
             STAGING_SSH_PRIVATE_KEY \
             STAGING_SSH_USER
@@ -283,13 +281,10 @@ jobs:
       - name: Configure SSH
         env:
           STAGING_SSH_PRIVATE_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
-          STAGING_SSH_KNOWN_HOSTS: ${{ secrets.STAGING_SSH_KNOWN_HOSTS }}
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$STAGING_SSH_PRIVATE_KEY" > ~/.ssh/staging_deploy_key
           chmod 600 ~/.ssh/staging_deploy_key
-          printf '%s\n' "$STAGING_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
 
       - name: Deploy on staging server
         env:
@@ -303,7 +298,7 @@ jobs:
             -p "$STAGING_SSH_PORT" \
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
+            -o StrictHostKeyChecking=accept-new \
             "$STAGING_SSH_USER@$STAGING_SSH_HOST" \
             "bash -s" -- "$STAGING_PROJECT_PATH" <<'EOF'
           set -euo pipefail
