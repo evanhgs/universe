@@ -277,39 +277,19 @@ jobs:
           done
 
           exit "$missing"
-
-      - name: Configure SSH
-        env:
-          STAGING_SSH_PRIVATE_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
-        run: |
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$STAGING_SSH_PRIVATE_KEY" > ~/.ssh/staging_deploy_key
-          chmod 600 ~/.ssh/staging_deploy_key
-
-      - name: Deploy on staging server
-        env:
-          STAGING_PROJECT_PATH: ${{ secrets.STAGING_PROJECT_PATH }}
-          STAGING_SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
-          STAGING_SSH_PORT: ${{ secrets.STAGING_SSH_PORT }}
-          STAGING_SSH_USER: ${{ secrets.STAGING_SSH_USER }}
-        run: |
-          ssh \
-            -i ~/.ssh/staging_deploy_key \
-            -p "$STAGING_SSH_PORT" \
-            -o BatchMode=yes \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=accept-new \
-            "$STAGING_SSH_USER@$STAGING_SSH_HOST" \
-            "bash -s" -- "$STAGING_PROJECT_PATH" <<'EOF'
-          set -euo pipefail
-
-          project_path="$1"
-
-          cd "$project_path"
-          git fetch --prune origin
-          git checkout staging
-          git pull --ff-only origin staging
-          make staging
-          make staging-prisma-push
-          make staging-ps
-          EOF
+      
+      - name: Execute remote ssh command and build the project_path
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST }}
+          port: ${{ secrets.STAGING_SSH_PORT }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          script: |
+            cd "${{ secrets.STAGING_PROJECT_PATH }}"
+            git fetch --prune origin
+            git checkout staging
+            git pull --ff-only origin staging
+            make staging
+            make staging-prisma-migrate
+            make staging-ps

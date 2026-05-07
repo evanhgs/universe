@@ -7,14 +7,33 @@ DEV_COMPOSE := docker compose -f infra/compose.dev.yml --env-file $(DEV_ENV_FILE
 STAGING_COMPOSE := docker compose -f infra/compose.staging.yml --env-file $(STAGING_ENV_FILE)
 PROD_COMPOSE := docker compose -f infra/compose.prod.yml --env-file $(PROD_ENV_FILE)
 
-.PHONY: dev dev-down dev-logs dev-ps \
-	staging staging-down staging-logs staging-ps staging-prisma-push \
+.PHONY: \
+	dev dev-down dev-logs dev-ps \
+	dev-next-sh dev-prisma-generate dev-prisma-migrate dev-prisma-push dev-prisma-studio \
+	staging staging-down staging-logs staging-ps staging-prisma-migrate staging-prisma-push \
 	prod prod-down prod-logs prod-ps \
-	next-sh prisma-generate prisma-migrate prisma-studio
+	next-sh prisma-generate prisma-migrate prisma-push prisma-studio
 
 define require_env_file
 	@test -f $(1) || (echo "Missing $(1). Copy $(1).example to $(1) before running this target." >&2; exit 1)
 endef
+
+define run_prisma_tooling
+	project_name=$$(awk -F= '/^COMPOSE_PROJECT_NAME=/{print $$2}' $(1)); \
+	project_name=$${project_name:-$(2)}; \
+	docker build --target tooling -t "$${project_name}-nextjs-prisma" $(APP_DIR); \
+	docker run --rm \
+		--network "$${project_name}_internal" \
+		--env-file $(1) \
+		-e HOME=/tmp \
+		-e NPM_CONFIG_CACHE=/tmp/.npm \
+		"$${project_name}-nextjs-prisma" \
+		$(3)
+endef
+
+# -----------------------------------------------------------------------------
+# Dev
+# -----------------------------------------------------------------------------
 
 dev:
 	$(call require_env_file,$(DEV_ENV_FILE))
@@ -32,6 +51,36 @@ dev-ps:
 	$(call require_env_file,$(DEV_ENV_FILE))
 	$(DEV_COMPOSE) ps
 
+dev-next-sh:
+	$(call require_env_file,$(DEV_ENV_FILE))
+	$(DEV_COMPOSE) exec nextjs sh
+
+dev-prisma-generate:
+	cd $(APP_DIR) && npx prisma generate
+
+dev-prisma-migrate:
+	$(call require_env_file,$(DEV_ENV_FILE))
+	$(DEV_COMPOSE) exec nextjs npx prisma migrate dev
+
+dev-prisma-push:
+	$(call require_env_file,$(DEV_ENV_FILE))
+	$(DEV_COMPOSE) exec nextjs npx prisma db push
+
+dev-prisma-studio:
+	$(call require_env_file,$(DEV_ENV_FILE))
+	$(DEV_COMPOSE) exec nextjs npx prisma studio --hostname 0.0.0.0 --port 5555
+
+# Backward-compatible dev aliases.
+next-sh: dev-next-sh
+prisma-generate: dev-prisma-generate
+prisma-migrate: dev-prisma-migrate
+prisma-push: dev-prisma-push
+prisma-studio: dev-prisma-studio
+
+# -----------------------------------------------------------------------------
+# Staging
+# -----------------------------------------------------------------------------
+
 staging:
 	$(call require_env_file,$(STAGING_ENV_FILE))
 	$(STAGING_COMPOSE) up --build -d
@@ -48,18 +97,18 @@ staging-ps:
 	$(call require_env_file,$(STAGING_ENV_FILE))
 	$(STAGING_COMPOSE) ps
 
+staging-prisma-migrate:
+	$(call require_env_file,$(STAGING_ENV_FILE))
+	$(STAGING_COMPOSE) up -d --wait postgres
+	$(call run_prisma_tooling,$(STAGING_ENV_FILE),universe-staging,./node_modules/.bin/prisma migrate deploy)
+
 staging-prisma-push:
 	$(call require_env_file,$(STAGING_ENV_FILE))
-	project_name=$$(awk -F= '/^COMPOSE_PROJECT_NAME=/{print $$2}' $(STAGING_ENV_FILE)); \
-	project_name=$${project_name:-universe-staging}; \
-	docker build --target tooling -t "$${project_name}-nextjs-prisma" $(APP_DIR); \
-	docker run --rm \
-		--network "$${project_name}_internal" \
-		--env-file $(STAGING_ENV_FILE) \
-		-e HOME=/tmp \
-		-e NPM_CONFIG_CACHE=/tmp/.npm \
-		"$${project_name}-nextjs-prisma" \
-		./node_modules/.bin/prisma db push
+	$(call run_prisma_tooling,$(STAGING_ENV_FILE),universe-staging,./node_modules/.bin/prisma db push)
+
+# -----------------------------------------------------------------------------
+# Production
+# -----------------------------------------------------------------------------
 
 prod:
 	$(call require_env_file,$(PROD_ENV_FILE))
@@ -76,22 +125,3 @@ prod-logs:
 prod-ps:
 	$(call require_env_file,$(PROD_ENV_FILE))
 	$(PROD_COMPOSE) ps
-
-next-sh:
-	$(call require_env_file,$(DEV_ENV_FILE))
-	$(DEV_COMPOSE) exec nextjs sh
-
-prisma-generate:
-	cd $(APP_DIR) && npx prisma generate
-
-prisma-migrate:
-	$(call require_env_file,$(DEV_ENV_FILE))
-	$(DEV_COMPOSE) exec nextjs npx prisma migrate dev
-
-prisma-push:
-	$(call require_env_file,$(DEV_ENV_FILE))
-	$(DEV_COMPOSE) exec nextjs npx prisma db push
-
-prisma-studio:
-	$(call require_env_file,$(DEV_ENV_FILE))
-	$(DEV_COMPOSE) exec nextjs npx prisma studio --hostname 0.0.0.0 --port 5555
