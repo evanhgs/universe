@@ -6,9 +6,11 @@ import { getPublicAssetUrl } from "@/server/storage/s3";
 import type { AssetType } from "../../../generated/prisma/enums";
 import {
   createBeat,
+  findBeatPreviewJobForOwner,
   findPublishedBeatPreviewBySlug,
   findPublishedBeats,
   findVisibleBeatBySlug,
+  resetBeatPreviewJobForOwner,
   softDeleteBeatBySlug,
   updateBeatBySlug,
 } from "./beat.repository";
@@ -244,6 +246,32 @@ export async function deleteBeatForCurrentSeller(clerkUserId: string, slug: stri
   const account = await assertSellerAccount(clerkUserId);
 
   return softDeleteBeatBySlug(account.id, slug);
+}
+
+/**
+ * Retourne l'etat du job de generation de preview pour un beat appartenant au
+ * vendeur authentifie (audit B6 — alimente la UI vendeur). Renvoie null si le
+ * beat n'a pas de job preview.
+ */
+export async function getBeatPreviewJobForCurrentSeller(
+  clerkUserId: string,
+  slug: string,
+) {
+  const account = await assertSellerAccount(clerkUserId);
+  return findBeatPreviewJobForOwner(account.id, slug);
+}
+
+/**
+ * Relance la generation de preview pour le beat du vendeur authentifie en
+ * resetant le job (audit B6 volet 2). Utile lorsque le worker Rust a echoue
+ * (timeout, ffmpeg KO, S3 down) ou s'est gele en PROCESSING (audit C7).
+ */
+export async function retryBeatPreviewForCurrentSeller(
+  clerkUserId: string,
+  slug: string,
+) {
+  const account = await assertSellerAccount(clerkUserId);
+  return resetBeatPreviewJobForOwner(account.id, slug);
 }
 
 /**

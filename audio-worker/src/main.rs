@@ -12,6 +12,7 @@ use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use sqlx::{postgres::PgPoolOptions, PgPool, Row};
+use tempfile::TempDir;
 use tokio::{fs, process::Command, time::sleep};
 use tracing::{error, info, warn};
 
@@ -100,6 +101,9 @@ struct WorkerConfig {
     id: String,
     poll_interval: Duration,
     tmp_dir: PathBuf,
+    /// Maximum allowed size in bytes for a downloaded source asset. Prevents a
+    /// hostile or malformed asset from filling the worker disk (audit C5).
+    max_source_bytes: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -132,6 +136,10 @@ async fn main() -> Result<()> {
             env::var("AUDIO_WORKER_TMP_DIR")
                 .unwrap_or_else(|_| "/tmp/universe-audio-worker".into()),
         ),
+        max_source_bytes: env::var("AUDIO_WORKER_MAX_SOURCE_BYTES")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(5_000 * 1024 * 1024),
     };
 
     fs::create_dir_all(&config.tmp_dir).await?;
@@ -295,10 +303,16 @@ async fn process_job(
 
     let source = fetch_asset(pool, &job.source_asset_id).await?;
     let output = fetch_asset(pool, &job.output_asset_id).await?;
-    let source_path = config.tmp_dir.join(format!("{}-source", job.id));
-    let preview_path = config.tmp_dir.join(format!("{}-preview.mp3", job.id));
 
-    download_asset(storage, &source, &source_path).await?;
+    // Per-job scratch dir; Drop guarantees cleanup even on early return / panic
+    // unwinding (audit C6 — fixes tempfile leak that previously occurred when
+    // download/probe/encode/upload failed mid-flight).
+    let workdir = TempDir::new_in(&config.tmp_dir)
+        .with_context(|| format!("failed to create scratch dir under {:?}", config.tmp_dir))?;
+    let source_path = workdir.path().join("source");
+    let preview_path = workdir.path().join("preview.mp3");
+
+    download_asset(storage, &source, &source_path, config.max_source_bytes).await?;
     let duration = probe_duration(&source_path).await?;
     let preview_seconds = preview_length(duration, &job.preview_policy);
 
@@ -321,19 +335,24 @@ async fn process_job(
     upload_preview(storage, &output, &preview_path).await?;
     mark_job_ready(pool, &job, duration, preview_seconds, size_bytes).await?;
 
-    let _ = fs::remove_file(&source_path).await;
-    let _ = fs::remove_file(&preview_path).await;
-
     info!(job_id = %job.id, beat_id = %job.beat_id, output_asset_id = %output.id, "preview generated");
+    // workdir drops here, removing source and preview tempfiles.
+    drop(workdir);
     Ok(())
 }
 
-async fn download_asset(storage: &StorageConfig, asset: &Asset, path: &Path) -> Result<()> {
+async fn download_asset(
+    storage: &StorageConfig,
+    asset: &Asset,
+    path: &Path,
+    max_bytes: u64,
+) -> Result<()> {
     let url = presigned_s3_url(storage, "GET", &asset.bucket, &asset.object_key, None)?;
     info!(
         bucket = %asset.bucket,
         object_key = %asset.object_key,
         target = %path.display(),
+        max_bytes = max_bytes,
         "downloading source asset"
     );
 
@@ -342,6 +361,10 @@ async fn download_asset(storage: &StorageConfig, asset: &Asset, path: &Path) -> 
         .arg("--silent")
         .arg("--show-error")
         .arg("--location")
+        // Cap download size to mitigate DoS / disk exhaustion (audit C5).
+        // curl exits with code 63 if the response or Content-Length exceeds this.
+        .arg("--max-filesize")
+        .arg(max_bytes.to_string())
         .arg(url)
         .arg("--output")
         .arg(path)
@@ -350,9 +373,11 @@ async fn download_asset(storage: &StorageConfig, asset: &Asset, path: &Path) -> 
 
     if !status.success() {
         return Err(anyhow!(
-            "failed to download s3://{}/{}",
+            "failed to download s3://{}/{} (curl exit {:?}; check --max-filesize={})",
             asset.bucket,
-            asset.object_key
+            asset.object_key,
+            status.code(),
+            max_bytes
         ));
     }
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   parseCreateDirectPurchaseOrderInput,
@@ -27,21 +27,57 @@ describe("marketplace validation", () => {
     );
   });
 
-  it("accepts only absolute http checkout URLs", () => {
-    expect(
-      parseStripeCheckoutInput({
-        successUrl: " https://example.com/success ",
-        cancelUrl: "http://example.com/cancel",
-      }),
-    ).toEqual({
-      successUrl: "https://example.com/success",
-      cancelUrl: "http://example.com/cancel",
+  describe("Stripe checkout redirect URLs", () => {
+    const originalAppUrl = process.env.APP_URL;
+
+    beforeEach(() => {
+      process.env.APP_URL = "https://example.com";
     });
 
-    expect(parseStripeCheckoutInput(null)).toEqual({});
-    expect(() => parseStripeCheckoutInput({ successUrl: "/relative" })).toThrow(
-      "successUrl must be an absolute http(s) URL.",
-    );
+    afterEach(() => {
+      if (originalAppUrl === undefined) {
+        delete process.env.APP_URL;
+      } else {
+        process.env.APP_URL = originalAppUrl;
+      }
+    });
+
+    it("accepts URLs whose origin matches APP_URL", () => {
+      expect(
+        parseStripeCheckoutInput({
+          successUrl: " https://example.com/success ",
+          cancelUrl: "https://example.com/cancel",
+        }),
+      ).toEqual({
+        successUrl: "https://example.com/success",
+        cancelUrl: "https://example.com/cancel",
+      });
+
+      expect(parseStripeCheckoutInput(null)).toEqual({});
+    });
+
+    it("rejects URLs targeting a different origin (audit C2)", () => {
+      expect(() =>
+        parseStripeCheckoutInput({ successUrl: "https://attacker.example/success" }),
+      ).toThrow("successUrl origin is not allowed.");
+      expect(() =>
+        parseStripeCheckoutInput({ cancelUrl: "http://example.com/cancel" }),
+      ).toThrow("cancelUrl origin is not allowed.");
+    });
+
+    it("rejects non-absolute URLs", () => {
+      expect(() => parseStripeCheckoutInput({ successUrl: "/relative" })).toThrow(
+        "successUrl must be an absolute http(s) URL.",
+      );
+    });
+
+    it("fails closed when APP_URL is missing", () => {
+      delete process.env.APP_URL;
+
+      expect(() =>
+        parseStripeCheckoutInput({ successUrl: "https://example.com/success" }),
+      ).toThrow("successUrl cannot be validated: APP_URL is not configured.");
+    });
   });
 
   it("normalizes optional Stripe confirmation session id", () => {

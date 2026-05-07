@@ -24,6 +24,9 @@ import {
   listSellerOrderItems,
   markOrderPaidFromStripe,
   markStripePaymentFailedBySession,
+  markWebhookEventFailed,
+  markWebhookEventProcessed,
+  recordWebhookEventStart,
 } from "./marketplace.repository";
 import { createStripeCheckoutSession, retrieveStripeCheckoutSession } from "./stripe.client";
 import type {
@@ -448,10 +451,11 @@ export async function fulfillStripeCheckoutSession(sessionId: string) {
 }
 
 /**
- * Route les evenements webhook Stripe Checkout vers fulfillment ou echec de paiement.
- * @param event Evenement Stripe deja verifie par signature.
+ * Traitement effectif de l'evenement, isole pour permettre l'enrobage par le
+ * verrou d'idempotence. Ne dois pas etre appele directement depuis la route
+ * webhook : passer par `handleStripeCheckoutWebhookEvent`.
  */
-export async function handleStripeCheckoutWebhookEvent(event: Stripe.Event) {
+async function dispatchStripeCheckoutWebhookEvent(event: Stripe.Event) {
   switch (event.type) {
     case "checkout.session.completed":
     case "checkout.session.async_payment_succeeded": {
@@ -475,6 +479,42 @@ export async function handleStripeCheckoutWebhookEvent(event: Stripe.Event) {
     }
     default:
       return null;
+  }
+}
+
+/**
+ * Route les evenements webhook Stripe Checkout vers fulfillment ou echec de
+ * paiement, en garantissant l'idempotence via `WebhookEventLog` (audit C1) :
+ * un meme `event.id` ne peut etre traite qu'une seule fois, ce qui empeche
+ * la duplication d'entitlements ou de lignes ledger sur replay Stripe.
+ *
+ * @param event Evenement Stripe deja verifie par signature.
+ */
+export async function handleStripeCheckoutWebhookEvent(event: Stripe.Event) {
+  const { alreadyProcessed } = await recordWebhookEventStart({
+    provider: "STRIPE",
+    eventId: event.id,
+    eventType: event.type,
+  });
+
+  if (alreadyProcessed) {
+    // Stripe replay du meme event : on accuse reception sans rejouer le
+    // fulfillment. Retourner null indique au caller de repondre 200 OK.
+    return null;
+  }
+
+  try {
+    const result = await dispatchStripeCheckoutWebhookEvent(event);
+    await markWebhookEventProcessed({ provider: "STRIPE", eventId: event.id });
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown_error";
+    await markWebhookEventFailed({
+      provider: "STRIPE",
+      eventId: event.id,
+      errorMessage: message,
+    });
+    throw error;
   }
 }
 
