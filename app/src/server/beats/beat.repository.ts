@@ -780,6 +780,186 @@ export async function updateBeatBySlug(ownerId: string, slug: string, input: Upd
 }
 
 /**
+ * Periode au-dela de laquelle un job PREVIEW_GENERATION encore en PROCESSING
+ * est considere comme gele (worker mort entre claim et completion). Un job
+ * gele est eligible au retry meme si son statut n'est pas FAILED. Coherent
+ * avec la recommandation C7 de l'audit.
+ */
+const STALE_PROCESSING_LOCK_MS = 5 * 60 * 1000;
+
+/**
+ * Etat courant du job de generation de preview pour un beat appartenant
+ * au vendeur. Permet a l'UI de decider entre "attendre", "relancer" ou
+ * "uploader manuellement" (audit B6, volet 3 — sera consomme par le dashboard).
+ */
+export type BeatPreviewJobState = {
+  jobId: string;
+  status: "PENDING" | "PROCESSING" | "READY" | "FAILED";
+  attempts: number;
+  maxAttempts: number;
+  lockedAt: Date | null;
+  failedAt: Date | null;
+  errorMessage: string | null;
+  isStale: boolean;
+  canRetry: boolean;
+  outputAssetStatus: "PENDING" | "PROCESSING" | "READY" | "FAILED";
+};
+
+/**
+ * Retourne l'etat du dernier job PREVIEW_GENERATION pour le beat appartenant
+ * au vendeur. Retourne null si le beat ou son job n'existe pas.
+ * @throws "beat_forbidden" si le slug n'appartient pas a `ownerId`.
+ */
+export async function findBeatPreviewJobForOwner(
+  ownerId: string,
+  slug: string,
+): Promise<BeatPreviewJobState | null> {
+  const prisma = getPrisma();
+  const beat = await prisma.beat.findUnique({
+    where: { slug },
+    select: { id: true, ownerId: true },
+  });
+
+  if (!beat) {
+    return null;
+  }
+  if (beat.ownerId !== ownerId) {
+    throw new Error("beat_forbidden");
+  }
+
+  const job = await prisma.audioProcessingJob.findFirst({
+    where: { beatId: beat.id, type: "PREVIEW_GENERATION" },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      status: true,
+      attempts: true,
+      maxAttempts: true,
+      lockedAt: true,
+      failedAt: true,
+      errorMessage: true,
+      outputAsset: { select: { processingStatus: true } },
+    },
+  });
+
+  if (!job) {
+    return null;
+  }
+
+  const isStale =
+    job.status === "PROCESSING" &&
+    job.lockedAt !== null &&
+    Date.now() - job.lockedAt.getTime() > STALE_PROCESSING_LOCK_MS;
+  const canRetry = job.status === "FAILED" || isStale;
+
+  return {
+    jobId: job.id,
+    status: job.status,
+    attempts: job.attempts,
+    maxAttempts: job.maxAttempts,
+    lockedAt: job.lockedAt,
+    failedAt: job.failedAt,
+    errorMessage: job.errorMessage,
+    isStale,
+    canRetry,
+    outputAssetStatus: job.outputAsset.processingStatus,
+  };
+}
+
+/**
+ * Reinitialise le job de generation de preview d'un beat pour relance par le
+ * worker Rust (audit B6, volet 2). Autorise si le job est FAILED ou si son
+ * verrou PROCESSING est obsolete (worker mort, voir C7).
+ *
+ * Effets :
+ *  - AudioProcessingJob: status=PENDING, attempts=0, lockedAt/lockedBy/errorMessage null
+ *  - MediaAsset (outputAsset): processingStatus=PENDING (efface l'erreur precedente)
+ *  - Beat: si DRAFT (suite a un echec terminal), repasse en PROCESSING pour
+ *    permettre au worker de republier sur succes
+ *
+ * @throws "beat_not_found", "beat_forbidden",
+ *         "beat_preview_job_missing", "beat_preview_job_not_retryable"
+ */
+export async function resetBeatPreviewJobForOwner(
+  ownerId: string,
+  slug: string,
+): Promise<BeatPreviewJobState> {
+  const prisma = getPrisma();
+
+  const jobId = await prisma.$transaction(async (tx) => {
+    const beat = await tx.beat.findUnique({
+      where: { slug },
+      select: { id: true, ownerId: true, status: true },
+    });
+
+    if (!beat) {
+      throw new Error("beat_not_found");
+    }
+    if (beat.ownerId !== ownerId) {
+      throw new Error("beat_forbidden");
+    }
+
+    const job = await tx.audioProcessingJob.findFirst({
+      where: { beatId: beat.id, type: "PREVIEW_GENERATION" },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        status: true,
+        lockedAt: true,
+        outputAssetId: true,
+      },
+    });
+
+    if (!job) {
+      throw new Error("beat_preview_job_missing");
+    }
+
+    const isStale =
+      job.status === "PROCESSING" &&
+      job.lockedAt !== null &&
+      Date.now() - job.lockedAt.getTime() > STALE_PROCESSING_LOCK_MS;
+    const canRetry = job.status === "FAILED" || isStale;
+
+    if (!canRetry) {
+      throw new Error("beat_preview_job_not_retryable");
+    }
+
+    await tx.audioProcessingJob.update({
+      where: { id: job.id },
+      data: {
+        status: "PENDING",
+        attempts: 0,
+        lockedAt: null,
+        lockedBy: null,
+        errorMessage: null,
+        failedAt: null,
+        completedAt: null,
+      },
+    });
+
+    await tx.mediaAsset.update({
+      where: { id: job.outputAssetId },
+      data: { processingStatus: "PENDING" },
+    });
+
+    if (beat.status === "DRAFT") {
+      await tx.beat.update({
+        where: { id: beat.id },
+        data: { status: "PROCESSING" },
+      });
+    }
+
+    return job.id;
+  });
+
+  const refreshed = await findBeatPreviewJobForOwner(ownerId, slug);
+  if (!refreshed || refreshed.jobId !== jobId) {
+    throw new Error("beat_preview_job_missing");
+  }
+  return refreshed;
+}
+
+/**
  * Supprime logiquement un beat en le rendant prive et DELETED.
  * @param ownerId Identifiant utilisateur interne du vendeur.
  * @param slug Slug du beat a supprimer.

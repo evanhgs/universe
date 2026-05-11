@@ -552,6 +552,24 @@ model Payment {
   @@index([provider, status])
 }
 
+/// Idempotence des webhooks paiement (audit C1).
+/// Le code DOIT essayer d'insérer la ligne avant de traiter l'évènement et
+/// traiter une erreur P2002 (provider, eventId) comme "déjà traité, ignorer".
+/// Cela protège contre les replays Stripe (retry réseau, 5xx, duplicate).
+model WebhookEventLog {
+  id           String          @id @default(cuid())
+  provider     PaymentProvider
+  eventId      String
+  eventType    String
+  status       String          @default("PROCESSING") // PROCESSING | PROCESSED | FAILED
+  receivedAt   DateTime        @default(now())
+  processedAt  DateTime?
+  errorMessage String?
+
+  @@unique([provider, eventId])
+  @@index([provider, receivedAt])
+}
+
 model PayoutLedgerEntry {
   id                      String           @id @default(cuid())
   orderId                 String?
@@ -568,6 +586,10 @@ model PayoutLedgerEntry {
   order                   Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
   payment                 Payment?         @relation(fields: [paymentId], references: [id], onDelete: SetNull)
 
+  // Idempotence ligne ledger : un seul GROSS_SALE / PLATFORM_COMMISSION /
+  // SELLER_EARNING par (orderItemId, paymentId, type). Défense en profondeur
+  // contre un éventuel double-traitement webhook (audit C1).
+  @@unique([orderItemId, paymentId, type], map: "PayoutLedgerEntry_idempotency_key")
   @@index([sellerId, occurredAt])
   @@index([type, occurredAt])
 }

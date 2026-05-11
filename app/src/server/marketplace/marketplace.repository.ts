@@ -431,6 +431,10 @@ export async function markOrderPaidFromStripe(args: {
               description: "Seller earning after platform commission",
             },
           ],
+          // Defense in depth (audit C1): l'idempotence webhook est en amont,
+          // mais la contrainte UNIQUE (orderItemId, paymentId, type) + ce flag
+          // garantissent qu'un replay ne crée jamais des lignes ledger doublees.
+          skipDuplicates: true,
         });
       }
     }
@@ -488,6 +492,83 @@ export async function markStripePaymentFailedBySession(args: {
       status: args.status,
       failureMessage: args.failureMessage,
       providerPayloadJson: args.payload,
+    },
+  });
+}
+
+type WebhookProvider = "STRIPE" | "PAYPAL" | "MANUAL";
+
+/**
+ * Enregistre la reception d'un evenement webhook pour idempotence (audit C1).
+ * Tente d'inserer la ligne (provider, eventId) dans WebhookEventLog : la
+ * contrainte UNIQUE garantit qu'un replay (retry Stripe, doublon reseau) sera
+ * detecte ici et court-circuite avant tout effet de bord.
+ *
+ * @returns alreadyProcessed=true si l'evenement a deja ete vu.
+ */
+export async function recordWebhookEventStart(args: {
+  provider: WebhookProvider;
+  eventId: string;
+  eventType: string;
+}): Promise<{ alreadyProcessed: boolean }> {
+  try {
+    await getPrisma().webhookEventLog.create({
+      data: {
+        provider: args.provider,
+        eventId: args.eventId,
+        eventType: args.eventType,
+        status: "PROCESSING",
+      },
+    });
+    return { alreadyProcessed: false };
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return { alreadyProcessed: true };
+    }
+    throw error;
+  }
+}
+
+/**
+ * Marque un evenement webhook comme traite avec succes.
+ */
+export async function markWebhookEventProcessed(args: {
+  provider: WebhookProvider;
+  eventId: string;
+}) {
+  return getPrisma().webhookEventLog.update({
+    where: {
+      provider_eventId: { provider: args.provider, eventId: args.eventId },
+    },
+    data: {
+      status: "PROCESSED",
+      processedAt: new Date(),
+      errorMessage: null,
+    },
+  });
+}
+
+/**
+ * Marque un evenement webhook comme ayant echoue. La ligne reste en base avec
+ * son `eventId` UNIQUE pour empecher un replay automatique tant que l'erreur
+ * n'a pas ete diagnostiquee (les operations doivent rejouer manuellement).
+ */
+export async function markWebhookEventFailed(args: {
+  provider: WebhookProvider;
+  eventId: string;
+  errorMessage: string;
+}) {
+  return getPrisma().webhookEventLog.update({
+    where: {
+      provider_eventId: { provider: args.provider, eventId: args.eventId },
+    },
+    data: {
+      status: "FAILED",
+      processedAt: new Date(),
+      errorMessage: args.errorMessage.slice(0, 2000),
     },
   });
 }

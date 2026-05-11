@@ -2,6 +2,13 @@
 .idea/
 
 # Runtime configuration and secrets.
+# - never commit real env or secret files; only their .example variants are tracked
 infra/env/*.env
 infra/secrets/**/*.txt
 !infra/secrets/**/*.txt.example
+
+# Next.js / app-level env files (dotenv conventions).
+.env
+.env.*
+!.env.example
+!.env.*.example
