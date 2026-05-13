@@ -64,6 +64,55 @@ function parseAbsoluteUrl(value: unknown, field: string) {
 }
 
 /**
+ * Liste des origines autorisees comme cible de redirection Stripe checkout.
+ * Lit APP_URL au moment de l'appel (et non au chargement du module) pour
+ * permettre les overrides en test. Une chaine vide invalide rejette toutes
+ * les redirections fournies par le client (fail-closed).
+ */
+function getAllowedRedirectOrigins(): Set<string> {
+  const origins = new Set<string>();
+  const raw = process.env.APP_URL?.trim();
+
+  if (!raw) {
+    return origins;
+  }
+
+  try {
+    origins.add(new URL(raw).origin);
+  } catch {
+    // APP_URL is mis-configured; no origin is whitelisted.
+  }
+
+  return origins;
+}
+
+/**
+ * Valide une URL de redirection Stripe et impose qu'elle pointe vers une
+ * origine connue (audit C2 : sans cette verification, un attaquant peut
+ * utiliser `successUrl=https://phishing.example` pour rediriger l'acheteur
+ * apres paiement).
+ */
+function parseRedirectUrl(value: unknown, field: string) {
+  const url = parseAbsoluteUrl(value, field);
+
+  if (!url) {
+    return undefined;
+  }
+
+  const allowed = getAllowedRedirectOrigins();
+
+  if (allowed.size === 0) {
+    throw new Error(`${field} cannot be validated: APP_URL is not configured.`);
+  }
+
+  if (!allowed.has(new URL(url).origin)) {
+    throw new Error(`${field} origin is not allowed.`);
+  }
+
+  return url;
+}
+
+/**
  * Valide la demande de creation de commande marketplace.
  * @param payload Corps JSON contenant beatSlug ou licenseOfferingId.
  * @returns Criteres d'achat normalises.
@@ -98,8 +147,8 @@ export function parseStripeCheckoutInput(payload: unknown): StripeCheckoutInput 
   const body = assertPayloadObject(payload);
 
   return {
-    successUrl: parseAbsoluteUrl(body.successUrl, "successUrl"),
-    cancelUrl: parseAbsoluteUrl(body.cancelUrl, "cancelUrl"),
+    successUrl: parseRedirectUrl(body.successUrl, "successUrl"),
+    cancelUrl: parseRedirectUrl(body.cancelUrl, "cancelUrl"),
   };
 }
 
