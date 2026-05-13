@@ -14,7 +14,6 @@ It is intentionally split from the application code so you can later add sibling
 - `compose.staging.yml`: hardened pre-production stack for Next.js + FastAPI + Rust audio worker
 - `compose.prod.yml`: hardened production stack for Next.js + FastAPI
 - `env/`: runtime environment files plus versioned templates
-- `secrets/`: production secret examples and placeholders
 - `proxy/`: Caddy reverse-proxy configs for staging and production
 
 ## Current assumptions
@@ -116,15 +115,6 @@ The staging file contains both regular config and secrets, including:
 - `S3_SECRET_ACCESS_KEY`
 
 Keep `POSTGRES_PASSWORD` aligned with the password embedded in `DATABASE_URL`.
-
-Production still supports Docker secret files:
-
-- `secrets/prod/next_server_actions_encryption_key.txt`
-- `secrets/prod/database_url.txt`
-- `secrets/prod/clerk_secret_key.txt`
-- `secrets/prod/clerk_webhook_signing_secret.txt`
-- `secrets/prod/stripe_secret_key.txt`
-- `secrets/prod/stripe_webhook_secret.txt`
 
 - The Next.js encryption key must be a base64-encoded AES key as documented by Next.js for multi-instance deployments.
 - The database URL must contain the full Postgres connection string on a single line.

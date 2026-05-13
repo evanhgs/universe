@@ -1,6 +1,5 @@
 import "server-only";
 
-import { Prisma } from "../../../generated/prisma/client";
 import type { EmailProviderClient, OrderEmailContext, TransactionalEmail } from "./email.types";
 import {
   createEmailEvent,
@@ -10,50 +9,15 @@ import {
   findOrderEmailContext,
   updateEmailEventStatus,
 } from "./email.repository";
+import {
+  renderChatUnreadReminderEmail,
+  renderPurchaseConfirmedEmail,
+  renderSaleConfirmedEmail,
+  renderSellerAccessGrantedEmail,
+} from "./email.templates";
 import { PostmarkEmailProvider } from "./postmark.provider";
 
 const defaultProvider = new PostmarkEmailProvider();
-
-/**
- * Echappe une valeur pour insertion HTML basique.
- * @param value Texte non fiable.
- */
-function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-/**
- * Formate un montant dans sa devise.
- * @param value Montant decimal.
- * @param currency Code devise ISO.
- */
-function formatMoney(value: number, currency: string) {
-  return new Intl.NumberFormat("fr-FR", {
-    currency,
-    style: "currency",
-  }).format(value);
-}
-
-/**
- * Construit le greeting de base.
- * @param name Nom public nullable.
- */
-function greeting(name: string | null) {
-  return name ? `Bonjour ${name},` : "Bonjour,";
-}
-
-/**
- * Transforme le corps texte en HTML simple.
- * @param body Corps texte.
- */
-function htmlFromText(body: string) {
-  return `<p>${escapeHtml(body).replaceAll("\n", "<br />")}</p>`;
-}
 
 /**
  * Service transactionnel centralise. Ne doit etre appele que cote serveur.
@@ -126,34 +90,7 @@ export class EmailService {
    * @param order Commande payee.
    */
   async sendPurchaseConfirmed(order: OrderEmailContext) {
-    const itemList = order.items.map((item) => `- ${item.title}`).join("\n");
-    const textBody = `${greeting(order.buyer.displayName)}
-
-Ton achat Universe est confirme.
-
-Commande: ${order.id}
-Total paye: ${formatMoney(order.totalAmount, order.currency)}
-
-Instrumentales:
-${itemList}
-
-Tes fichiers sont disponibles depuis Mes achats.`;
-
-    return this.send({
-      to: {
-        email: order.buyer.email,
-        name: order.buyer.displayName,
-      },
-      subject: "Achat confirme sur Universe",
-      textBody,
-      htmlBody: htmlFromText(textBody),
-      template: "PURCHASE_CONFIRMED",
-      dedupeKey: `purchase.confirmed:${order.id}`,
-      recipientUserId: order.buyer.id,
-      metadata: {
-        orderId: order.id,
-      },
-    });
+    return this.send(renderPurchaseConfirmedEmail(order));
   }
 
   /**
@@ -173,42 +110,13 @@ Tes fichiers sont disponibles depuis Mes achats.`;
 
     return Promise.all(
       Array.from(itemsBySeller.entries()).map(async ([sellerId, items]) => {
-        const seller = items[0]?.seller;
+        const email = renderSaleConfirmedEmail(order, sellerId, items);
 
-        if (!seller) {
+        if (!email) {
           return null;
         }
 
-        const total = items.reduce((sum, item) => sum + item.lineTotalAmount, 0);
-        const textBody = `${greeting(seller.displayName)}
-
-Tu as une nouvelle vente sur Universe.
-
-Commande: ${order.id}
-Montant brut vendeur: ${formatMoney(total, order.currency)}
-
-Instrumentales:
-${items.map((item) => `- ${item.title}`).join("\n")}
-
-Retrouve le detail dans ton dashboard vendeur.`;
-
-        return this.send({
-          to: {
-            email: seller.email,
-            name: seller.displayName,
-          },
-          subject: "Nouvelle vente sur Universe",
-          textBody,
-          htmlBody: htmlFromText(textBody),
-          template: "SALE_CONFIRMED",
-          dedupeKey: `sale.confirmed:${order.id}:${sellerId}`,
-          recipientUserId: sellerId,
-          metadata: {
-            orderId: order.id,
-            sellerId,
-            orderItemIds: items.map((item) => item.id),
-          },
-        });
+        return this.send(email);
       }),
     );
   }
@@ -224,27 +132,7 @@ Retrouve le detail dans ton dashboard vendeur.`;
       return null;
     }
 
-    const textBody = `${greeting(account.profile?.displayName ?? null)}
-
-Ton acces vendeur Universe est active.
-
-Tu peux publier tes instrumentales, suivre tes ventes et gerer ton catalogue depuis ton compte.`;
-
-    return this.send({
-      to: {
-        email: account.email,
-        name: account.profile?.displayName ?? null,
-      },
-      subject: "Ton acces vendeur Universe est active",
-      textBody,
-      htmlBody: htmlFromText(textBody),
-      template: "SELLER_ACCESS_GRANTED",
-      dedupeKey: `seller.access.granted:${account.id}`,
-      recipientUserId: account.id,
-      metadata: {
-        clerkUserId,
-      },
-    });
+    return this.send(renderSellerAccessGrantedEmail(account, clerkUserId));
   }
 
   /**
@@ -291,30 +179,7 @@ Tu peux publier tes instrumentales, suivre tes ventes et gerer ton catalogue dep
         continue;
       }
 
-      const senderName = latestUnread.sender?.profile?.displayName ?? "Un utilisateur";
-      const textBody = `${greeting(candidate.user.profile?.displayName ?? null)}
-
-${senderName} t'a envoye un message sur Universe il y a plus de 24h.
-
-Ouvre ta messagerie pour repondre.`;
-
-      await this.send({
-        to: {
-          email: candidate.user.email,
-          name: candidate.user.profile?.displayName ?? null,
-        },
-        subject: "Message non lu sur Universe",
-        textBody,
-        htmlBody: htmlFromText(textBody),
-        template: "CHAT_UNREAD_REMINDER",
-        dedupeKey: `chat.unread.reminder:${candidate.conversationId}:${candidate.userId}:${latestUnread.id}`,
-        recipientUserId: candidate.userId,
-        metadata: {
-          conversationId: candidate.conversationId,
-          latestUnreadMessageId: latestUnread.id,
-          latestUnreadAt: latestUnread.createdAt.toISOString(),
-        } satisfies Prisma.InputJsonObject,
-      });
+      await this.send(renderChatUnreadReminderEmail(candidate, latestUnread));
       sentOrRecorded += 1;
     }
 
