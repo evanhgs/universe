@@ -66,6 +66,7 @@ export default function AccountTestPage() {
   const [profile, setProfile] = useState<ApiState>(initialState);
   const [roles, setRoles] = useState<ApiState>(initialState);
   const [emailTest, setEmailTest] = useState<ApiState>(initialState);
+  const [emailConfig, setEmailConfig] = useState<ApiState>(initialState);
   const [sessionToken, setSessionToken] = useState<string>("");
   const [profilePayload, setProfilePayload] = useState(
     JSON.stringify(
@@ -368,6 +369,21 @@ export default function AccountTestPage() {
             </div>
             {renderStatus(emailTest.status)}
           </div>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <button
+              className={secondaryButtonClass}
+              onClick={() =>
+                run(async () => {
+                  setEmailConfig(await request("/api/account-test/email"));
+                })
+              }
+              type="button"
+            >
+              Load email config
+            </button>
+            {renderStatus(emailConfig.status)}
+          </div>
+          <pre className={preClass}>{JSON.stringify(emailConfig.body, null, 2)}</pre>
           <textarea
             className={textareaClass}
             onChange={(event) => setEmailPayload(event.target.value)}

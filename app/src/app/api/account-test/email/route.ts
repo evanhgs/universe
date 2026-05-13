@@ -34,6 +34,16 @@ function emailTestEnabled() {
   return process.env.NODE_ENV !== "production" || process.env.EMAIL_TEST_ENABLED === "true";
 }
 
+function emailDiagnostics() {
+  return {
+    enabled: emailTestEnabled(),
+    fromEmail: process.env.POSTMARK_FROM_EMAIL || null,
+    hasServerToken: Boolean(process.env.POSTMARK_SERVER_TOKEN),
+    messageStream: process.env.POSTMARK_MESSAGE_STREAM || "outbound",
+    nodeEnv: process.env.NODE_ENV ?? null,
+  };
+}
+
 function parsePayload(value: unknown) {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error("payload_must_be_object");
@@ -174,14 +184,38 @@ function renderTestEmail(args: {
 }
 
 function testEmailEvent(email: TransactionalEmail): TransactionalEmail {
+  const metadata =
+    typeof email.metadata === "object" && email.metadata !== null && !Array.isArray(email.metadata)
+      ? email.metadata
+      : {};
+
   return {
     ...email,
     recipientUserId: null,
     metadata: {
-      ...email.metadata,
+      ...metadata,
       emailTest: true,
     },
   };
+}
+
+/**
+ * Retourne l'etat de configuration email sans exposer le token Postmark.
+ */
+export async function GET() {
+  const { isAuthenticated } = await auth();
+
+  if (!isAuthenticated) {
+    return NextResponse.json(
+      { error: "unauthorized" },
+      { status: 401, headers: PRIVATE_JSON_HEADERS },
+    );
+  }
+
+  return NextResponse.json(emailDiagnostics(), {
+    status: 200,
+    headers: PRIVATE_JSON_HEADERS,
+  });
 }
 
 /**
@@ -209,14 +243,17 @@ export async function POST(request: Request) {
     const payload = parsePayload(await request.json());
     const email = renderTestEmail(payload);
     const event = await emailService.send(email);
+    const accepted = event.status === "SENT";
 
     return NextResponse.json(
       {
+        accepted,
+        diagnostics: emailDiagnostics(),
         event,
         template: email.template,
         toEmail: email.to.email,
       },
-      { status: 200, headers: PRIVATE_JSON_HEADERS },
+      { status: accepted ? 200 : 502, headers: PRIVATE_JSON_HEADERS },
     );
   } catch (error) {
     return NextResponse.json(

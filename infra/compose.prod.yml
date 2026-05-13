@@ -47,6 +47,10 @@ services:
       NEXT_TELEMETRY_DISABLED: "${NEXTJS_TELEMETRY_DISABLED:-1}"
       HOSTNAME: ${NEXTJS_HOSTNAME:-0.0.0.0}
       PORT: "${NEXTJS_PORT:-3000}"
+      POSTMARK_SERVER_TOKEN: ${POSTMARK_SERVER_TOKEN:?set POSTMARK_SERVER_TOKEN in infra/env/stack.prod.env}
+      POSTMARK_FROM_EMAIL: ${POSTMARK_FROM_EMAIL:?set POSTMARK_FROM_EMAIL in infra/env/stack.prod.env}
+      POSTMARK_MESSAGE_STREAM: ${POSTMARK_MESSAGE_STREAM:-outbound}
+      CRON_SECRET: ${CRON_SECRET:?set CRON_SECRET in infra/env/stack.prod.env}
     image: ${NEXTJS_IMAGE:-universe/nextjs}:${NEXTJS_IMAGE_TAG:-prod}
     build:
       context: ${NEXTJS_CONTEXT:-../app}
