@@ -65,6 +65,7 @@ export default function AccountTestPage() {
   const [me, setMe] = useState<ApiState>(initialState);
   const [profile, setProfile] = useState<ApiState>(initialState);
   const [roles, setRoles] = useState<ApiState>(initialState);
+  const [emailTest, setEmailTest] = useState<ApiState>(initialState);
   const [sessionToken, setSessionToken] = useState<string>("");
   const [profilePayload, setProfilePayload] = useState(
     JSON.stringify(
@@ -83,6 +84,17 @@ export default function AccountTestPage() {
     JSON.stringify(
       {
         roles: ["BUYER", "SELLER"],
+      },
+      null,
+      2,
+    ),
+  );
+  const [emailPayload, setEmailPayload] = useState(
+    JSON.stringify(
+      {
+        toEmail: "replace-me@example.com",
+        recipientName: "Universe Tester",
+        template: "PURCHASE_CONFIRMED",
       },
       null,
       2,
@@ -342,6 +354,43 @@ export default function AccountTestPage() {
           >
             Update roles
           </button>
+        </section>
+
+        <section className={sectionClass}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">POST /api/account-test/email</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Envoie un email Postmark reel avec un template transactionnel de test. Templates disponibles:{" "}
+                <code>PURCHASE_CONFIRMED</code>, <code>SALE_CONFIRMED</code>,{" "}
+                <code>SELLER_ACCESS_GRANTED</code>, <code>CHAT_UNREAD_REMINDER</code>.
+              </p>
+            </div>
+            {renderStatus(emailTest.status)}
+          </div>
+          <textarea
+            className={textareaClass}
+            onChange={(event) => setEmailPayload(event.target.value)}
+            rows={8}
+            value={emailPayload}
+          />
+          <button
+            className={`mt-4 ${buttonClass}`}
+            onClick={() =>
+              run(async () => {
+                setEmailTest(
+                  await request("/api/account-test/email", {
+                    method: "POST",
+                    body: emailPayload,
+                  }),
+                );
+              })
+            }
+            type="button"
+          >
+            Send test email
+          </button>
+          <pre className={preClass}>{JSON.stringify(emailTest.body, null, 2)}</pre>
         </section>
       </div>
     </main>
