@@ -53,6 +53,7 @@ services:
       CRON_ALLOWED_IPS: ${CRON_ALLOWED_IPS:-127.0.0.1}
       UPSTASH_REDIS_REST_URL: ${UPSTASH_REDIS_REST_URL:-}
       UPSTASH_REDIS_REST_TOKEN: ${UPSTASH_REDIS_REST_TOKEN:-}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD}@redis:6379
       S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-}
       S3_REGION: ${S3_REGION:-us-east-1}
       S3_BUCKET_BEATS: ${S3_BUCKET_BEATS:-}
@@ -67,6 +68,8 @@ services:
       DATABASE_URL: ${DATABASE_URL}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
     stop_grace_period: 15s
@@ -194,9 +197,31 @@ services:
     networks:
       - edge
 
+  redis:
+    image: redis:8.6.3
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD}"]
+    ports:
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+    restart: unless-stopped
+    networks:
+      - edge
+      
+
 networks:
   edge:
     driver: bridge
 
 volumes:
   postgres_dev_data:
+  redis-data:
+    driver: local
