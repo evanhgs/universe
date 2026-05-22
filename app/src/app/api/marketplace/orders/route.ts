@@ -5,6 +5,7 @@ import { marketplaceErrorResponse } from "@/server/marketplace/marketplace.http"
 import { createDirectPurchaseOrderForCurrentBuyer } from "@/server/marketplace/marketplace.service";
 import { parseCreateDirectPurchaseOrderInput } from "@/server/marketplace/marketplace.validation";
 import { PRIVATE_JSON_HEADERS } from "@/server/http/response-headers";
+import { enforceRateLimit, RATE_LIMITS } from "@/server/security/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,13 @@ export async function POST(request: Request) {
       { status: 401, headers: PRIVATE_JSON_HEADERS },
     );
   }
+
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.marketplaceWrite,
+    userId,
+  });
+  if (limited) return limited;
 
   try {
     const input = parseCreateDirectPurchaseOrderInput(await request.json());

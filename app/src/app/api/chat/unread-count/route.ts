@@ -4,13 +4,14 @@ import { NextResponse } from "next/server";
 import { chatErrorResponse } from "@/server/chat/chat.http";
 import { getCurrentUserUnreadCount } from "@/server/chat/chat.service";
 import { PRIVATE_JSON_HEADERS } from "@/server/http/response-headers";
+import { enforceRateLimit, RATE_LIMITS } from "@/server/security/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Retourne le total des messages non lus pour le badge in-app.
  */
-export async function GET() {
+export async function GET(request: Request = new Request("http://localhost")) {
   const { isAuthenticated, userId } = await auth();
 
   if (!isAuthenticated || !userId) {
@@ -19,6 +20,13 @@ export async function GET() {
       { status: 401, headers: PRIVATE_JSON_HEADERS },
     );
   }
+
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.chatRead,
+    userId,
+  });
+  if (limited) return limited;
 
   try {
     return NextResponse.json(await getCurrentUserUnreadCount(userId), {

@@ -6,6 +6,7 @@ import {
   getProfilePayloadBySlug,
   isValidProfileSlug,
 } from "@/server/profiles/profile.service";
+import { enforceRateLimit, RATE_LIMITS } from "@/server/security/rate-limit";
 
 type RouteContext = {
   params: Promise<{
@@ -18,7 +19,7 @@ type RouteContext = {
  * @param _request Requete HTTP non utilisee.
  * @param context Parametres de route contenant slug.
  */
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   const { slug } = await context.params;
 
   if (!isValidProfileSlug(slug)) {
@@ -32,6 +33,12 @@ export async function GET(_request: Request, context: RouteContext) {
       },
     );
   }
+
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.publicEnumeration,
+  });
+  if (limited) return limited;
 
   const { userId } = await auth();
   const profile = await getProfilePayloadBySlug(slug, userId ?? null);

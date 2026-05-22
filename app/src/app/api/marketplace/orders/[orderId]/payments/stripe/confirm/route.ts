@@ -8,6 +8,7 @@ import {
   confirmStripePaymentForCurrentBuyer,
 } from "@/server/marketplace/marketplace.service";
 import { parseStripeConfirmationInput } from "@/server/marketplace/marketplace.validation";
+import { enforceRateLimit, RATE_LIMITS } from "@/server/security/rate-limit";
 
 type RouteContext = {
   params: Promise<{
@@ -35,6 +36,13 @@ async function readOptionalJson(request: Request) {
  */
 export async function POST(request: Request, context: RouteContext) {
   const { isAuthenticated, userId } = await auth();
+
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.marketplaceWrite,
+    userId,
+  });
+  if (limited) return limited;
 
   try {
     const { orderId } = await context.params;

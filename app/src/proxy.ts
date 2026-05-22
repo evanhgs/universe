@@ -1,5 +1,7 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 
+import { enforceGlobalApiRateLimit } from "@/server/security/proxy-rate-limit";
+
 /**
  * Decoupe une variable d'environnement listee par virgules.
  * @param value Valeur brute optionnelle.
@@ -40,7 +42,7 @@ const connectSrc = Array.from(
 );
 const storageAssetSrc = s3PublicEndpoint ? [s3PublicEndpoint] : [];
 
-export const proxy = clerkMiddleware({
+const clerkOptions = {
   authorizedParties: authorizedParties.length > 0 ? authorizedParties : undefined,
   contentSecurityPolicy: {
     strict: true,
@@ -50,7 +52,11 @@ export const proxy = clerkMiddleware({
       ...(storageAssetSrc.length > 0 ? { "media-src": storageAssetSrc } : {}),
     },
   },
-});
+};
+
+export const proxy = clerkMiddleware(async (_auth, request) => {
+  return enforceGlobalApiRateLimit(request);
+}, clerkOptions);
 
 export default proxy;
 

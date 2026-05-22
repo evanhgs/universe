@@ -46,7 +46,7 @@ describe("ProfileForm", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ roles: ["BUYER", "SELLER"] }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ roles: ["BUYER"] }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
     render(<ProfileForm initialAccount={initialAccount} />);
@@ -55,7 +55,6 @@ describe("ProfileForm", () => {
     await userEvent.type(screen.getByLabelText("Nom public"), "Universe Seller");
     await userEvent.clear(screen.getByLabelText(/Slug public/));
     await userEvent.type(screen.getByLabelText(/Slug public/), "universe-seller");
-    await userEvent.click(screen.getByLabelText(/Activer le role vendeur/));
     await userEvent.click(screen.getByRole("button", { name: "Enregistrer" }));
 
     await waitFor(() => {
@@ -74,7 +73,7 @@ describe("ProfileForm", () => {
       "/api/account/me/roles",
       expect.objectContaining({
         method: "PUT",
-        body: JSON.stringify({ roles: ["BUYER", "SELLER"] }),
+        body: JSON.stringify({ roles: ["BUYER"] }),
       }),
     );
     expect(await screen.findByText("Profil mis a jour.")).toBeInTheDocument();

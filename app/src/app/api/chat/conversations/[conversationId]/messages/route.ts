@@ -11,6 +11,7 @@ import {
   parseSendMessageInput,
 } from "@/server/chat/chat.validation";
 import { PRIVATE_JSON_HEADERS } from "@/server/http/response-headers";
+import { enforceRateLimit, RATE_LIMITS } from "@/server/security/rate-limit";
 
 type ConversationMessagesRouteContext = {
   params: Promise<{
@@ -34,6 +35,13 @@ export async function GET(request: Request, context: ConversationMessagesRouteCo
       { status: 401, headers: PRIVATE_JSON_HEADERS },
     );
   }
+
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.chatRead,
+    userId,
+  });
+  if (limited) return limited;
 
   try {
     const { conversationId } = await context.params;
@@ -62,6 +70,13 @@ export async function POST(request: Request, context: ConversationMessagesRouteC
       { status: 401, headers: PRIVATE_JSON_HEADERS },
     );
   }
+
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.chatWrite,
+    userId,
+  });
+  if (limited) return limited;
 
   try {
     const { conversationId } = await context.params;

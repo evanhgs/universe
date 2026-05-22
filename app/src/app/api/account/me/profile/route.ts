@@ -7,12 +7,13 @@ import {
   updateCurrentAccountProfile,
 } from "@/server/account/account.service";
 import { parseProfileUpdateInput } from "@/server/account/account.validation";
+import { enforceRateLimit, RATE_LIMITS } from "@/server/security/rate-limit";
 
 /**
  * Retourne le profil du compte authentifie.
  * @returns Reponse JSON privee contenant le profil courant.
  */
-export async function GET() {
+export async function GET(request: Request = new Request("http://localhost")) {
   const { isAuthenticated } = await auth();
 
   if (!isAuthenticated) {
@@ -21,6 +22,12 @@ export async function GET() {
       { status: 401, headers: PRIVATE_JSON_HEADERS },
     );
   }
+
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.accountWrite,
+  });
+  if (limited) return limited;
 
   const account = await getCurrentAccountSnapshot();
 
@@ -43,6 +50,13 @@ export async function PATCH(request: Request) {
       { status: 401, headers: PRIVATE_JSON_HEADERS },
     );
   }
+
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.accountWrite,
+    userId,
+  });
+  if (limited) return limited;
 
   try {
     const input = parseProfileUpdateInput(await request.json());

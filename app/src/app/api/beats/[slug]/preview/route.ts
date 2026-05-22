@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getBeatPreviewPayloadBySlug } from "@/server/beats/beat.service";
 import { BEAT_SLUG_PATTERN } from "@/server/beats/beat.constants";
 import { PUBLIC_JSON_HEADERS } from "@/server/http/response-headers";
+import { enforceRateLimit, RATE_LIMITS } from "@/server/security/rate-limit";
 
 type RouteContext = {
   params: Promise<{
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
  * @param _request Requete HTTP non utilisee.
  * @param context Parametres de route contenant slug.
  */
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   const { slug } = await context.params;
 
   if (!BEAT_SLUG_PATTERN.test(slug)) {
@@ -26,6 +27,12 @@ export async function GET(_request: Request, context: RouteContext) {
       { status: 400, headers: PUBLIC_JSON_HEADERS },
     );
   }
+
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.publicEnumeration,
+  });
+  if (limited) return limited;
 
   const preview = await getBeatPreviewPayloadBySlug(slug);
 
