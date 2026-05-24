@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { PRIVATE_JSON_HEADERS } from "@/server/http/response-headers";
 import { marketplaceErrorResponse } from "@/server/marketplace/marketplace.http";
 import { getDownloadAccessForCurrentBuyer } from "@/server/marketplace/marketplace.service";
+import { enforceRateLimit, RATE_LIMITS } from "@/server/security/rate-limit";
 
 type RouteContext = {
   params: Promise<{
@@ -27,6 +28,13 @@ export async function GET(_request: Request, context: RouteContext) {
       { status: 401, headers: PRIVATE_JSON_HEADERS },
     );
   }
+
+  const limited = await enforceRateLimit({
+    request: _request,
+    policy: RATE_LIMITS.marketplaceRead,
+    userId,
+  });
+  if (limited) return limited;
 
   try {
     const { entitlementId } = await context.params;

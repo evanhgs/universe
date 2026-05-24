@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { chatErrorResponse } from "@/server/chat/chat.http";
 import { markCurrentUserConversationRead } from "@/server/chat/chat.service";
 import { PRIVATE_JSON_HEADERS } from "@/server/http/response-headers";
+import { enforceRateLimit, RATE_LIMITS } from "@/server/security/rate-limit";
 
 type ConversationReadRouteContext = {
   params: Promise<{
@@ -18,7 +19,7 @@ export const dynamic = "force-dynamic";
  * @param _request Requete PATCH.
  * @param context Parametres dynamiques Next.
  */
-export async function PATCH(_request: Request, context: ConversationReadRouteContext) {
+export async function PATCH(request: Request, context: ConversationReadRouteContext) {
   const { isAuthenticated, userId } = await auth();
 
   if (!isAuthenticated || !userId) {
@@ -27,6 +28,13 @@ export async function PATCH(_request: Request, context: ConversationReadRouteCon
       { status: 401, headers: PRIVATE_JSON_HEADERS },
     );
   }
+
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.chatWrite,
+    userId,
+  });
+  if (limited) return limited;
 
   try {
     const { conversationId } = await context.params;

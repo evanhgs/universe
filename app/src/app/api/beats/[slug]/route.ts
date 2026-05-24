@@ -9,6 +9,7 @@ import {
 } from "@/server/beats/beat.service";
 import { BEAT_SLUG_PATTERN } from "@/server/beats/beat.constants";
 import { parseUpdateBeatInput } from "@/server/beats/beat.validation";
+import { enforceRateLimit, RATE_LIMITS } from "@/server/security/rate-limit";
 
 type RouteContext = {
   params: Promise<{
@@ -72,12 +73,18 @@ function mutationErrorResponse(error: unknown) {
  * @param _request Requete HTTP non utilisee.
  * @param context Parametres de route contenant slug.
  */
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   const { slug } = await context.params;
 
   if (!BEAT_SLUG_PATTERN.test(slug)) {
     return invalidSlugResponse();
   }
+
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.publicEnumeration,
+  });
+  if (limited) return limited;
 
   const { userId } = await auth();
   const beat = await getBeatPayloadBySlug(slug, userId ?? null);
@@ -115,6 +122,13 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.marketplaceWrite,
+    userId,
+  });
+  if (limited) return limited;
+
   try {
     const input = parseUpdateBeatInput(await request.json());
     const beat = await updateBeatForCurrentSeller(userId, slug, input);
@@ -140,7 +154,7 @@ export async function PATCH(request: Request, context: RouteContext) {
  * @param _request Requete HTTP non utilisee.
  * @param context Parametres de route contenant slug.
  */
-export async function DELETE(_request: Request, context: RouteContext) {
+export async function DELETE(request: Request, context: RouteContext) {
   const { slug } = await context.params;
   const { isAuthenticated, userId } = await auth();
 
@@ -154,6 +168,13 @@ export async function DELETE(_request: Request, context: RouteContext) {
       { status: 401, headers: PRIVATE_JSON_HEADERS },
     );
   }
+
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.marketplaceWrite,
+    userId,
+  });
+  if (limited) return limited;
 
   try {
     const deleted = await deleteBeatForCurrentSeller(userId, slug);

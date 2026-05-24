@@ -737,6 +737,10 @@ export async function getDownloadAccessForCurrentBuyer(
     throw new Error("entitlement_not_found");
   }
 
+  if (entitlement.buyerId !== account.id) {
+    throw new Error("entitlement_not_found");
+  }
+
   if (entitlement.expiresAt && entitlement.expiresAt.getTime() <= Date.now()) {
     throw new Error("entitlement_expired");
   }

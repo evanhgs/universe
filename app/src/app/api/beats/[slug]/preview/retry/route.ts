@@ -7,6 +7,7 @@ import {
   retryBeatPreviewForCurrentSeller,
 } from "@/server/beats/beat.service";
 import { PRIVATE_JSON_HEADERS, PUBLIC_JSON_HEADERS } from "@/server/http/response-headers";
+import { enforceRateLimit, RATE_LIMITS } from "@/server/security/rate-limit";
 
 type RouteContext = {
   params: Promise<{
@@ -49,7 +50,7 @@ function retryErrorResponse(error: unknown) {
  * Utilise par l'UI dashboard pour afficher PENDING/PROCESSING/FAILED et
  * decider quand proposer le bouton "Relancer" (audit B6, volet 3).
  */
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   const { slug } = await context.params;
 
   if (!BEAT_SLUG_PATTERN.test(slug)) {
@@ -66,6 +67,13 @@ export async function GET(_request: Request, context: RouteContext) {
       { status: 401, headers: PRIVATE_JSON_HEADERS },
     );
   }
+
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.marketplaceRead,
+    userId,
+  });
+  if (limited) return limited;
 
   try {
     const job = await getBeatPreviewJobForCurrentSeller(userId, slug);
@@ -86,7 +94,7 @@ export async function GET(_request: Request, context: RouteContext) {
  * (audit B6 volet 2). N'accepte le retry que si le job est en FAILED ou si son
  * verrou PROCESSING est obsolete (>5min, voir C7).
  */
-export async function POST(_request: Request, context: RouteContext) {
+export async function POST(request: Request, context: RouteContext) {
   const { slug } = await context.params;
 
   if (!BEAT_SLUG_PATTERN.test(slug)) {
@@ -103,6 +111,13 @@ export async function POST(_request: Request, context: RouteContext) {
       { status: 401, headers: PRIVATE_JSON_HEADERS },
     );
   }
+
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.marketplaceWrite,
+    userId,
+  });
+  if (limited) return limited;
 
   try {
     const job = await retryBeatPreviewForCurrentSeller(userId, slug);

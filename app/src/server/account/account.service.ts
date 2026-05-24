@@ -2,7 +2,6 @@ import "server-only";
 
 import { clerkClient } from "@clerk/nextjs/server";
 
-import { emailService } from "@/server/email/email.service";
 import {
   SELF_SERVICE_ROLE_CODES,
   USERNAME_PATTERN,
@@ -106,7 +105,7 @@ export async function updateCurrentAccountProfile(
 /**
  * Remplace les roles self-service du compte courant et les publie dans les metadata Clerk.
  * @param clerkUserId Identifiant Clerk de l'utilisateur authentifie.
- * @param roles Roles self-service autorises, typiquement BUYER et/ou SELLER.
+ * @param roles Roles self-service autorises.
  * @returns Snapshot du compte avec la liste finale des roles.
  */
 export async function updateCurrentAccountRoles(
@@ -114,9 +113,6 @@ export async function updateCurrentAccountRoles(
   roles: SelfServiceRoleCode[],
 ) {
   const client = await clerkClient();
-  const previousAccount = await findAccountByClerkUserId(clerkUserId);
-  const hadSellerRole =
-    previousAccount?.roles.some(({ role }) => role === "SELLER") ?? false;
   const account = await replaceSelfServiceRolesByClerkUserId({
     clerkUserId,
     allowedRoles: [...SELF_SERVICE_ROLE_CODES],
@@ -128,10 +124,6 @@ export async function updateCurrentAccountRoles(
       marketplaceRoles: roles,
     },
   });
-
-  if (!hadSellerRole && roles.includes("SELLER")) {
-    await emailService.sendSellerAccessGranted(clerkUserId);
-  }
 
   return serializeAccount(account);
 }
