@@ -1,16 +1,17 @@
-import "server-only";
-
-import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
 import { NextResponse } from "next/server";
 
-import { PRIVATE_JSON_HEADERS } from "@/server/http/response-headers";
+import { getRedis } from "@/lib/redis";
 
-type RateLimitPolicy = {
+export type RateLimitPolicy = {
   limit: number;
   window: `${number} ${"s" | "m" | "h" | "d"}`;
   prefix: string;
 };
+
+type RateLimitResult =
+  | { status: "allowed" }
+  | { status: "blocked"; retryAfterMs: number }
+  | { status: "unavailable" };
 
 type EnforceRateLimitArgs = {
   request: Request;
@@ -18,10 +19,11 @@ type EnforceRateLimitArgs = {
   userId?: string | null;
 };
 
-type UpstashEnv = {
-  url: string;
-  token: string;
-};
+const PRIVATE_JSON_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  Vary: "Cookie",
+  "X-Content-Type-Options": "nosniff",
+} as const;
 
 export const RATE_LIMITS = {
   apiGlobal: { limit: 300, window: "1 m", prefix: "api-global" },
@@ -32,23 +34,105 @@ export const RATE_LIMITS = {
   chatWrite: { limit: 60, window: "1 m", prefix: "chat-write" },
   chatRead: { limit: 180, window: "1 m", prefix: "chat-read" },
   publicEnumeration: { limit: 120, window: "1 m", prefix: "public-enumeration" },
+  accountTestBurst: { limit: 8, window: "10 s", prefix: "account-test-burst" },
 } as const satisfies Record<string, RateLimitPolicy>;
 
-const limiters = new Map<string, Ratelimit>();
-
-function readUpstashEnv(): UpstashEnv | null {
-  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
-
-  if (!url || !token) {
-    return null;
-  }
-
-  return { url, token };
-}
+const RATE_LIMIT_SCRIPT = `
+local current = redis.call("INCR", KEYS[1])
+if current == 1 then
+  redis.call("PEXPIRE", KEYS[1], ARGV[1])
+end
+local ttl = redis.call("PTTL", KEYS[1])
+if ttl < 0 then
+  redis.call("PEXPIRE", KEYS[1], ARGV[1])
+  ttl = tonumber(ARGV[1])
+end
+return { current, ttl }
+`;
 
 function shouldFailClosedWhenMissingConfig() {
   return process.env.NODE_ENV === "production";
+}
+
+function parseWindowMs(window: RateLimitPolicy["window"]) {
+  const [amountRaw, unit] = window.split(" ") as [string, "s" | "m" | "h" | "d"];
+  const amount = Number(amountRaw);
+
+  if (!Number.isInteger(amount) || amount <= 0) {
+    throw new Error("rate_limit_window_invalid");
+  }
+
+  switch (unit) {
+    case "s":
+      return amount * 1000;
+    case "m":
+      return amount * 60 * 1000;
+    case "h":
+      return amount * 60 * 60 * 1000;
+    case "d":
+      return amount * 24 * 60 * 60 * 1000;
+  }
+}
+
+function rateLimitKey(policy: RateLimitPolicy, identifier: string) {
+  return `universe:rate-limit:${policy.prefix}:${identifier}`;
+}
+
+function normalizeRedisEvalResult(result: unknown): { count: number; ttlMs: number } {
+  if (!Array.isArray(result) || result.length !== 2) {
+    throw new Error("rate_limit_redis_result_invalid");
+  }
+
+  const [count, ttlMs] = result.map(Number);
+
+  if (!Number.isFinite(count) || !Number.isFinite(ttlMs)) {
+    throw new Error("rate_limit_redis_result_invalid");
+  }
+
+  return { count, ttlMs };
+}
+
+export function getClientIp(request: Request) {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  const firstForwardedIp = forwardedFor?.split(",")[0]?.trim();
+
+  return (
+    request.headers.get("cf-connecting-ip")?.trim() ||
+    request.headers.get("x-real-ip")?.trim() ||
+    firstForwardedIp ||
+    "unknown"
+  );
+}
+
+async function checkRateLimit(
+  policy: RateLimitPolicy,
+  identifier: string,
+): Promise<RateLimitResult> {
+  try {
+    const result = await getRedis().eval(
+      RATE_LIMIT_SCRIPT,
+      1,
+      rateLimitKey(policy, identifier),
+      parseWindowMs(policy.window),
+    );
+    const { count, ttlMs } = normalizeRedisEvalResult(result);
+
+    if (count <= policy.limit) {
+      return { status: "allowed" };
+    }
+
+    return { status: "blocked", retryAfterMs: ttlMs };
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "redis_not_configured" &&
+      !shouldFailClosedWhenMissingConfig()
+    ) {
+      return { status: "allowed" };
+    }
+
+    return shouldFailClosedWhenMissingConfig() ? { status: "unavailable" } : { status: "allowed" };
+  }
 }
 
 function rateLimitUnavailableResponse() {
@@ -61,8 +145,8 @@ function rateLimitUnavailableResponse() {
   );
 }
 
-function rateLimitedResponse(reset: number) {
-  const retryAfterSeconds = Math.max(1, Math.ceil((reset - Date.now()) / 1000));
+function rateLimitedResponse(retryAfterMs: number) {
+  const retryAfterSeconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
 
   return NextResponse.json(
     {
@@ -79,38 +163,15 @@ function rateLimitedResponse(reset: number) {
   );
 }
 
-function getLimiter(policy: RateLimitPolicy, env: UpstashEnv) {
-  const key = `${policy.prefix}:${policy.limit}:${policy.window}:${env.url}`;
-  const existing = limiters.get(key);
-
-  if (existing) {
-    return existing;
+function enforceResult(result: RateLimitResult) {
+  switch (result.status) {
+    case "allowed":
+      return null;
+    case "blocked":
+      return rateLimitedResponse(result.retryAfterMs);
+    case "unavailable":
+      return rateLimitUnavailableResponse();
   }
-
-  const limiter = new Ratelimit({
-    redis: new Redis({
-      url: env.url,
-      token: env.token,
-    }),
-    limiter: Ratelimit.slidingWindow(policy.limit, policy.window),
-    prefix: `universe:${policy.prefix}`,
-    analytics: false,
-  });
-
-  limiters.set(key, limiter);
-  return limiter;
-}
-
-export function getClientIp(request: Request) {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  const firstForwardedIp = forwardedFor?.split(",")[0]?.trim();
-
-  return (
-    request.headers.get("cf-connecting-ip")?.trim() ||
-    request.headers.get("x-real-ip")?.trim() ||
-    firstForwardedIp ||
-    "unknown"
-  );
 }
 
 export async function enforceRateLimit({
@@ -118,19 +179,19 @@ export async function enforceRateLimit({
   policy,
   userId,
 }: EnforceRateLimitArgs): Promise<Response | null> {
-  const env = readUpstashEnv();
-
-  if (!env) {
-    return shouldFailClosedWhenMissingConfig() ? rateLimitUnavailableResponse() : null;
-  }
-
   const ip = getClientIp(request);
   const identifier = userId ? `user:${userId}:ip:${ip}` : `ip:${ip}`;
-  const result = await getLimiter(policy, env).limit(identifier);
+  const result = await checkRateLimit(policy, identifier);
 
-  if (result.success) {
+  return enforceResult(result);
+}
+
+export async function enforceGlobalApiRateLimit(request: Request): Promise<Response | null> {
+  if (!new URL(request.url).pathname.startsWith("/api/")) {
     return null;
   }
 
-  return rateLimitedResponse(result.reset);
+  const result = await checkRateLimit(RATE_LIMITS.apiGlobal, `ip:${getClientIp(request)}`);
+
+  return enforceResult(result);
 }

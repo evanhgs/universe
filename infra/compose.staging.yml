@@ -92,8 +92,6 @@ services:
       POSTMARK_MESSAGE_STREAM: ${POSTMARK_MESSAGE_STREAM:-outbound}
       CRON_SECRET: ${CRON_SECRET:?set CRON_SECRET in infra/env/stack.staging.env}
       CRON_ALLOWED_IPS: ${CRON_ALLOWED_IPS:?set CRON_ALLOWED_IPS in infra/env/stack.staging.env}
-      UPSTASH_REDIS_REST_URL: ${UPSTASH_REDIS_REST_URL:?set UPSTASH_REDIS_REST_URL in infra/env/stack.staging.env}
-      UPSTASH_REDIS_REST_TOKEN: ${UPSTASH_REDIS_REST_TOKEN:?set UPSTASH_REDIS_REST_TOKEN in infra/env/stack.staging.env}
       REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in infra/env/stack.staging.env}@redis:6379
       CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:?set CLERK_SECRET_KEY in infra/env/stack.staging.env}
       CLERK_WEBHOOK_SIGNING_SECRET: ${CLERK_WEBHOOK_SIGNING_SECRET:?set CLERK_WEBHOOK_SIGNING_SECRET in infra/env/stack.staging.env}

@@ -1,6 +1,6 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 
-import { enforceGlobalApiRateLimit } from "@/server/security/proxy-rate-limit";
+import { enforceGlobalApiRateLimit } from "@/server/security/rate-limit";
 
 /**
  * Decoupe une variable d'environnement listee par virgules.

@@ -1,33 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const limitMock = vi.hoisted(() => vi.fn());
-const redisConstructorMock = vi.hoisted(() => vi.fn());
+const redisEvalMock = vi.hoisted(() => vi.fn());
 
-vi.mock("@upstash/redis", () => ({
-  Redis: redisConstructorMock,
+vi.mock("@/lib/redis", () => ({
+  getRedis: () => ({
+    eval: redisEvalMock,
+  }),
 }));
-
-vi.mock("@upstash/ratelimit", () => {
-  class Ratelimit {
-    static slidingWindow = vi.fn((limit: number, window: string) => ({ limit, window }));
-
-    limit = limitMock;
-  }
-
-  return { Ratelimit };
-});
 
 describe("rate limit helper", () => {
   beforeEach(() => {
     vi.resetModules();
-    limitMock.mockReset();
-    redisConstructorMock.mockReset();
+    redisEvalMock.mockReset();
   });
 
-  it("allows requests when Upstash accepts the identifier", async () => {
-    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example");
-    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "token");
-    limitMock.mockResolvedValue({ success: true, reset: Date.now() + 60_000 });
+  it("allows requests when Redis counter is under the policy limit", async () => {
+    redisEvalMock.mockResolvedValue([1, 600_000]);
     const { enforceRateLimit, RATE_LIMITS } = await import("@/server/security/rate-limit");
 
     const response = await enforceRateLimit({
@@ -39,13 +27,16 @@ describe("rate limit helper", () => {
     });
 
     expect(response).toBeNull();
-    expect(limitMock).toHaveBeenCalledWith("user:user_123:ip:203.0.113.10");
+    expect(redisEvalMock).toHaveBeenCalledWith(
+      expect.any(String),
+      1,
+      "universe:rate-limit:marketplace-write:user:user_123:ip:203.0.113.10",
+      600_000,
+    );
   });
 
-  it("returns 429 with Retry-After when Upstash blocks the request", async () => {
-    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example");
-    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "token");
-    limitMock.mockResolvedValue({ success: false, reset: Date.now() + 30_000 });
+  it("returns 429 with Retry-After when Redis counter exceeds the policy limit", async () => {
+    redisEvalMock.mockResolvedValue([31, 30_000]);
     const { enforceRateLimit, RATE_LIMITS } = await import("@/server/security/rate-limit");
 
     const response = await enforceRateLimit({
@@ -58,8 +49,9 @@ describe("rate limit helper", () => {
     expect(await response?.json()).toMatchObject({ error: "rate_limited" });
   });
 
-  it("fails open outside production when Upstash env is missing", async () => {
+  it("fails open outside production when Redis is not configured", async () => {
     vi.stubEnv("NODE_ENV", "test");
+    redisEvalMock.mockRejectedValue(new Error("redis_not_configured"));
     const { enforceRateLimit, RATE_LIMITS } = await import("@/server/security/rate-limit");
 
     await expect(
@@ -70,8 +62,9 @@ describe("rate limit helper", () => {
     ).resolves.toBeNull();
   });
 
-  it("fails closed in production when Upstash env is missing", async () => {
+  it("fails closed in production when Redis is not configured", async () => {
     vi.stubEnv("NODE_ENV", "production");
+    redisEvalMock.mockRejectedValue(new Error("redis_not_configured"));
     const { enforceRateLimit, RATE_LIMITS } = await import("@/server/security/rate-limit");
 
     const response = await enforceRateLimit({
