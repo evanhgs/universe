@@ -5,6 +5,7 @@ import { PRIVATE_JSON_HEADERS } from "@/server/http/response-headers";
 import { marketplaceErrorResponse } from "@/server/marketplace/marketplace.http";
 import { createStripeCheckoutForCurrentBuyer } from "@/server/marketplace/marketplace.service";
 import { parseStripeCheckoutInput } from "@/server/marketplace/marketplace.validation";
+import { enforceRateLimit, RATE_LIMITS } from "@/server/security/rate-limit";
 
 type RouteContext = {
   params: Promise<{
@@ -39,6 +40,13 @@ export async function POST(request: Request, context: RouteContext) {
       { status: 401, headers: PRIVATE_JSON_HEADERS },
     );
   }
+
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.marketplaceWrite,
+    userId,
+  });
+  if (limited) return limited;
 
   try {
     const { orderId } = await context.params;

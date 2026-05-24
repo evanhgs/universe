@@ -16,6 +16,27 @@ type ApiState = {
   body: JsonValue | null;
 };
 
+type SaturationSample = {
+  id: number;
+  status: number | null;
+  retryAfter: string | null;
+  durationMs: number;
+  body: JsonValue | null;
+  error?: string;
+};
+
+type SaturationRun = {
+  total: number;
+  completed: number;
+  durationMs: number;
+  ok: number;
+  limited: number;
+  unavailable: number;
+  unauthorized: number;
+  failed: number;
+  samples: SaturationSample[];
+};
+
 const initialState: ApiState = {
   status: null,
   body: null,
@@ -27,6 +48,8 @@ const buttonClass =
   "rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700";
 const secondaryButtonClass =
   "rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50";
+const inputClass =
+  "w-full rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 outline-none transition focus:border-amber-400";
 const textareaClass =
   "mt-3 block w-full rounded-2xl border border-slate-200 bg-slate-950 p-4 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-amber-400";
 const preClass =
@@ -101,6 +124,10 @@ export default function AccountTestPage() {
       2,
     ),
   );
+  const [saturationTotal, setSaturationTotal] = useState(32);
+  const [saturationConcurrency, setSaturationConcurrency] = useState(8);
+  const [saturationRun, setSaturationRun] = useState<SaturationRun | null>(null);
+  const [isSaturating, setIsSaturating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tokenStatus, setTokenStatus] = useState<string | null>(null);
 
@@ -153,6 +180,89 @@ export default function AccountTestPage() {
 
     await navigator.clipboard.writeText(sessionToken);
     setTokenStatus("Session token copie dans le presse-papiers.");
+  }
+
+  function summarizeSaturation(samples: SaturationSample[], total: number, startedAt: number): SaturationRun {
+    return {
+      total,
+      completed: samples.length,
+      durationMs: Math.round(performance.now() - startedAt),
+      ok: samples.filter((sample) => sample.status !== null && sample.status >= 200 && sample.status < 300).length,
+      limited: samples.filter((sample) => sample.status === 429).length,
+      unavailable: samples.filter((sample) => sample.status === 503).length,
+      unauthorized: samples.filter((sample) => sample.status === 401).length,
+      failed: samples.filter((sample) => sample.status === null).length,
+      samples: [...samples].sort((a, b) => a.id - b.id).slice(-12),
+    };
+  }
+
+  async function requestRateLimitProbe(id: number): Promise<SaturationSample> {
+    const startedAt = performance.now();
+
+    try {
+      const response = await fetch("/api/account-test/rate-limit", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          id,
+          nonce: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${id}`,
+        }),
+      });
+      const text = await response.text();
+      const body = text ? (JSON.parse(text) as JsonValue) : null;
+
+      return {
+        id,
+        status: response.status,
+        retryAfter: response.headers.get("Retry-After"),
+        durationMs: Math.round(performance.now() - startedAt),
+        body,
+      };
+    } catch (err) {
+      return {
+        id,
+        status: null,
+        retryAfter: null,
+        durationMs: Math.round(performance.now() - startedAt),
+        body: null,
+        error: err instanceof Error ? err.message : "Unknown error",
+      };
+    }
+  }
+
+  async function runSaturation() {
+    setError(null);
+    setIsSaturating(true);
+
+    const total = Math.min(400, Math.max(1, Math.trunc(saturationTotal)));
+    const concurrency = Math.min(50, total, Math.max(1, Math.trunc(saturationConcurrency)));
+    const startedAt = performance.now();
+    const samples: SaturationSample[] = [];
+    let nextId = 1;
+
+    setSaturationRun(summarizeSaturation(samples, total, startedAt));
+
+    async function worker() {
+      while (nextId <= total) {
+        const id = nextId;
+        nextId += 1;
+        const sample = await requestRateLimitProbe(id);
+
+        samples.push(sample);
+        setSaturationRun(summarizeSaturation(samples, total, startedAt));
+      }
+    }
+
+    try {
+      await Promise.all(Array.from({ length: Math.min(concurrency, total) }, () => worker()));
+    } finally {
+      setSaturationRun(summarizeSaturation(samples, total, startedAt));
+      setIsSaturating(false);
+    }
   }
 
   /**
@@ -237,6 +347,89 @@ export default function AccountTestPage() {
             {tokenStatus ?? "Charge un token si tu veux tester Bruno avec Authorization: Bearer."}
           </p>
           <textarea className={textareaClass} readOnly rows={8} value={sessionToken} />
+        </section>
+
+        <section className={sectionClass}>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Rate limit saturation</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                Lance un burst sur <code>/api/account-test/rate-limit</code>. La policy de test est{" "}
+                <code>8 requetes / 10 s</code>, donc un burst au-dessus doit produire des <code>429</code> avec{" "}
+                <code>Retry-After</code>.
+              </p>
+            </div>
+            <button
+              className={isSaturating ? `${secondaryButtonClass} cursor-wait opacity-70` : buttonClass}
+              disabled={isSaturating}
+              onClick={() => void runSaturation()}
+              type="button"
+            >
+              {isSaturating ? "Burst running" : "Run burst"}
+            </button>
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="text-sm font-medium text-slate-700">
+              Total requests
+              <input
+                className={`mt-2 ${inputClass}`}
+                max={400}
+                min={1}
+                onChange={(event) => setSaturationTotal(Number(event.target.value))}
+                type="number"
+                value={saturationTotal}
+              />
+            </label>
+            <label className="text-sm font-medium text-slate-700">
+              Concurrency
+              <input
+                className={`mt-2 ${inputClass}`}
+                max={50}
+                min={1}
+                onChange={(event) => setSaturationConcurrency(Number(event.target.value))}
+                type="number"
+                value={saturationConcurrency}
+              />
+            </label>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Progress</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">
+                {saturationRun ? `${saturationRun.completed}/${saturationRun.total}` : "0/0"}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Duration</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">
+                {saturationRun ? `${saturationRun.durationMs} ms` : "-"}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">2xx</p>
+              <p className="mt-2 text-2xl font-semibold text-emerald-900">{saturationRun?.ok ?? 0}</p>
+            </div>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">429</p>
+              <p className="mt-2 text-2xl font-semibold text-amber-900">{saturationRun?.limited ?? 0}</p>
+            </div>
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700">503</p>
+              <p className="mt-2 text-2xl font-semibold text-rose-900">{saturationRun?.unavailable ?? 0}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">401</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">{saturationRun?.unauthorized ?? 0}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Network</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">{saturationRun?.failed ?? 0}</p>
+            </div>
+          </div>
+
+          <pre className={preClass}>{JSON.stringify(saturationRun?.samples ?? [], null, 2)}</pre>
         </section>
 
         <div className="grid gap-6 lg:grid-cols-2">

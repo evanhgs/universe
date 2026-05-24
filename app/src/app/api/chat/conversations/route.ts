@@ -8,13 +8,14 @@ import {
 } from "@/server/chat/chat.service";
 import { parseCreateConversationInput } from "@/server/chat/chat.validation";
 import { PRIVATE_JSON_HEADERS } from "@/server/http/response-headers";
+import { enforceRateLimit, RATE_LIMITS } from "@/server/security/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Liste les conversations de l'utilisateur authentifie.
  */
-export async function GET() {
+export async function GET(request: Request = new Request("http://localhost")) {
   const { isAuthenticated, userId } = await auth();
 
   if (!isAuthenticated || !userId) {
@@ -23,6 +24,13 @@ export async function GET() {
       { status: 401, headers: PRIVATE_JSON_HEADERS },
     );
   }
+
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.chatRead,
+    userId,
+  });
+  if (limited) return limited;
 
   try {
     return NextResponse.json(await listCurrentUserConversations(userId), {
@@ -47,6 +55,13 @@ export async function POST(request: Request) {
       { status: 401, headers: PRIVATE_JSON_HEADERS },
     );
   }
+
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.chatWrite,
+    userId,
+  });
+  if (limited) return limited;
 
   try {
     const input = parseCreateConversationInput(await request.json());

@@ -7,6 +7,7 @@ import {
   listPublishedBeatsPayload,
 } from "@/server/beats/beat.service";
 import { parseBeatListQuery, parseCreateBeatInput } from "@/server/beats/beat.validation";
+import { enforceRateLimit, RATE_LIMITS } from "@/server/security/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,12 @@ function beatErrorResponse(error: unknown) {
  * @param request Requete HTTP contenant les filtres de recherche en query string.
  */
 export async function GET(request: Request) {
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.publicEnumeration,
+  });
+  if (limited) return limited;
+
   const beats = await listPublishedBeatsPayload(parseBeatListQuery(new URL(request.url)));
 
   return NextResponse.json(
@@ -67,6 +74,13 @@ export async function POST(request: Request) {
       { status: 401, headers: PRIVATE_JSON_HEADERS },
     );
   }
+
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.marketplaceWrite,
+    userId,
+  });
+  if (limited) return limited;
 
   try {
     const input = parseCreateBeatInput(await request.json());
