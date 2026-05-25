@@ -244,6 +244,8 @@ jobs:
           AUDIO_WORKER_TMP_DIR=/tmp/universe-audio-worker
           AUDIO_WORKER_TMPFS_SIZE=1g
           AUDIO_WORKER_RUST_LOG=info
+          REDIS_PASSWORD=replace_me_redis_password
+          REDIS_URL=redis://:replace_me_redis_password@redis:6379
           EOF
 
       - name: Validate staging Compose config
