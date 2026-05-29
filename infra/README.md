@@ -163,6 +163,21 @@ Clerk CSP is enforced in Next.js middleware instead of a static `next.config.ts`
 
 In practice, this means `app/.env.local` is no longer required for Clerk when the app is started through Compose. Keep the real keys in ignored runtime files such as `infra/env/stack.dev.env`, not in the versioned `*.example` files.
 
+## Sentry
+
+The Next.js app uses a minimal Sentry setup:
+
+- `NEXT_PUBLIC_SENTRY_DSN`: browser DSN, compiled into the client bundle
+- `NEXT_PUBLIC_SENTRY_ENVIRONMENT`: browser environment label
+- `SENTRY_DSN`: optional server DSN; leave empty to reuse `NEXT_PUBLIC_SENTRY_DSN`
+- `SENTRY_ENVIRONMENT`: server environment label
+- `SENTRY_RELEASE`: optional release identifier, usually the git SHA
+- `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`: only needed during image builds when uploading source maps
+
+Development and CI can leave all DSNs and Sentry upload variables empty. The SDK is initialized only when a DSN is present, and the Sentry build plugin only runs when `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` are all set.
+
+For staging and production Docker builds, Compose passes the public Sentry variables and upload credentials as build args so Next.js can compile browser config and upload source maps during `next build`. The same runtime env file also injects server-side Sentry variables when the container starts.
+
 ## Why the stack is structured this way
 
 - Development uses one Compose file and one env file for both services.
