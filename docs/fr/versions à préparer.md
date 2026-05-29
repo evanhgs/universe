@@ -131,7 +131,7 @@ Objectif : améliorer **engagement, monétisation et expérience utilisateur**
 
 ---
 
-## **5\. Chat avancé**
+## **5\. Chat avancé** (décalé en v4 je pense très optionnel)
 
 * Traduction automatique (API externe)  
 * Détection langue  
