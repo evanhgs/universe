@@ -8,6 +8,7 @@ import {
   createStorageObjectKey,
   getBeatStorageBucket,
 } from "@/server/storage/s3";
+import { enforceRateLimit, RATE_LIMITS } from "@/server/security/rate-limit";
 
 type UploadKind =
   | "audio-source"
@@ -148,6 +149,13 @@ export async function POST(request: Request) {
     if (!roles.includes("SELLER")) {
       throw new Error("seller_role_required");
     }
+
+    const limited = await enforceRateLimit({
+      request,
+      policy: RATE_LIMITS.storagePresign,
+      userId,
+    });
+    if (limited) return limited;
 
     const input = parseUploadRequest(await request.json());
     const bucket = getBeatStorageBucket();

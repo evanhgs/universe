@@ -44,16 +44,16 @@ describe("account validation", () => {
   });
 
   it("deduplicates and validates self-service roles", () => {
-    expect(parseSelfServiceRoles({ roles: [" buyer ", "SELLER", "buyer"] })).toEqual([
-      "BUYER",
-      "SELLER",
-    ]);
+    expect(parseSelfServiceRoles({ roles: [" buyer ", "buyer"] })).toEqual(["BUYER"]);
   });
 
   it("rejects roles outside self-service scope", () => {
     expect(() => parseSelfServiceRoles({ roles: [] })).toThrow("At least one role is required.");
     expect(() => parseSelfServiceRoles({ roles: ["ADMIN"] })).toThrow(
       'Role "ADMIN" cannot be self-assigned.',
+    );
+    expect(() => parseSelfServiceRoles({ roles: ["SELLER"] })).toThrow(
+      'Role "SELLER" cannot be self-assigned.',
     );
     expect(() => parseSelfServiceRoles({ roles: ["BUYER", 1] })).toThrow(
       "roles must only contain strings.",

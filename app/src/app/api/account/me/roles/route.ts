@@ -7,12 +7,13 @@ import {
   updateCurrentAccountRoles,
 } from "@/server/account/account.service";
 import { parseSelfServiceRoles } from "@/server/account/account.validation";
+import { enforceRateLimit, RATE_LIMITS } from "@/server/security/rate-limit";
 
 /**
  * Retourne les roles du compte authentifie.
  * @returns Reponse JSON privee contenant roles.
  */
-export async function GET() {
+export async function GET(request: Request = new Request("http://localhost")) {
   const { isAuthenticated } = await auth();
 
   if (!isAuthenticated) {
@@ -21,6 +22,12 @@ export async function GET() {
       { status: 401, headers: PRIVATE_JSON_HEADERS },
     );
   }
+
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.accountWrite,
+  });
+  if (limited) return limited;
 
   const account = await getCurrentAccountSnapshot();
 
@@ -46,6 +53,13 @@ export async function PUT(request: Request) {
       { status: 401, headers: PRIVATE_JSON_HEADERS },
     );
   }
+
+  const limited = await enforceRateLimit({
+    request,
+    policy: RATE_LIMITS.accountWrite,
+    userId,
+  });
+  if (limited) return limited;
 
   try {
     const roles = parseSelfServiceRoles(await request.json());

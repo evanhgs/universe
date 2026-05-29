@@ -78,7 +78,6 @@ export function ProfileForm({ initialAccount }: ProfileFormProps) {
   const [city, setCity] = useState(initialAccount.profile.city ?? "");
   const [countryCode, setCountryCode] = useState(initialAccount.profile.countryCode ?? "");
   const [isPublic, setIsPublic] = useState(initialAccount.profile.isPublic);
-  const [isSeller, setIsSeller] = useState(initialAccount.roles.includes("SELLER"));
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -136,7 +135,7 @@ export function ProfileForm({ initialAccount }: ProfileFormProps) {
             "Content-Type": "application/json",
           }),
           body: JSON.stringify({
-            roles: isSeller ? ["BUYER", "SELLER"] : ["BUYER"],
+            roles: ["BUYER"],
           }),
         }),
       );
@@ -268,20 +267,6 @@ export function ProfileForm({ initialAccount }: ProfileFormProps) {
                 Profil public
                 <span className="block text-xs leading-5 text-black/45">
                   Si le profil est prive, seul ton compte peut consulter la page publique.
-                </span>
-              </span>
-            </label>
-            <label className="flex items-start gap-3 text-sm text-black">
-              <input
-                checked={isSeller}
-                className="mt-1 h-4 w-4"
-                onChange={(event) => setIsSeller(event.target.checked)}
-                type="checkbox"
-              />
-              <span>
-                Activer le role vendeur
-                <span className="block text-xs leading-5 text-black/45">
-                  Le role acheteur reste conserve par defaut.
                 </span>
               </span>
             </label>

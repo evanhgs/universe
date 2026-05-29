@@ -2,26 +2,9 @@ import { NextResponse } from "next/server";
 
 import { emailService } from "@/server/email/email.service";
 import { PRIVATE_JSON_HEADERS } from "@/server/http/response-headers";
+import { assertCronRequestAuthorized } from "@/server/security/cron-auth";
 
 export const dynamic = "force-dynamic";
-
-/**
- * Verifie le secret cron self-host.
- * @param request Requete cron.
- */
-function assertCronAuthorized(request: Request) {
-  const secret = process.env.CRON_SECRET;
-
-  if (!secret) {
-    throw new Error("cron_secret_not_configured");
-  }
-
-  const authorization = request.headers.get("authorization");
-
-  if (authorization !== `Bearer ${secret}`) {
-    throw new Error("unauthorized");
-  }
-}
 
 /**
  * Execute le cron de rappels chat non lus.
@@ -29,7 +12,7 @@ function assertCronAuthorized(request: Request) {
  */
 async function handleCron(request: Request) {
   try {
-    assertCronAuthorized(request);
+    assertCronRequestAuthorized(request);
 
     return NextResponse.json(await emailService.sendChatUnreadReminders(), {
       status: 200,
@@ -38,9 +21,15 @@ async function handleCron(request: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error.";
     const status =
-      message === "unauthorized"
+      message === "cron_signature_missing" ||
+      message === "cron_signature_invalid" ||
+      message === "cron_timestamp_missing" ||
+      message === "cron_timestamp_invalid" ||
+      message === "cron_timestamp_expired" ||
+      message === "cron_ip_forbidden"
         ? 401
-        : message === "cron_secret_not_configured"
+        : message === "cron_secret_not_configured" ||
+            message === "cron_allowed_ips_not_configured"
           ? 503
           : 500;
 
