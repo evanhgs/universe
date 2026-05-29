@@ -72,6 +72,11 @@ services:
       CLERK_AUTHORIZED_PARTIES: ${CLERK_AUTHORIZED_PARTIES}
       CLERK_TELEMETRY_DISABLED: "${CLERK_PROXY_DEBUG:-0}"
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+      NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${NEXT_PUBLIC_SENTRY_ENVIRONMENT:-production}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+      SENTRY_RELEASE: ${SENTRY_RELEASE:-}
       STRIPE_AUTOMATIC_TAX_ENABLED: "${STRIPE_AUTOMATIC_TAX_ENABLED:-false}"
       S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT}
       S3_REGION: ${S3_REGION:-us-east-1}
@@ -100,11 +105,13 @@ services:
       context: ${NEXTJS_CONTEXT:-../app}
       dockerfile: ${NEXTJS_DOCKERFILE:-../app/Dockerfile}
       target: runner
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      args:
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${NEXT_PUBLIC_SENTRY_ENVIRONMENT:-production}
+        SENTRY_AUTH_TOKEN: ${SENTRY_AUTH_TOKEN:-}
+        SENTRY_ORG: ${SENTRY_ORG:-}
+        SENTRY_PROJECT: ${SENTRY_PROJECT:-}
+        SENTRY_RELEASE: ${SENTRY_RELEASE:-}
     expose:
       - "${NEXTJS_PORT:-3000}"
 
@@ -197,9 +204,6 @@ services:
       AUDIO_WORKER_POLL_INTERVAL_MS: ${AUDIO_WORKER_POLL_INTERVAL_MS:-2000}
       AUDIO_WORKER_TMP_DIR: ${AUDIO_WORKER_TMP_DIR:-/tmp/universe-audio-worker}
       RUST_LOG: ${AUDIO_WORKER_RUST_LOG:-info}
-    depends_on:
-      postgres:
-        condition: service_healthy
     restart: unless-stopped
     stop_signal: SIGTERM
     stop_grace_period: 30s

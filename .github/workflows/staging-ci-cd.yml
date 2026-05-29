@@ -15,6 +15,14 @@ env:
   APP_URL: http://staging.example.test
   NEXT_TELEMETRY_DISABLED: "1"
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_dummy
+  NEXT_PUBLIC_SENTRY_DSN: ""
+  NEXT_PUBLIC_SENTRY_ENVIRONMENT: ci
+  SENTRY_DSN: ""
+  SENTRY_ENVIRONMENT: ci
+  SENTRY_AUTH_TOKEN: ""
+  SENTRY_ORG: ""
+  SENTRY_PROJECT: ""
+  SENTRY_RELEASE: ${{ github.sha }}
   CLERK_SECRET_KEY: sk_test_dummy
   CLERK_WEBHOOK_SIGNING_SECRET: whsec_dummy
   STRIPE_SECRET_KEY: sk_test_dummy
@@ -195,6 +203,14 @@ jobs:
           CLERK_AUTHORIZED_PARTIES=http://staging.example.test
           S3_PUBLIC_ENDPOINT=https://s3-staging.example.test
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_dummy
+          NEXT_PUBLIC_SENTRY_DSN=
+          NEXT_PUBLIC_SENTRY_ENVIRONMENT=ci
+          SENTRY_DSN=
+          SENTRY_ENVIRONMENT=ci
+          SENTRY_AUTH_TOKEN=
+          SENTRY_ORG=
+          SENTRY_PROJECT=
+          SENTRY_RELEASE=${{ github.sha }}
           CLERK_SECRET_KEY=sk_test_dummy
           CLERK_WEBHOOK_SIGNING_SECRET=whsec_dummy
           CLERK_TELEMETRY_DISABLED=1
