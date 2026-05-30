@@ -555,7 +555,7 @@ export default function AccountTestPage() {
             <div>
               <h2 className="text-lg font-semibold">POST /api/account-test/email</h2>
               <p className="mt-2 text-sm text-slate-600">
-                Envoie un email Postmark reel avec un template transactionnel de test. Templates disponibles:{" "}
+                Envoie un email Resend reel avec un template transactionnel de test. Templates disponibles:{" "}
                 <code>PURCHASE_CONFIRMED</code>, <code>SALE_CONFIRMED</code>,{" "}
                 <code>SELLER_ACCESS_GRANTED</code>, <code>CHAT_UNREAD_REMINDER</code>.
               </p>

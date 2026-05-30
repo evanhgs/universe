@@ -37,9 +37,8 @@ function emailTestEnabled() {
 function emailDiagnostics() {
   return {
     enabled: emailTestEnabled(),
-    fromEmail: process.env.POSTMARK_FROM_EMAIL || null,
-    hasServerToken: Boolean(process.env.POSTMARK_SERVER_TOKEN),
-    messageStream: process.env.POSTMARK_MESSAGE_STREAM || "outbound",
+    fromEmail: process.env.RESEND_EMAIL_FROM || null,
+    hasApiKey: Boolean(process.env.RESEND_API_KEY),
     nodeEnv: process.env.NODE_ENV ?? null,
   };
 }
@@ -200,7 +199,7 @@ function testEmailEvent(email: TransactionalEmail): TransactionalEmail {
 }
 
 /**
- * Retourne l'etat de configuration email sans exposer le token Postmark.
+ * Retourne l'etat de configuration email sans exposer la cle API Resend.
  */
 export async function GET() {
   const { isAuthenticated } = await auth();

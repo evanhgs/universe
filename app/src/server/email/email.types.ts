@@ -26,6 +26,7 @@ export type EmailProviderSendInput = {
   textBody: string;
   htmlBody: string;
   template: EmailTemplate;
+  dedupeKey?: string;
   metadata?: Prisma.InputJsonValue;
 };
 

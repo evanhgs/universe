@@ -92,9 +92,8 @@ services:
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in infra/env/stack.prod.env}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:?set STRIPE_SECRET_KEY in infra/env/stack.prod.env}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:?set STRIPE_WEBHOOK_SECRET in infra/env/stack.prod.env}
-      POSTMARK_SERVER_TOKEN: ${POSTMARK_SERVER_TOKEN:?set POSTMARK_SERVER_TOKEN in infra/env/stack.prod.env}
-      POSTMARK_FROM_EMAIL: ${POSTMARK_FROM_EMAIL:?set POSTMARK_FROM_EMAIL in infra/env/stack.prod.env}
-      POSTMARK_MESSAGE_STREAM: ${POSTMARK_MESSAGE_STREAM:-outbound}
+      RESEND_API_KEY: ${RESEND_API_KEY:?set RESEND_API_KEY in infra/env/stack.prod.env}
+      RESEND_EMAIL_FROM: ${RESEND_EMAIL_FROM:?set RESEND_EMAIL_FROM in infra/env/stack.prod.env}
       CRON_SECRET: ${CRON_SECRET:?set CRON_SECRET in infra/env/stack.prod.env}
       CRON_ALLOWED_IPS: ${CRON_ALLOWED_IPS:?set CRON_ALLOWED_IPS in infra/env/stack.prod.env}
       REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in infra/env/stack.prod.env}@redis:6379
