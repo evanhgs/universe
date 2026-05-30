@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 
 import { emailService } from "@/server/email/email.service";
@@ -6,6 +7,19 @@ import { assertCronRequestAuthorized } from "@/server/security/cron-auth";
 
 export const dynamic = "force-dynamic";
 
+const CHAT_UNREAD_REMINDERS_MONITOR_SLUG = "universe-nextjs-chat-unread-reminders";
+const CHAT_UNREAD_REMINDERS_MONITOR_CONFIG = {
+  schedule: {
+    type: "crontab" as const,
+    value: "0 * * * *",
+  },
+  checkinMargin: 10,
+  maxRuntime: 5,
+  timezone: "UTC",
+  failureIssueThreshold: 1,
+  recoveryThreshold: 1,
+};
+
 /**
  * Execute le cron de rappels chat non lus.
  * @param request Requete HTTP.
@@ -13,8 +27,13 @@ export const dynamic = "force-dynamic";
 async function handleCron(request: Request) {
   try {
     assertCronRequestAuthorized(request);
+    const result = await Sentry.withMonitor(
+      CHAT_UNREAD_REMINDERS_MONITOR_SLUG,
+      () => emailService.sendChatUnreadReminders(),
+      CHAT_UNREAD_REMINDERS_MONITOR_CONFIG,
+    );
 
-    return NextResponse.json(await emailService.sendChatUnreadReminders(), {
+    return NextResponse.json(result, {
       status: 200,
       headers: PRIVATE_JSON_HEADERS,
     });
