@@ -205,8 +205,7 @@ enum EmailEventStatus {
 }
 
 enum EmailProvider {
-  POSTMARK
-  SES
+  RESEND
 }
 
 /// -------------------------
@@ -687,7 +686,7 @@ model EmailEvent {
   fromEmail          String?
   template           EmailTemplate
   status             EmailEventStatus @default(PENDING)
-  provider           EmailProvider    @default(POSTMARK)
+  provider           EmailProvider    @default(RESEND)
   providerMessageId  String?
   subject            String
   errorMessage       String?

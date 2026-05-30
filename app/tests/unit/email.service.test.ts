@@ -25,7 +25,7 @@ function emailEvent() {
 
 describe("EmailService", () => {
   beforeEach(() => {
-    vi.stubEnv("POSTMARK_FROM_EMAIL", "Universe <no-reply@example.com>");
+    vi.stubEnv("RESEND_EMAIL_FROM", "Universe <no-reply@example.com>");
     createEmailEventMock.mockReset().mockResolvedValue(emailEvent());
     findChatUnreadReminderCandidatesMock.mockReset().mockResolvedValue([]);
     findEmailAccountByClerkUserIdMock.mockReset();
@@ -37,8 +37,8 @@ describe("EmailService", () => {
   it("records a sent EmailEvent with the provider message id", async () => {
     const provider = {
       send: vi.fn().mockResolvedValue({
-        provider: "POSTMARK",
-        providerMessageId: "postmark_123",
+        provider: "RESEND",
+        providerMessageId: "resend_123",
       }),
     };
     const { EmailService } = await import("@/server/email/email.service");
@@ -71,13 +71,13 @@ describe("EmailService", () => {
     expect(updateEmailEventStatusMock).toHaveBeenCalledWith({
       id: "email_123",
       status: "SENT",
-      providerMessageId: "postmark_123",
+      providerMessageId: "resend_123",
       sentAt: expect.any(Date),
     });
   });
 
-  it("records skipped events when POSTMARK_FROM_EMAIL is missing", async () => {
-    vi.stubEnv("POSTMARK_FROM_EMAIL", "");
+  it("records skipped events when RESEND_EMAIL_FROM is missing", async () => {
+    vi.stubEnv("RESEND_EMAIL_FROM", "");
     const provider = { send: vi.fn() };
     const { EmailService } = await import("@/server/email/email.service");
     const service = new EmailService(provider);
@@ -94,15 +94,15 @@ describe("EmailService", () => {
     expect(updateEmailEventStatusMock).toHaveBeenCalledWith({
       id: "email_123",
       status: "SKIPPED",
-      errorMessage: "postmark_from_email_missing",
+      errorMessage: "resend_email_from_missing",
     });
   });
 
   it("sends purchase and sale confirmations from an order context", async () => {
     const provider = {
       send: vi.fn().mockResolvedValue({
-        provider: "POSTMARK",
-        providerMessageId: "postmark_123",
+        provider: "RESEND",
+        providerMessageId: "resend_123",
       }),
     };
     findOrderEmailContextMock.mockResolvedValue({
@@ -155,8 +155,8 @@ describe("EmailService", () => {
   it("sends unread chat reminders only for messages newer than lastReadAt and older than 24h", async () => {
     const provider = {
       send: vi.fn().mockResolvedValue({
-        provider: "POSTMARK",
-        providerMessageId: "postmark_123",
+        provider: "RESEND",
+        providerMessageId: "resend_123",
       }),
     };
     findChatUnreadReminderCandidatesMock.mockResolvedValue([

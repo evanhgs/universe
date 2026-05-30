@@ -90,6 +90,7 @@ export default function AccountTestPage() {
   const [roles, setRoles] = useState<ApiState>(initialState);
   const [emailTest, setEmailTest] = useState<ApiState>(initialState);
   const [emailConfig, setEmailConfig] = useState<ApiState>(initialState);
+  const [sentryTest, setSentryTest] = useState<ApiState>(initialState);
   const [sessionToken, setSessionToken] = useState<string>("");
   const [profilePayload, setProfilePayload] = useState(
     JSON.stringify(
@@ -553,9 +554,40 @@ export default function AccountTestPage() {
         <section className={sectionClass}>
           <div className="flex items-center justify-between gap-3">
             <div>
+              <h2 className="text-lg font-semibold">POST /api/account-test/sentry</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Capture une exception de test dans Sentry puis retourne un <code>500</code> JSON avec l&apos;event id.
+              </p>
+            </div>
+            {renderStatus(sentryTest.status)}
+          </div>
+          <button
+            className={`mt-4 ${buttonClass}`}
+            onClick={() =>
+              run(async () => {
+                setSentryTest(
+                  await request("/api/account-test/sentry", {
+                    method: "POST",
+                    body: JSON.stringify({
+                      source: "account-test",
+                    }),
+                  }),
+                );
+              })
+            }
+            type="button"
+          >
+            Trigger Sentry error
+          </button>
+          <pre className={preClass}>{JSON.stringify(sentryTest.body, null, 2)}</pre>
+        </section>
+
+        <section className={sectionClass}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
               <h2 className="text-lg font-semibold">POST /api/account-test/email</h2>
               <p className="mt-2 text-sm text-slate-600">
-                Envoie un email Postmark reel avec un template transactionnel de test. Templates disponibles:{" "}
+                Envoie un email Resend reel avec un template transactionnel de test. Templates disponibles:{" "}
                 <code>PURCHASE_CONFIRMED</code>, <code>SALE_CONFIRMED</code>,{" "}
                 <code>SELLER_ACCESS_GRANTED</code>, <code>CHAT_UNREAD_REMINDER</code>.
               </p>
