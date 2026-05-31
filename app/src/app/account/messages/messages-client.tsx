@@ -3,7 +3,7 @@
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { type KeyboardEvent, type SyntheticEvent, useEffect, useMemo, useState } from "react";
 
 import type {
   ConversationSummary,
@@ -66,15 +66,22 @@ function userMessage(error: string) {
  * @param conversation Conversation a afficher.
  */
 function conversationTitle(conversation: ConversationSummary) {
+  const otherNames = (conversation.otherParticipants ?? [])
+    .map((participant) => participant.displayName ?? participant.slug)
+    .filter(Boolean)
+    .join(" / ");
+
   if (conversation.beat) {
-    return conversation.beat.title;
+    return otherNames ? `${otherNames} : ${conversation.beat.title}` : conversation.beat.title;
   }
 
   return (
+    otherNames ||
     conversation.participants
       .map((participant) => participant.displayName ?? participant.slug)
       .filter(Boolean)
-      .join(" / ") || "Conversation"
+      .join(" / ") ||
+    "Utilisateur"
   );
 }
 
@@ -209,7 +216,7 @@ export function MessagesClient() {
    * Envoie le brouillon courant.
    * @param event Soumission formulaire.
    */
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!selectedConversation || isSending) {
@@ -255,6 +262,24 @@ export function MessagesClient() {
     }
   }
 
+  /**
+   * Envoie avec Entree et conserve Shift + Entree pour les retours a la ligne.
+   * @param event Touche pressee dans le champ message.
+   */
+  function handleMessageKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (draft.trim().length === 0 || isSending) {
+      return;
+    }
+
+    event.currentTarget.form?.requestSubmit();
+  }
+
   return (
     <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-6xl px-6 py-10">
       <section className="border-b border-black/10 pb-6">
@@ -262,7 +287,7 @@ export function MessagesClient() {
           Messagerie
         </p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-black">
-          Conversations
+          {conversations.length > 1 ? 'Conversations' : 'Conversation'}
         </h1>
       </section>
 
@@ -280,7 +305,7 @@ export function MessagesClient() {
             <div className="p-5">
               <h2 className="font-semibold text-black">Aucune conversation</h2>
               <p className="mt-2 text-sm leading-6 text-black/60">
-                Contacte un vendeur depuis une page beat ou un profil public.
+                Vous pouvez contacter un vendeur depuis son profil ou depuis le catalogue avant d&#39;effectuer un achat.
               </p>
               <Link className="mt-4 inline-flex text-sm font-medium text-black" href="/beats">
                 Explorer le catalogue
@@ -307,6 +332,7 @@ export function MessagesClient() {
                       </span>
                     ) : null}
                   </span>
+                  {/*TODO: ajouter la photo de profil à coté du pseudo*/}
                   <span className="line-clamp-2 text-sm leading-5 text-black/55">
                     {conversation.lastMessage?.body ?? "Conversation ouverte."}
                   </span>
@@ -364,7 +390,8 @@ export function MessagesClient() {
                   id="chat-message"
                   maxLength={2000}
                   onChange={(event) => setDraft(event.target.value)}
-                  placeholder="Ecris ton message..."
+                  onKeyDown={handleMessageKeyDown}
+                  placeholder="Ecrivez votre message..."
                   value={draft}
                 />
                 <div className="mt-3 flex items-center justify-between gap-4">
