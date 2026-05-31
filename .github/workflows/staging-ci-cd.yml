@@ -217,9 +217,8 @@ jobs:
           STRIPE_SECRET_KEY=sk_test_dummy
           STRIPE_WEBHOOK_SECRET=whsec_dummy
           STRIPE_AUTOMATIC_TAX_ENABLED=false
-          POSTMARK_SERVER_TOKEN=postmark_dummy
-          POSTMARK_FROM_EMAIL=no-reply@staging.example.test
-          POSTMARK_MESSAGE_STREAM=outbound
+          RESEND_API_KEY=resend_dummy
+          RESEND_EMAIL_FROM=no-reply@staging.example.test
           CRON_SECRET=cron_dummy
           CRON_ALLOWED_IPS=127.0.0.1
           UPSTASH_REDIS_REST_URL=https://redis-ci.example.test
