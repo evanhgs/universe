@@ -3,7 +3,14 @@
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { type KeyboardEvent, type SyntheticEvent, useEffect, useMemo, useState } from "react";
+import {
+  type KeyboardEvent,
+  type SyntheticEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import type {
   ConversationSummary,
@@ -100,6 +107,7 @@ export function MessagesClient() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const selectedConversation = useMemo(
     () =>
@@ -204,6 +212,10 @@ export function MessagesClient() {
     };
   }, [getToken, selectedConversationIdForLoad]);
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView?.({ block: "end" });
+  }, [messages.length, selectedConversationIdForLoad]);
+
   /**
    * Selectionne une conversation via query string.
    * @param conversationId Identifiant conversation.
@@ -281,7 +293,7 @@ export function MessagesClient() {
   }
 
   return (
-    <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-6xl px-6 py-10">
+    <main className="mx-auto flex h-[calc(100dvh-73px)] w-full max-w-6xl flex-col px-6 pb-8 pt-10">
       <section className="border-b border-black/10 pb-6">
         <p className="text-sm font-medium uppercase tracking-[0.24em] text-black/45">
           Messagerie
@@ -297,8 +309,8 @@ export function MessagesClient() {
         </p>
       ) : null}
 
-      <section className="mt-8 grid min-h-[560px] border border-black/10 bg-white lg:grid-cols-[320px_1fr]">
-        <aside className="border-b border-black/10 lg:border-b-0 lg:border-r">
+      <section className="mt-8 grid min-h-0 flex-1 overflow-hidden border border-black/10 bg-white lg:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="min-h-0 overflow-y-auto border-b border-black/10 lg:border-b-0 lg:border-r">
           {isLoading ? (
             <p className="p-5 text-sm text-black/55">Chargement des conversations...</p>
           ) : conversations.length === 0 ? (
@@ -342,7 +354,7 @@ export function MessagesClient() {
           )}
         </aside>
 
-        <div className="grid min-h-[560px] grid-rows-[auto_1fr_auto]">
+        <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]">
           {selectedConversation ? (
             <>
               <header className="border-b border-black/10 p-5">
@@ -359,7 +371,7 @@ export function MessagesClient() {
                 ) : null}
               </header>
 
-              <div className="space-y-4 overflow-y-auto p-5">
+              <div className="min-h-0 space-y-4 overflow-y-auto p-5">
                 {messages.length === 0 ? (
                   <p className="text-sm text-black/55">Aucun message pour le moment.</p>
                 ) : (
@@ -379,6 +391,7 @@ export function MessagesClient() {
                     </article>
                   ))
                 )}
+                <div ref={messagesEndRef} />
               </div>
 
               <form className="border-t border-black/10 p-5" onSubmit={handleSubmit}>
