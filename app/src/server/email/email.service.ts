@@ -15,9 +15,9 @@ import {
   renderSaleConfirmedEmail,
   renderSellerAccessGrantedEmail,
 } from "./email.templates";
-import { PostmarkEmailProvider } from "./postmark.provider";
+import { ResendEmailProvider } from "./resend.provider";
 
-const defaultProvider = new PostmarkEmailProvider();
+const defaultProvider = new ResendEmailProvider();
 
 /**
  * Service transactionnel centralise. Ne doit etre appele que cote serveur.
@@ -30,7 +30,7 @@ export class EmailService {
    * @param email Email transactionnel.
    */
   async send(email: TransactionalEmail) {
-    const fromEmail = process.env.POSTMARK_FROM_EMAIL;
+    const fromEmail = process.env.RESEND_EMAIL_FROM;
 
     if (email.dedupeKey) {
       const existing = await findEmailEventByDedupeKey(email.dedupeKey);
@@ -45,7 +45,7 @@ export class EmailService {
       toEmail: email.to.email,
       fromEmail,
       template: email.template,
-      provider: "POSTMARK",
+      provider: "RESEND",
       subject: email.subject,
       dedupeKey: email.dedupeKey,
       metadataJson: email.metadata,
@@ -55,7 +55,7 @@ export class EmailService {
       return updateEmailEventStatus({
         id: event.id,
         status: "SKIPPED",
-        errorMessage: "postmark_from_email_missing",
+        errorMessage: "resend_email_from_missing",
       });
     }
 
@@ -67,6 +67,7 @@ export class EmailService {
         textBody: email.textBody,
         htmlBody: email.htmlBody,
         template: email.template,
+        dedupeKey: email.dedupeKey,
         metadata: email.metadata,
       });
 

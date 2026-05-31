@@ -43,6 +43,7 @@ export type ConversationSummary = {
   type: ConversationType;
   beat: ChatBeatPayload;
   participants: ChatUserPayload[];
+  otherParticipants: ChatUserPayload[];
   lastMessage: MessagePayload | null;
   lastMessageAt: string | null;
   unreadCount: number;

@@ -34,6 +34,12 @@ export default async function Home() {
           >
             Tester le compte
           </Link>
+          <Link
+              className="inline-flex h-11 items-center justify-center rounded-full border border-purple-800/30 px-5 text-sm font-medium text-purple-700"
+              href="/feed"
+          >
+            Scroller comme un abrutis
+          </Link>
         </div>
         <div className="rounded-2xl border border-black/10 bg-black/[0.03] p-5">
           <p className="text-sm text-black/60">
