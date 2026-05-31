@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  parseBeatFeedQuery,
   parseBeatListQuery,
   parseCreateBeatInput,
   parseUpdateBeatInput,
@@ -127,5 +128,30 @@ describe("beat validation", () => {
       priceAmount: 12.35,
       status: "HIDDEN",
     });
+  });
+
+  it("normalizes feed pagination queries", () => {
+    const cursor = Buffer.from(
+      JSON.stringify({ publishedAt: "2026-05-31T12:00:00.000Z", id: "beat_123" }),
+      "utf8",
+    ).toString("base64url");
+
+    expect(parseBeatFeedQuery(new URL(`https://example.com/api/feed?limit=50&cursor=${cursor}`)))
+      .toEqual({
+        limit: 20,
+        cursor: {
+          publishedAt: "2026-05-31T12:00:00.000Z",
+          id: "beat_123",
+        },
+      });
+
+    expect(parseBeatFeedQuery(new URL("https://example.com/api/feed"))).toEqual({
+      limit: 10,
+      cursor: undefined,
+    });
+
+    expect(() =>
+      parseBeatFeedQuery(new URL("https://example.com/api/feed?cursor=not-a-cursor")),
+    ).toThrow("feed_cursor_invalid");
   });
 });

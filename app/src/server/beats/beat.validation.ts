@@ -5,7 +5,14 @@ import {
   DEFAULT_BEAT_CURRENCY,
   MAX_BEAT_TAGS,
 } from "./beat.constants";
-import type { BeatAssetInput, BeatListQuery, CreateBeatInput, UpdateBeatInput } from "./beat.types";
+import type {
+  BeatAssetInput,
+  BeatFeedCursor,
+  BeatFeedQuery,
+  BeatListQuery,
+  CreateBeatInput,
+  UpdateBeatInput,
+} from "./beat.types";
 
 const allowedVisibility = new Set<Visibility>(["PUBLIC", "UNLISTED", "PRIVATE"]);
 const allowedEditableStatuses = new Set<BeatStatus>(["DRAFT", "PUBLISHED", "HIDDEN", "ARCHIVED"]);
@@ -24,6 +31,8 @@ const allowedSorts = new Set<BeatListQuery["sort"]>([
   "bpm_desc",
 ]);
 const MAX_LICENSE_OFFERINGS = 3;
+const DEFAULT_FEED_LIMIT = 10;
+const MAX_FEED_LIMIT = 20;
 const defaultLicenseTitles: Record<LicenseScope, string> = {
   BASIC: "MP3",
   PREMIUM: "WAV",
@@ -263,6 +272,55 @@ function parseSort(value: string | null): BeatListQuery["sort"] {
   }
 
   return sort;
+}
+
+/**
+ * Parse une limite positive bornee depuis les query params publics.
+ * @param value Valeur brute.
+ * @param fallback Valeur par defaut si absente ou invalide.
+ * @param max Valeur maximale autorisee.
+ */
+function parsePositiveLimit(value: string | null, fallback: number, max: number) {
+  const limit = Number(value ?? fallback);
+
+  return Number.isInteger(limit) && limit > 0 ? Math.min(limit, max) : fallback;
+}
+
+/**
+ * Decode le curseur opaque du feed.
+ * @param value Parametre cursor en base64url/base64.
+ */
+function parseFeedCursor(value: string | null): BeatFeedCursor | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    const decoded = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as unknown;
+
+    if (!decoded || typeof decoded !== "object" || Array.isArray(decoded)) {
+      throw new Error("invalid_cursor");
+    }
+
+    const cursor = decoded as Record<string, unknown>;
+
+    if (typeof cursor.id !== "string" || typeof cursor.publishedAt !== "string") {
+      throw new Error("invalid_cursor");
+    }
+
+    const publishedAt = new Date(cursor.publishedAt);
+
+    if (Number.isNaN(publishedAt.getTime())) {
+      throw new Error("invalid_cursor");
+    }
+
+    return {
+      id: cursor.id,
+      publishedAt: publishedAt.toISOString(),
+    };
+  } catch {
+    throw new Error("feed_cursor_invalid");
+  }
 }
 
 /**
@@ -562,7 +620,6 @@ export function parseUpdateBeatInput(payload: unknown): UpdateBeatInput {
  * @returns Query normalisee avec limites et tri bornes.
  */
 export function parseBeatListQuery(url: URL): BeatListQuery {
-  const limit = Number(url.searchParams.get("limit") ?? 24);
   const bpm = parseOptionalInteger(url.searchParams.get("bpm"), "bpm", 20, 300);
   const bpmMin = parseOptionalInteger(url.searchParams.get("bpmMin"), "bpmMin", 20, 300);
   const bpmMax = parseOptionalInteger(url.searchParams.get("bpmMax"), "bpmMax", 20, 300);
@@ -584,6 +641,17 @@ export function parseBeatListQuery(url: URL): BeatListQuery {
     sellerSlug: normalizeOptionalString(url.searchParams.get("sellerSlug")) ?? undefined,
     licenseType: parseLicenseType(url.searchParams.get("licenseType")),
     sort: parseSort(url.searchParams.get("sort")),
-    limit: Number.isInteger(limit) && limit > 0 ? Math.min(limit, 50) : 24,
+    limit: parsePositiveLimit(url.searchParams.get("limit"), 24, 50),
+  };
+}
+
+/**
+ * Parse la pagination publique du feed decouverte.
+ * @param url URL complete de la requete entrante.
+ */
+export function parseBeatFeedQuery(url: URL): BeatFeedQuery {
+  return {
+    limit: parsePositiveLimit(url.searchParams.get("limit"), DEFAULT_FEED_LIMIT, MAX_FEED_LIMIT),
+    cursor: parseFeedCursor(url.searchParams.get("cursor")),
   };
 }
