@@ -9,12 +9,20 @@ import {
   findBeatPreviewJobForOwner,
   findPublishedBeatPreviewBySlug,
   findPublishedBeats,
+  findPublishedFeedBeats,
   findVisibleBeatBySlug,
   resetBeatPreviewJobForOwner,
   softDeleteBeatBySlug,
   updateBeatBySlug,
 } from "./beat.repository";
-import type { BeatApiPayload, BeatListQuery, CreateBeatInput, UpdateBeatInput } from "./beat.types";
+import type {
+  BeatApiPayload,
+  BeatFeedPagePayload,
+  BeatFeedQuery,
+  BeatListQuery,
+  CreateBeatInput,
+  UpdateBeatInput,
+} from "./beat.types";
 
 type BeatRecord = Awaited<ReturnType<typeof createBeat>>;
 
@@ -60,7 +68,7 @@ function isWorkerGeneratedPreview(asset: { metadataJson: unknown }) {
  * @param beat Beat charge avec owner et assets.
  * @returns Payload API consommable par les pages et clients.
  */
-async function serializeBeat(beat: BeatRecord): Promise<BeatApiPayload> {
+export async function serializeBeat(beat: BeatRecord): Promise<BeatApiPayload> {
   const publicAssets = beat.assets.filter(({ role, asset }) => {
     if (!asset.isPublic || asset.processingStatus !== "READY") {
       return false;
@@ -116,6 +124,24 @@ async function serializeBeat(beat: BeatRecord): Promise<BeatApiPayload> {
 }
 
 /**
+ * Encode le dernier beat retourne sous forme de curseur opaque.
+ * @param beat Beat publie utilise comme borne de page suivante.
+ */
+function encodeFeedCursor(beat: { id: string; publishedAt: Date | null }) {
+  if (!beat.publishedAt) {
+    return null;
+  }
+
+  return Buffer.from(
+    JSON.stringify({
+      publishedAt: beat.publishedAt.toISOString(),
+      id: beat.id,
+    }),
+    "utf8",
+  ).toString("base64url");
+}
+
+/**
  * Synchronise le compte courant et verifie qu'il correspond au Clerk user vendeur.
  * @param clerkUserId Identifiant Clerk attendu depuis auth().
  * @returns Compte local vendeur.
@@ -155,6 +181,25 @@ export async function listPublishedBeatsPayload(query: BeatListQuery) {
   const beats = await findPublishedBeats(query);
 
   return Promise.all(beats.map(serializeBeat));
+}
+
+/**
+ * Retourne une page du feed decouverte avec curseur de pagination.
+ * @param query Limite et curseur normalises.
+ */
+export async function listPublishedFeedPagePayload(
+  query: BeatFeedQuery,
+): Promise<BeatFeedPagePayload> {
+  const beats = await findPublishedFeedBeats(query);
+  const hasMore = beats.length > query.limit;
+  const pageItems = hasMore ? beats.slice(0, query.limit) : beats;
+  const lastItem = pageItems.at(-1);
+
+  return {
+    items: await Promise.all(pageItems.map(serializeBeat)),
+    nextCursor: hasMore && lastItem ? encodeFeedCursor(lastItem) : null,
+    hasMore,
+  };
 }
 
 /**

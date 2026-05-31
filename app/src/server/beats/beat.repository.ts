@@ -11,6 +11,7 @@ import {
 } from "./beat.constants";
 import type {
   BeatAssetInput,
+  BeatFeedQuery,
   BeatListQuery,
   CreateBeatInput,
   UpdateBeatInput,
@@ -549,6 +550,38 @@ export async function findPublishedBeats(query: BeatListQuery) {
     },
     orderBy,
     take: query.limit,
+    include: beatInclude,
+  });
+}
+
+/**
+ * Liste une page de beats pour le feed decouverte avec pagination par curseur.
+ * @param query Limite et curseur deja valides.
+ * @returns Une page limite+1 pour detecter s'il reste des resultats.
+ */
+export async function findPublishedFeedBeats(query: BeatFeedQuery) {
+  const cursorDate = query.cursor ? new Date(query.cursor.publishedAt) : null;
+
+  return getPrisma().beat.findMany({
+    where: {
+      status: "PUBLISHED",
+      visibility: "PUBLIC",
+      moderationStatus: "CLEAN",
+      publishedAt: { not: null },
+      ...(query.cursor && cursorDate
+        ? {
+            OR: [
+              { publishedAt: { lt: cursorDate } },
+              {
+                publishedAt: cursorDate,
+                id: { lt: query.cursor.id },
+              },
+            ],
+          }
+        : {}),
+    },
+    orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
+    take: query.limit + 1,
     include: beatInclude,
   });
 }

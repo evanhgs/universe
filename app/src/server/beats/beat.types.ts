@@ -119,3 +119,19 @@ export type BeatListQuery = {
   sort: "newest" | "price_asc" | "price_desc" | "bpm_asc" | "bpm_desc";
   limit: number;
 };
+
+export type BeatFeedCursor = {
+  publishedAt: string;
+  id: string;
+};
+
+export type BeatFeedQuery = {
+  limit: number;
+  cursor?: BeatFeedCursor;
+};
+
+export type BeatFeedPagePayload = {
+  items: BeatApiPayload[];
+  nextCursor: string | null;
+  hasMore: boolean;
+};
