@@ -134,6 +134,9 @@ async function serializeConversations(args: {
         participants: conversation.participants.map((participant) =>
           serializeUser(participant.user),
         ),
+        otherParticipants: conversation.participants
+          .filter((participant) => participant.userId !== args.userId)
+          .map((participant) => serializeUser(participant.user)),
         lastMessage: conversation.messages[0]
           ? serializeMessage(conversation.messages[0])
           : null,

@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Marque une conversation comme lue pour l'utilisateur courant.
- * @param _request Requete PATCH.
+ * @param request
  * @param context Parametres dynamiques Next.
  */
 export async function PATCH(request: Request, context: ConversationReadRouteContext) {

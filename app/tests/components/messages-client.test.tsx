@@ -25,6 +25,7 @@ const conversation = {
     { id: "user_1", displayName: "Buyer", slug: "buyer" },
     { id: "user_2", displayName: "Seller", slug: "seller" },
   ],
+  otherParticipants: [{ id: "user_2", displayName: "Seller", slug: "seller" }],
   lastMessage: null,
   lastMessageAt: null,
   unreadCount: 3,
@@ -76,7 +77,7 @@ describe("MessagesClient", () => {
             conversationId: "conv_123",
             sender: { id: "user_1", displayName: "Buyer", slug: "buyer" },
             type: "TEXT",
-            body: "Bonjour",
+            body: "Bonjour\nencore",
             createdAt: "2026-01-01T00:02:00.000Z",
             editedAt: null,
           }),
@@ -88,24 +89,31 @@ describe("MessagesClient", () => {
 
     render(<MessagesClient />);
 
-    expect(await screen.findByRole("heading", { name: "Beat One" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Seller : Beat One" })).toBeInTheDocument();
     expect(await screen.findByText("Salut")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.queryByText("3")).not.toBeInTheDocument();
     });
 
-    await userEvent.type(screen.getByLabelText("Message"), "Bonjour");
-    await userEvent.click(screen.getByRole("button", { name: "Envoyer" }));
+    const messageField = screen.getByLabelText("Message");
+    await userEvent.type(messageField, "Bonjour{Shift>}{Enter}{/Shift}encore");
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(messageField).toHaveValue("Bonjour\nencore");
+
+    await userEvent.type(messageField, "{Enter}");
 
     await waitFor(() => {
-      expect(screen.getAllByText("Bonjour").length).toBeGreaterThan(0);
+      expect(
+        screen.getAllByText((_, element) => element?.textContent === "Bonjour\nencore").length,
+      ).toBeGreaterThan(0);
     });
     expect(fetchMock).toHaveBeenLastCalledWith(
       "/api/chat/conversations/conv_123/messages",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ body: "Bonjour" }),
+        body: JSON.stringify({ body: "Bonjour\nencore" }),
       }),
     );
   });
