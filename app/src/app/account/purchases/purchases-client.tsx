@@ -82,9 +82,9 @@ type JsonBody = {
 };
 
 const buttonClass =
-  "inline-flex h-10 items-center justify-center rounded-full bg-black px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-black/35";
+  "inline-flex h-10 items-center justify-center rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:bg-primary/35";
 const secondaryButtonClass =
-  "inline-flex h-10 items-center justify-center rounded-full border border-black/15 px-4 text-sm font-medium text-black disabled:cursor-not-allowed disabled:text-black/35";
+  "inline-flex h-10 items-center justify-center rounded-full border border-input px-4 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:text-foreground/35";
 
 /**
  * Formate un montant de commande dans la devise fournie.
@@ -339,7 +339,7 @@ export function PurchasesClient() {
   if (!isLoaded || isLoading) {
     return (
       <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-5xl px-6 py-10">
-        <p className="text-sm text-black/60">Chargement des achats...</p>
+        <p className="text-sm text-muted-foreground">Chargement des achats...</p>
       </main>
     );
   }
@@ -347,8 +347,8 @@ export function PurchasesClient() {
   if (!isSignedIn) {
     return (
       <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-5xl px-6 py-10">
-        <h1 className="text-3xl font-semibold tracking-tight text-black">Mes achats</h1>
-        <p className="mt-3 text-sm leading-6 text-black/60">
+        <h1 className="text-3xl font-semibold tracking-tight text-foreground">Mes achats</h1>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
           Connecte-toi pour consulter tes licences et telecharger tes fichiers.
         </p>
         {notice ? (
@@ -370,12 +370,12 @@ export function PurchasesClient() {
 
   return (
     <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-5xl px-6 py-10">
-      <div className="border-b border-black/10 pb-8">
-        <p className="text-sm font-medium uppercase tracking-[0.24em] text-black/45">
+      <div className="border-b border-border pb-8">
+        <p className="text-sm font-medium uppercase tracking-[0.24em] text-muted-foreground">
           Marketplace
         </p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-black">Mes achats</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-black/60">
+        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground">Mes achats</h1>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
           Retrouve tes licences payees et genere un lien de telechargement securise.
         </p>
       </div>
@@ -392,9 +392,9 @@ export function PurchasesClient() {
       ) : null}
 
       {orders.length === 0 ? (
-        <div className="mt-8 border border-dashed border-black/20 p-8">
-          <h2 className="text-xl font-semibold text-black">Aucun achat</h2>
-          <p className="mt-2 text-sm leading-6 text-black/60">
+        <div className="mt-8 border border-dashed border-border p-8">
+          <h2 className="text-xl font-semibold text-foreground">Aucun achat</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Les licences achetees apparaitront ici apres paiement valide.
           </p>
           <Link className={`mt-5 ${secondaryButtonClass}`} href="/beats">
@@ -404,20 +404,20 @@ export function PurchasesClient() {
       ) : (
         <div className="mt-8 grid gap-4">
           {orders.map((order) => (
-            <article className="border border-black/10 bg-white p-5" key={order.id}>
+            <article className="border border-border bg-card p-5" key={order.id}>
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-black">{statusLabel(order.status)}</p>
-                  <p className="mt-1 text-xs text-black/45">
+                  <p className="text-sm font-semibold text-foreground">{statusLabel(order.status)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
                     Commande {order.id} - creee le {formatDate(order.createdAt)}
                   </p>
                   {order.paidAt ? (
-                    <p className="mt-1 text-xs text-black/45">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       Payee le {formatDate(order.paidAt)}
                     </p>
                   ) : null}
                 </div>
-                <dl className="grid gap-1 text-sm text-black/65">
+                <dl className="grid gap-1 text-sm text-muted-foreground">
                   <div className="flex justify-between gap-8">
                     <dt>HT</dt>
                     <dd>{formatMoney(order.subtotalAmount, order.currency)}</dd>
@@ -426,7 +426,7 @@ export function PurchasesClient() {
                     <dt>Taxe</dt>
                     <dd>{formatMoney(order.taxAmount, order.currency)}</dd>
                   </div>
-                  <div className="flex justify-between gap-8 font-semibold text-black">
+                  <div className="flex justify-between gap-8 font-semibold text-foreground">
                     <dt>TTC</dt>
                     <dd>{formatMoney(order.totalAmount, order.currency)}</dd>
                   </div>
@@ -440,24 +440,24 @@ export function PurchasesClient() {
                     order.status === "PAID" && entitlement?.status === "ACTIVE";
 
                   return (
-                    <div className="border border-black/10 p-4" key={item.id}>
+                    <div className="border border-border p-4" key={item.id}>
                       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div>
-                          <h2 className="text-lg font-semibold text-black">{item.title}</h2>
-                          <p className="mt-1 text-sm text-black/60">
+                          <h2 className="text-lg font-semibold text-foreground">{item.title}</h2>
+                          <p className="mt-1 text-sm text-muted-foreground">
                             Licence {item.licenseName ?? "Non renseignee"} -{" "}
                             {formatMoney(item.lineTotalAmount, order.currency)} HT
                           </p>
                           {item.beat?.slug ? (
                             <Link
-                              className="mt-2 inline-flex text-sm font-medium text-black hover:text-black/65"
+                              className="mt-2 inline-flex text-sm font-medium text-foreground hover:text-muted-foreground"
                               href={`/beats/${item.beat.slug}`}
                             >
                               Ouvrir la fiche
                             </Link>
                           ) : null}
                         </div>
-                        <div className="text-sm text-black/55">
+                        <div className="text-sm text-muted-foreground">
                           {entitlement ? (
                             <>
                               <p>

@@ -1,6 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Pause, Play } from "lucide-react";
+
+import { AudioMeter } from "@/components/audio/audio-meter";
+import { AudioTimeline } from "@/components/audio/audio-timeline";
+import { VolumeControl } from "@/components/audio/volume-control";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type PreviewStatus = "waiting" | "loading" | "ready" | "error";
 
@@ -30,6 +38,12 @@ export function BeatPreviewPlayer({
   const audioRef = useRef<HTMLAudioElement>(null);
   const [previewUrl, setPreviewUrl] = useState(initialUrl);
   const [status, setStatus] = useState<PreviewStatus>(initialUrl ? "loading" : "waiting");
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(0.72);
+  const [isMuted, setIsMuted] = useState(false);
 
   useEffect(() => {
     if (previewUrl || !shouldPoll) {
@@ -85,6 +99,58 @@ export function BeatPreviewPlayer({
     audio?.load();
   }, [previewUrl]);
 
+  useEffect(() => {
+    const audio = audioRef.current;
+
+    if (!audio) {
+      return;
+    }
+
+    audio.volume = isMuted ? 0 : volume;
+  }, [isMuted, volume]);
+
+  async function togglePlayback() {
+    const audio = audioRef.current;
+
+    if (!audio || !previewUrl) {
+      return;
+    }
+
+    if (isPlaying) {
+      audio.pause();
+      setIsPlaying(false);
+      return;
+    }
+
+    try {
+      setAudioError(null);
+      await audio.play();
+      setIsPlaying(true);
+      setStatus("ready");
+    } catch {
+      setIsPlaying(false);
+      setAudioError("Lecture impossible pour le moment.");
+    }
+  }
+
+  function seekTo(value: number) {
+    const audio = audioRef.current;
+
+    if (!audio || !Number.isFinite(value)) {
+      return;
+    }
+
+    audio.currentTime = value;
+    setCurrentTime(value);
+  }
+
+  function changeVolume(nextVolume: number) {
+    const safeVolume = Math.min(Math.max(nextVolume, 0), 1);
+
+    setVolume(safeVolume);
+    setIsMuted(safeVolume === 0);
+  }
+
   const label =
     status === "ready"
       ? "Preview prete"
@@ -95,50 +161,95 @@ export function BeatPreviewPlayer({
           : "Preview en preparation";
 
   return (
-    <div className="mt-6 border border-black/10 bg-white p-5">
+    <Card className="mt-6 p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-semibold text-black">Preview audio</p>
-          <p className="mt-1 text-sm text-black/55">{label}</p>
+          <p className="text-sm font-semibold text-foreground">Preview audio</p>
+          <p className="mt-1 text-sm text-muted-foreground">{label}</p>
         </div>
-        <div
-          aria-hidden="true"
-          className="flex h-9 items-center gap-1"
-        >
-          {[0, 1, 2, 3, 4].map((bar) => (
-            <span
-              className={`block w-1.5 rounded-full bg-black transition-all ${
-                status === "ready"
-                  ? "h-5"
-                  : status === "loading" || status === "waiting"
-                    ? "h-3 animate-pulse"
-                    : "h-2 bg-black/30"
-              }`}
-              key={bar}
-              style={{
-                animationDelay: `${bar * 120}ms`,
-              }}
-            />
-          ))}
-        </div>
+        <AudioMeter isActive={isPlaying || status === "loading" || status === "waiting"} />
       </div>
 
       {previewUrl ? (
-        <audio
-          className="mt-4 w-full"
-          controls
-          onCanPlay={() => setStatus("ready")}
-          onError={() => setStatus("error")}
-          onLoadStart={() => setStatus("loading")}
-          preload="metadata"
-          ref={audioRef}
-          src={previewUrl}
-        />
-      ) : (
-        <div className="mt-4 h-11 w-full overflow-hidden rounded-full border border-black/10 bg-black/[0.03]">
-          <div className="h-full w-1/3 animate-pulse bg-black/10" />
+        <div className="mt-5 rounded-lg border border-border bg-card p-3 text-card-foreground">
+          <audio
+            onCanPlay={() => setStatus("ready")}
+            onDurationChange={(event) => setDuration(event.currentTarget.duration || 0)}
+            onEnded={() => {
+              setCurrentTime(0);
+              setIsPlaying(false);
+            }}
+            onError={() => {
+              setAudioError("Preview audio indisponible.");
+              setIsPlaying(false);
+              setStatus("error");
+            }}
+            onPause={() => setIsPlaying(false)}
+            onPlay={() => setIsPlaying(true)}
+            onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+            preload="metadata"
+            ref={audioRef}
+            src={previewUrl}
+          />
+          <div className="flex items-center gap-3">
+            <Button
+              aria-label={isPlaying ? "Mettre en pause" : "Lire la preview"}
+              className="size-12 hover:scale-105"
+              onClick={() => void togglePlayback()}
+              size="icon"
+              type="button"
+              variant="inverse"
+            >
+              {isPlaying ? <Pause size={21} /> : <Play size={21} />}
+            </Button>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    Preview audio
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    Extrait de l&apos;instrumentale
+                  </p>
+                </div>
+
+                <AudioMeter
+                  barCount={6}
+                  className="shrink-0 text-accent"
+                  isActive={isPlaying}
+                  tone="accent"
+                />
+              </div>
+
+              <AudioTimeline
+                className="mt-3"
+                disabled={status !== "ready"}
+                duration={duration}
+                onSeek={seekTo}
+                progress={currentTime}
+                textClassName="text-muted-foreground"
+              />
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <VolumeControl
+              buttonClassName="border-border bg-background/60"
+              isMuted={isMuted}
+              onMuteChange={setIsMuted}
+              onVolumeChange={changeVolume}
+              textClassName="text-muted-foreground"
+              volume={volume}
+            />
+            {audioError ? (
+              <span className="text-xs text-destructive">{audioError}</span>
+            ) : null}
+          </div>
         </div>
+      ) : (
+        <Skeleton className="mt-4 h-11 w-full rounded-full" />
       )}
-    </div>
+    </Card>
   );
 }

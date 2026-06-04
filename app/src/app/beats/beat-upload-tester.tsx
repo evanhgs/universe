@@ -50,11 +50,11 @@ const licenseLabels: Record<LicenseScope, string> = {
 const licenseScopes: LicenseScope[] = ["BASIC", "PREMIUM", "UNLIMITED", "EXCLUSIVE", "CUSTOM"];
 
 const inputClass =
-  "h-11 w-full rounded-lg border border-black/15 px-4 text-sm outline-none focus:border-black";
+  "h-11 w-full rounded-lg border border-input px-4 text-sm outline-none focus:border-primary";
 const fileClass =
-  "block w-full cursor-pointer rounded-lg border border-black/15 bg-white px-4 py-3 text-sm text-black file:mr-4 file:rounded-full file:border-0 file:bg-black file:px-4 file:py-2 file:text-sm file:font-medium file:text-white";
-const labelClass = "text-sm font-medium text-black";
-const helperClass = "mt-1 text-xs leading-5 text-black/50";
+  "block w-full cursor-pointer rounded-lg border border-input bg-card px-4 py-3 text-sm text-foreground file:mr-4 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary-foreground";
+const labelClass = "text-sm font-medium text-foreground";
+const helperClass = "mt-1 text-xs leading-5 text-muted-foreground";
 
 /**
  * Extrait l'extension lowercase d'un nom de fichier.
@@ -467,23 +467,23 @@ export function BeatUploadTester() {
   }
 
   return (
-    <section className="mt-8 border border-black/10 bg-white p-5">
-      <div className="flex flex-col gap-3 border-b border-black/10 pb-5 md:flex-row md:items-start md:justify-between">
+    <section className="mt-8 border border-border bg-card p-5">
+      <div className="flex flex-col gap-3 border-b border-border pb-5 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-sm font-medium uppercase tracking-[0.24em] text-black/45">
+          <p className="text-sm font-medium uppercase tracking-[0.24em] text-muted-foreground">
             Test upload S3
           </p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-black">
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
             Ajouter une instrumentale
           </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-black/60">
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
             Ce formulaire appelle <code>/api/storage/uploads/presign</code>, envoie les fichiers
             vers S3, puis cree le beat avec <code>/api/beats</code>.
           </p>
         </div>
         {createdBeat?.slug ? (
           <a
-            className="inline-flex h-10 items-center justify-center rounded-full border border-black px-4 text-sm font-medium text-black"
+            className="inline-flex h-10 items-center justify-center rounded-full border border-primary px-4 text-sm font-medium text-foreground"
             href={`/beats/${createdBeat.slug}`}
           >
             Ouvrir la fiche
@@ -554,7 +554,7 @@ export function BeatUploadTester() {
           </label>
           <div className={labelClass}>
             Devise
-            <div className="mt-2 flex h-11 items-center rounded-lg border border-black/10 bg-black/[0.03] px-4 text-sm text-black/65">
+            <div className="mt-2 flex h-11 items-center rounded-lg border border-border bg-muted px-4 text-sm text-muted-foreground">
               EUR
             </div>
             <p className={helperClass}>Devise fixee en V1. Le choix pourra etre gere plus tard au paiement.</p>
@@ -564,7 +564,7 @@ export function BeatUploadTester() {
         <label className={labelClass}>
           Description
           <textarea
-            className="mt-2 min-h-24 w-full rounded-lg border border-black/15 px-4 py-3 text-sm leading-6 outline-none focus:border-black"
+            className="mt-2 min-h-24 w-full rounded-lg border border-input px-4 py-3 text-sm leading-6 outline-none focus:border-primary"
             onChange={(event) => setDescription(event.target.value)}
             placeholder="Notes rapides pour tester la publication."
             value={description}
@@ -572,15 +572,15 @@ export function BeatUploadTester() {
         </label>
 
         <div className="grid gap-4">
-          <div className="flex flex-col gap-3 border-t border-black/10 pt-5 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-3 border-t border-border pt-5 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-sm font-semibold text-black">Licences</p>
+              <p className="text-sm font-semibold text-foreground">Licences</p>
               <p className={helperClass}>
                 Maximum 3. La premiere licence sert de source pour generer automatiquement la preview.
               </p>
             </div>
             <button
-              className="inline-flex h-10 items-center justify-center rounded-full border border-black px-4 text-sm font-medium text-black disabled:cursor-not-allowed disabled:border-black/20 disabled:text-black/35"
+              className="inline-flex h-10 items-center justify-center rounded-full border border-primary px-4 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:border-border disabled:text-foreground/35"
               disabled={licenses.length >= MAX_LICENSES}
               onClick={addLicense}
               type="button"
@@ -592,7 +592,7 @@ export function BeatUploadTester() {
           <div className="grid gap-3">
             {licenses.map((license, index) => (
               <div
-                className="grid gap-3 border border-black/10 p-4 md:grid-cols-[220px_160px_1fr_auto]"
+                className="grid gap-3 border border-border p-4 md:grid-cols-[220px_160px_1fr_auto]"
                 key={license.id}
               >
                 <label className={labelClass}>
@@ -672,7 +672,7 @@ export function BeatUploadTester() {
 
                 <div className="flex items-end">
                   <button
-                    className="h-10 rounded-full border border-black/15 px-4 text-sm font-medium text-black disabled:cursor-not-allowed disabled:text-black/30"
+                    className="h-10 rounded-full border border-input px-4 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:text-foreground/30"
                     disabled={licenses.length === 1}
                     onClick={() => removeLicense(license.id)}
                     type="button"
@@ -696,11 +696,11 @@ export function BeatUploadTester() {
           </label>
         </div>
 
-        <div className="flex flex-wrap gap-4 border-t border-black/10 pt-5 text-sm text-black/70">
+        <div className="flex flex-wrap gap-4 border-t border-border pt-5 text-sm text-muted-foreground">
           <label className="inline-flex items-center gap-2">
             <input
               checked={publish}
-              className="h-4 w-4 accent-black"
+              className="h-4 w-4 accent-primary"
               onChange={(event) => setPublish(event.target.checked)}
               type="checkbox"
             />
@@ -721,13 +721,13 @@ export function BeatUploadTester() {
 
         <div className="flex flex-wrap items-center gap-3">
           <button
-            className="inline-flex h-11 items-center justify-center rounded-full bg-black px-5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-black/40"
+            className="inline-flex h-11 items-center justify-center rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:bg-primary/40"
             disabled={isSubmitting}
             type="submit"
           >
             {submitLabel}
           </button>
-          <p className="text-sm leading-6 text-black/50">
+          <p className="text-sm leading-6 text-muted-foreground">
             Il faut etre connecte avec un compte vendeur, sinon l API renverra
             <code> seller_role_required</code>.
           </p>

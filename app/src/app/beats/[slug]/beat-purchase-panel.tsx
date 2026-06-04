@@ -3,6 +3,10 @@
 import { useAuth, useClerk, useUser } from "@clerk/nextjs";
 import { useState } from "react";
 
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+
 type LicenseOffering = {
   id: string;
   title: string;
@@ -168,24 +172,24 @@ export function BeatPurchasePanel({
   }
 
   return (
-    <div className="mt-6 border-t border-black/10 pt-5">
+    <div className="mt-6 border-t border-border pt-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-black">Licences</p>
-          <p className="mt-1 text-sm leading-6 text-black/60">
+          <p className="text-sm font-semibold text-foreground">Licences</p>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
             Choisis une licence. Le prix TTC est calcule et affiche dans Stripe avant paiement.
           </p>
         </div>
       </div>
 
       {checkoutCancelled ? (
-        <p className="mt-4 border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+        <Alert className="mt-4 font-medium" variant="warning">
           Paiement annule. Tu peux choisir une licence et relancer le paiement.
-        </p>
+        </Alert>
       ) : null}
 
       {licenseOfferings.length === 0 ? (
-        <p className="mt-4 border border-dashed border-black/20 p-4 text-sm text-black/60">
+        <p className="mt-4 rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
           Aucune licence active pour cette instrumentale.
         </p>
       ) : (
@@ -195,23 +199,23 @@ export function BeatPurchasePanel({
             const disabled = isOwner || Boolean(loadingId);
 
             return (
-              <article className="border border-black/10 p-4" key={offering.id}>
+              <Card className="p-4" key={offering.id}>
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h2 className="text-base font-semibold text-black">{offering.title}</h2>
-                    <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-black/40">
+                    <h2 className="text-base font-semibold text-foreground">{offering.title}</h2>
+                    <p className="mt-1 text-xs font-medium uppercase text-muted-foreground">
                       {offering.scope}
                     </p>
                   </div>
-                  <p className="shrink-0 text-sm font-semibold text-black">
+                  <p className="shrink-0 text-sm font-semibold text-foreground">
                     {formatPriceHT(offering.priceAmount, offering.currency)}
                   </p>
                 </div>
                 {offering.description ? (
-                  <p className="mt-3 text-sm leading-6 text-black/60">{offering.description}</p>
+                  <p className="mt-3 text-sm leading-6 text-muted-foreground">{offering.description}</p>
                 ) : null}
-                <button
-                  className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-full bg-black px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-black/35"
+                <Button
+                  className="mt-4 w-full"
                   disabled={disabled}
                   onClick={() => void startPurchase(offering.id)}
                   type="button"
@@ -223,17 +227,17 @@ export function BeatPurchasePanel({
                       : isSignedIn
                         ? "Acheter"
                         : "Se connecter pour acheter"}
-                </button>
-              </article>
+                </Button>
+              </Card>
             );
           })}
         </div>
       )}
 
       {error ? (
-        <p className="mt-4 border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+        <Alert className="mt-4 font-medium" variant="destructive">
           {error}
-        </p>
+        </Alert>
       ) : null}
     </div>
   );
