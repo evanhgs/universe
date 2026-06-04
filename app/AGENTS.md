@@ -93,6 +93,8 @@ While coding:
 * keep naming aligned with the marketplace domain
 * avoid building placeholder business logic that conflicts with the docs
 * preserve separation between simple web flows and future heavy processing services
+* build user interfaces with shadcn/ui conventions and the existing reusable components in `src/components/ui` before creating custom UI primitives
+* keep UI styling aligned with the local component system, Tailwind tokens, and existing app patterns
 
 When uncertain:
 
