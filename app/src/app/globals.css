@@ -156,3 +156,40 @@ body {
   background: color-mix(in oklch, var(--brand-light) 42%, transparent);
   color: var(--foreground);
 }
+
+@keyframes feedMoodShift {
+  0% {
+    background-position: 0% 42%;
+    filter: saturate(1.05) hue-rotate(0deg);
+  }
+
+  50% {
+    background-position: 72% 28%;
+    filter: saturate(1.24) hue-rotate(10deg);
+  }
+
+  100% {
+    background-position: 100% 68%;
+    filter: saturate(1.14) hue-rotate(-8deg);
+  }
+}
+
+@keyframes feedMoodOrbit {
+  0% {
+    transform: translate3d(-2%, -1%, 0) scale(1);
+  }
+
+  100% {
+    transform: translate3d(3%, 2%, 0) scale(1.08);
+  }
+}
+
+@keyframes feedMoodPulse {
+  0% {
+    transform: scale(0.96);
+  }
+
+  100% {
+    transform: scale(1.08);
+  }
+}
