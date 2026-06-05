@@ -208,6 +208,22 @@ enum EmailProvider {
   RESEND
 }
 
+enum AnalyticsEventType {
+  BEAT_IMPRESSION
+  BEAT_CLICK
+  BEAT_PLAY
+  BEAT_PAUSE
+  BEAT_SKIP
+  BEAT_LIKE
+  BEAT_SAVE
+  BEAT_SHARE
+  BEAT_FULL_PLAY
+  LICENSE_CLICK
+  SELLER_PROFILE_CLICK
+  ADD_TO_CART
+  PURCHASE
+}
+
 /// -------------------------
 /// CORE IDENTITY
 /// -------------------------
@@ -251,6 +267,7 @@ model User {
   createdContracts   GeneratedContract[] @relation("ContractBuyer")
   soldContracts      GeneratedContract[] @relation("ContractSeller")
   emailEvents        EmailEvent[]
+  analyticsEvents AnalyticsEvent[]
 }
 
 model UserProfile {
@@ -381,6 +398,7 @@ model Beat {
   rightsRegistrations  BeatRightsRegistration[]
   contracts            GeneratedContract[]
   audioProcessingJobs  AudioProcessingJob[]
+  analyticsEvents      AnalyticsEvent[]
 
   @@index([ownerId, status, publishedAt])
   @@index([status, visibility, publishedAt])
@@ -909,4 +927,25 @@ model BeatRightsRegistration {
   organization            RightsOrganization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([beatId, organizationId])
+}
+
+model AnalyticsEvent {
+  id              String             @id @default(cuid())
+  type            AnalyticsEventType
+  beatId          String?
+  userId          String?
+  sessionId       String?
+  source          String?
+  watchMs         Int?
+  metadataJson    Json?
+  occurredAt      DateTime           @default(now())
+  createdAt       DateTime           @default(now())
+
+  beat            Beat?              @relation(fields: [beatId], references: [id], onDelete: Cascade)
+  user            User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([type, occurredAt])
+  @@index([beatId, type, occurredAt])
+  @@index([userId, occurredAt])
+  @@index([sessionId, occurredAt])
 }

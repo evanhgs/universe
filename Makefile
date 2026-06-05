@@ -2,6 +2,9 @@ DEV_ENV_FILE ?= infra/env/stack.dev.env
 STAGING_ENV_FILE ?= infra/env/stack.staging.env
 PROD_ENV_FILE ?= infra/env/stack.prod.env
 APP_DIR ?= app
+DEV_DB_HOST ?= localhost
+DEV_DB_PORT ?= 5432
+PRISMA_STUDIO_PORT ?= 5555
 
 DEV_COMPOSE := docker compose -f infra/compose.dev.yml --env-file $(DEV_ENV_FILE)
 STAGING_COMPOSE := docker compose -f infra/compose.staging.yml --env-file $(STAGING_ENV_FILE)
@@ -9,7 +12,8 @@ PROD_COMPOSE := docker compose -f infra/compose.prod.yml --env-file $(PROD_ENV_F
 
 .PHONY: \
 	dev dev-down dev-logs dev-ps \
-	dev-next-sh dev-prisma-generate dev-prisma-migrate dev-prisma-push dev-prisma-studio \
+	dev-next-sh dev-prisma-generate dev-prisma-migrate dev-prisma-migrate-container \
+	dev-prisma-push dev-prisma-push-container dev-prisma-studio dev-prisma-studio-container \
 	dev-test dev-test-next dev-test-rust dev-test-python \
 	staging staging-down staging-logs staging-ps staging-prisma-migrate staging-prisma-push \
 	prod prod-down prod-logs prod-ps \
@@ -30,6 +34,12 @@ define run_prisma_tooling
 		-e NPM_CONFIG_CACHE=/tmp/.npm \
 		"$${project_name}-nextjs-prisma" \
 		$(3)
+endef
+
+define run_dev_prisma_host
+	set -a; . $(DEV_ENV_FILE); set +a; \
+	DATABASE_URL="postgresql://$${POSTGRES_USER:-universe}:$${POSTGRES_PASSWORD:-universe_dev_password}@$(DEV_DB_HOST):$(DEV_DB_PORT)/$${POSTGRES_DB:-universe_dev}?schema=public"; \
+	cd $(APP_DIR) && DATABASE_URL="$$DATABASE_URL" $(1)
 endef
 
 # -----------------------------------------------------------------------------
@@ -61,15 +71,27 @@ dev-prisma-generate:
 
 dev-prisma-migrate:
 	$(call require_env_file,$(DEV_ENV_FILE))
+	$(call run_dev_prisma_host,npx prisma migrate dev $(if $(NAME),--name $(NAME),))
+
+dev-prisma-migrate-container:
+	$(call require_env_file,$(DEV_ENV_FILE))
 	$(DEV_COMPOSE) exec nextjs npx prisma migrate dev
 
 dev-prisma-push:
+	$(call require_env_file,$(DEV_ENV_FILE))
+	$(call run_dev_prisma_host,npx prisma db push)
+
+dev-prisma-push-container:
 	$(call require_env_file,$(DEV_ENV_FILE))
 	$(DEV_COMPOSE) exec nextjs npx prisma db push
 
 dev-prisma-studio:
 	$(call require_env_file,$(DEV_ENV_FILE))
-	$(DEV_COMPOSE) exec nextjs npx prisma studio --hostname 0.0.0.0 --port 5555
+	$(call run_dev_prisma_host,npx prisma studio --port $(PRISMA_STUDIO_PORT) --url "$$DATABASE_URL")
+
+dev-prisma-studio-container:
+	$(call require_env_file,$(DEV_ENV_FILE))
+	$(DEV_COMPOSE) exec nextjs npx prisma studio --port 5555
 
 # -----------------------------------------------------------------------------
 # Dev tests (run inside the dev compose containers — `make dev` must be up).
