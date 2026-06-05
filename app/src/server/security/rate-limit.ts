@@ -31,6 +31,7 @@ export const RATE_LIMITS = {
   storagePresign: { limit: 30, window: "10 m", prefix: "storage-presign" },
   marketplaceWrite: { limit: 30, window: "10 m", prefix: "marketplace-write" },
   marketplaceRead: { limit: 120, window: "10 m", prefix: "marketplace-read" },
+  analyticsWrite: { limit: 240, window: "1 m", prefix: "analytics-write" },
   chatWrite: { limit: 60, window: "1 m", prefix: "chat-write" },
   chatRead: { limit: 180, window: "1 m", prefix: "chat-read" },
   publicEnumeration: { limit: 120, window: "1 m", prefix: "public-enumeration" },

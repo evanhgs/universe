@@ -220,8 +220,12 @@ enum AnalyticsEventType {
   BEAT_FULL_PLAY
   LICENSE_CLICK
   SELLER_PROFILE_CLICK
+  SELLER_PROFILE_VIEW
+  SELLER_FOLLOW
   ADD_TO_CART
   PURCHASE
+  SEARCH
+  MESSAGE_SELLER
 }
 
 /// -------------------------
@@ -268,6 +272,9 @@ model User {
   soldContracts      GeneratedContract[] @relation("ContractSeller")
   emailEvents        EmailEvent[]
   analyticsEvents AnalyticsEvent[]
+  sellerAnalyticsEvents AnalyticsEvent[] @relation("AnalyticsEventSeller")
+  tasteProfile      UserTasteProfile?
+  sellerStats       SellerStats?
 }
 
 model UserProfile {
@@ -395,6 +402,8 @@ model Beat {
   views                BeatViewEvent[]
   likes                BeatLike[]
   scoreSnapshots       BeatScoreSnapshot[]
+  stats                BeatStats?
+  recommendationScore  BeatRecommendationScore?
   rightsRegistrations  BeatRightsRegistration[]
   contracts            GeneratedContract[]
   audioProcessingJobs  AudioProcessingJob[]
@@ -834,6 +843,77 @@ model BeatScoreSnapshot {
   @@index([beatId, computedAt])
 }
 
+model BeatStats {
+  id              String   @id @default(cuid())
+  beatId          String   @unique
+  impressions     Int      @default(0)
+  clicks          Int      @default(0)
+  plays           Int      @default(0)
+  pauses          Int      @default(0)
+  skips           Int      @default(0)
+  fullPlays       Int      @default(0)
+  likes           Int      @default(0)
+  saves           Int      @default(0)
+  shares          Int      @default(0)
+  licenseClicks   Int      @default(0)
+  addToCart       Int      @default(0)
+  purchases       Int      @default(0)
+  revenue         Decimal  @default(0) @db.Decimal(12,2)
+  conversionRate  Decimal  @default(0) @db.Decimal(8,4)
+  updatedAt       DateTime @updatedAt
+
+  beat            Beat     @relation(fields: [beatId], references: [id], onDelete: Cascade)
+
+  @@index([conversionRate])
+}
+
+model UserTasteProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  favoriteGenres  Json     @default("{}")
+  favoriteMoods   Json     @default("{}")
+  favoriteTags    Json     @default("{}")
+  preferredBpmMin Int?
+  preferredBpmMax Int?
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SellerStats {
+  id                String   @id @default(cuid())
+  sellerId          String   @unique
+  salesCount        Int      @default(0)
+  averageRating     Decimal  @default(0) @db.Decimal(3,2)
+  responseRate      Decimal  @default(0) @db.Decimal(5,4)
+  successfulOrders  Int      @default(0)
+  disputeRate       Decimal  @default(0) @db.Decimal(5,4)
+  updatedAt         DateTime @updatedAt
+
+  seller            User     @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+}
+
+model BeatRecommendationScore {
+  id              String   @id @default(cuid())
+  beatId          String   @unique
+  engagementScore Decimal  @default(0) @db.Decimal(8,4)
+  keywordScore    Decimal  @default(0) @db.Decimal(8,4)
+  similarityScore Decimal  @default(0) @db.Decimal(8,4)
+  salesScore      Decimal  @default(0) @db.Decimal(8,4)
+  freshnessScore  Decimal  @default(0) @db.Decimal(8,4)
+  sellerScore     Decimal  @default(0) @db.Decimal(8,4)
+  diversityScore  Decimal  @default(0) @db.Decimal(8,4)
+  organicScore    Decimal  @default(0) @db.Decimal(8,4)
+  reason          String?
+  scoreVersion    String
+  inputsJson      Json
+  computedAt      DateTime @default(now())
+
+  beat            Beat     @relation(fields: [beatId], references: [id], onDelete: Cascade)
+
+  @@index([organicScore, computedAt])
+}
+
 /// -------------------------
 /// V3 READY
 /// -------------------------
@@ -933,19 +1013,25 @@ model AnalyticsEvent {
   id              String             @id @default(cuid())
   type            AnalyticsEventType
   beatId          String?
+  sellerId        String?
   userId          String?
   sessionId       String?
   source          String?
+  durationMs      Int?
   watchMs         Int?
+  playPercentage  Decimal?           @db.Decimal(5,4)
+  keyword         String?
   metadataJson    Json?
   occurredAt      DateTime           @default(now())
   createdAt       DateTime           @default(now())
 
   beat            Beat?              @relation(fields: [beatId], references: [id], onDelete: Cascade)
+  seller          User?              @relation("AnalyticsEventSeller", fields: [sellerId], references: [id], onDelete: SetNull)
   user            User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([type, occurredAt])
   @@index([beatId, type, occurredAt])
+  @@index([sellerId, occurredAt])
   @@index([userId, occurredAt])
   @@index([sessionId, occurredAt])
 }

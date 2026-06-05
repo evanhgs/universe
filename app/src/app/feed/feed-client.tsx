@@ -53,6 +53,56 @@ type FeedClientProps = FeedPagePayload;
 
 const FALLBACK_VISUAL_URL = "/beat_music.gif";
 const VOLUME_STORAGE_KEY = "universe.feed.volume";
+const SESSION_STORAGE_KEY = "universe.analytics.sessionId";
+
+function getOrCreateSessionId() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const existing = window.localStorage.getItem(SESSION_STORAGE_KEY);
+
+  if (existing) {
+    return existing;
+  }
+
+  const next =
+    typeof window.crypto?.randomUUID === "function"
+      ? window.crypto.randomUUID()
+      : `sess_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+  window.localStorage.setItem(SESSION_STORAGE_KEY, next);
+
+  return next;
+}
+
+function postFeedAnalyticsEvent(payload: {
+  eventType: string;
+  beatId: string;
+  sessionId: string;
+  source?: string;
+  durationMs?: number;
+  watchMs?: number;
+  playPercentage?: number;
+}) {
+  const request = fetch("/api/analytics/events", {
+    method: "POST",
+    cache: "no-store",
+    keepalive: true,
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      source: "feed",
+      ...payload,
+    }),
+  });
+
+  if (request && typeof request.catch === "function") {
+    void request.catch(() => undefined);
+  }
+}
 
 function formatPrice(priceAmount: number | null, currency: string, isFree: boolean) {
   if (isFree || priceAmount === 0) {
@@ -108,14 +158,49 @@ export function FeedClient({
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.72);
   const [isMuted, setIsMuted] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const cardRefs = useRef<Array<HTMLElement | null>>([]);
   const activeIndexRef = useRef(0);
   const hasLoadedStoredVolumeRef = useRef(false);
   const navigationLockedRef = useRef(false);
   const loadingRef = useRef(false);
+  const impressionsSentRef = useRef(new Set<string>());
+  const fullPlaySentRef = useRef(new Set<string>());
+  const progressByBeatRef = useRef(new Map<string, { durationMs: number; percentage: number }>());
+  const previousActiveBeatIdRef = useRef<string | null>(initialItems[0]?.id ?? null);
 
   const preloadIndex = useMemo(() => Math.max(items.length - 4, 0), [items.length]);
+
+  const trackEvent = useCallback(
+    (
+      beatId: string,
+      eventType: string,
+      details?: {
+        durationMs?: number;
+        watchMs?: number;
+        playPercentage?: number;
+      },
+    ) => {
+      const currentSessionId = sessionId ?? getOrCreateSessionId();
+
+      if (!currentSessionId) {
+        return;
+      }
+
+      if (!sessionId) {
+        setSessionId(currentSessionId);
+      }
+
+      postFeedAnalyticsEvent({
+        eventType,
+        beatId,
+        sessionId: currentSessionId,
+        ...details,
+      });
+    },
+    [sessionId],
+  );
 
   const loadMore = useCallback(async () => {
     if (loadingRef.current || !hasMore || !nextCursor) {
@@ -131,6 +216,11 @@ export function FeedClient({
         limit: "10",
         cursor: nextCursor,
       });
+
+      if (sessionId) {
+        params.set("sessionId", sessionId);
+      }
+
       const response = await fetch(`/api/feed?${params.toString()}`, {
         cache: "no-store",
         headers: { Accept: "application/json" },
@@ -156,7 +246,7 @@ export function FeedClient({
       loadingRef.current = false;
       setIsLoading(false);
     }
-  }, [hasMore, nextCursor]);
+  }, [hasMore, nextCursor, sessionId]);
 
   const setCardRef = useCallback((index: number, node: HTMLElement | null) => {
     cardRefs.current[index] = node;
@@ -172,6 +262,7 @@ export function FeedClient({
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
+      setSessionId(getOrCreateSessionId());
       const storedVolume = window.localStorage.getItem(VOLUME_STORAGE_KEY);
       hasLoadedStoredVolumeRef.current = true;
 
@@ -189,6 +280,38 @@ export function FeedClient({
 
     return () => window.clearTimeout(timeoutId);
   }, []);
+
+  useEffect(() => {
+    const beat = items[activeIndex];
+
+    if (!beat) {
+      return;
+    }
+
+    if (!impressionsSentRef.current.has(beat.id)) {
+      impressionsSentRef.current.add(beat.id);
+      trackEvent(beat.id, "beat_impression");
+    }
+  }, [activeIndex, items, trackEvent]);
+
+  useEffect(() => {
+    const currentBeat = items[activeIndex];
+    const previousBeatId = previousActiveBeatIdRef.current;
+
+    if (previousBeatId && previousBeatId !== currentBeat?.id) {
+      const progress = progressByBeatRef.current.get(previousBeatId);
+
+      if (progress && progress.durationMs > 0 && progress.percentage < 0.25) {
+        trackEvent(previousBeatId, "beat_skip", {
+          durationMs: progress.durationMs,
+          watchMs: progress.durationMs,
+          playPercentage: progress.percentage,
+        });
+      }
+    }
+
+    previousActiveBeatIdRef.current = currentBeat?.id ?? null;
+  }, [activeIndex, items, trackEvent]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -259,6 +382,7 @@ export function FeedClient({
         await audio.play();
         setIsAudioPlaying(true);
         setAutoplayBlocked(false);
+        trackEvent(beat.id, "beat_play");
       } catch {
         setIsAudioPlaying(false);
 
@@ -270,15 +394,26 @@ export function FeedClient({
         setAudioError("Lecture impossible pour le moment.");
       }
     },
-    [items, playingBeatId],
+    [items, playingBeatId, trackEvent],
   );
 
-  const pauseAudio = useCallback(() => {
+  const pauseAudio = useCallback((track = false) => {
     const audio = audioRef.current;
+    const beatId = playingBeatId;
 
     audio?.pause();
     setIsAudioPlaying(false);
-  }, []);
+
+    if (track && beatId) {
+      const progress = progressByBeatRef.current.get(beatId);
+
+      trackEvent(beatId, "beat_pause", {
+        durationMs: progress?.durationMs,
+        watchMs: progress?.durationMs,
+        playPercentage: progress?.percentage,
+      });
+    }
+  }, [playingBeatId, trackEvent]);
 
   const scrollToBeat = useCallback(
     (direction: 1 | -1) => {
@@ -438,7 +573,7 @@ export function FeedClient({
     }
 
     if (playingBeatId === beat.id && isAudioPlaying) {
-      pauseAudio();
+      pauseAudio(true);
       return;
     }
 
@@ -472,14 +607,52 @@ export function FeedClient({
     <div className={`min-h-[calc(100vh-73px)] text-foreground transition-colors dark:text-white ${backgroundClass}`}>
       <audio
         onDurationChange={(event) => setDuration(event.currentTarget.duration)}
-        onEnded={() => setIsAudioPlaying(false)}
+        onEnded={() => {
+          setIsAudioPlaying(false);
+
+          if (playingBeatId) {
+            const progress = progressByBeatRef.current.get(playingBeatId);
+
+            trackEvent(playingBeatId, "beat_full_play", {
+              durationMs: progress?.durationMs,
+              watchMs: progress?.durationMs,
+              playPercentage: 1,
+            });
+            fullPlaySentRef.current.add(playingBeatId);
+          }
+        }}
         onError={() => {
           setIsAudioPlaying(false);
           setAudioError("Preview indisponible pour ce beat.");
         }}
         onPause={() => setIsAudioPlaying(false)}
         onPlay={() => setIsAudioPlaying(true)}
-        onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+        onTimeUpdate={(event) => {
+          const audio = event.currentTarget;
+          const nextCurrentTime = audio.currentTime;
+          const safeDuration = Number.isFinite(audio.duration) ? audio.duration : duration;
+          const percentage = safeDuration > 0 ? Math.min(nextCurrentTime / safeDuration, 1) : 0;
+
+          setCurrentTime(nextCurrentTime);
+
+          if (!playingBeatId) {
+            return;
+          }
+
+          progressByBeatRef.current.set(playingBeatId, {
+            durationMs: Math.round(nextCurrentTime * 1000),
+            percentage,
+          });
+
+          if (percentage >= 0.85 && !fullPlaySentRef.current.has(playingBeatId)) {
+            fullPlaySentRef.current.add(playingBeatId);
+            trackEvent(playingBeatId, "beat_full_play", {
+              durationMs: Math.round(nextCurrentTime * 1000),
+              watchMs: Math.round(nextCurrentTime * 1000),
+              playPercentage: percentage,
+            });
+          }
+        }}
         preload="auto"
         ref={audioRef}
       />
@@ -642,6 +815,7 @@ export function FeedClient({
                       <Link
                         className="inline-flex h-11 items-center justify-center rounded-full bg-white px-5 text-sm font-semibold text-black transition hover:bg-orange-100"
                         href={`/beats/${beat.slug}`}
+                        onClick={() => trackEvent(beat.id, "license_click")}
                       >
                         Voir licences
                       </Link>
