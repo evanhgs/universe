@@ -12,6 +12,10 @@ import {
   useState,
 } from "react";
 
+import { Alert } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import type {
   ConversationSummary,
   MessagePayload,
@@ -294,58 +298,58 @@ export function MessagesClient() {
 
   return (
     <main className="mx-auto flex h-[calc(100dvh-73px)] w-full max-w-6xl flex-col px-6 pb-8 pt-10">
-      <section className="border-b border-black/10 pb-6">
-        <p className="text-sm font-medium uppercase tracking-[0.24em] text-black/45">
+      <section className="border-b border-border pb-6">
+        <p className="text-sm font-medium uppercase tracking-[0.24em] text-muted-foreground">
           Messagerie
         </p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-black">
+        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground">
           {conversations.length > 1 ? 'Conversations' : 'Conversation'}
         </h1>
       </section>
 
       {error ? (
-        <p className="mt-5 border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <Alert className="mt-5" variant="destructive">
           {error}
-        </p>
+        </Alert>
       ) : null}
 
-      <section className="mt-8 grid min-h-0 flex-1 overflow-hidden border border-black/10 bg-white lg:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="min-h-0 overflow-y-auto border-b border-black/10 lg:border-b-0 lg:border-r">
+      <section className="mt-8 grid min-h-0 flex-1 overflow-hidden border border-border bg-card lg:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="min-h-0 overflow-y-auto border-b border-border lg:border-b-0 lg:border-r">
           {isLoading ? (
-            <p className="p-5 text-sm text-black/55">Chargement des conversations...</p>
+            <p className="p-5 text-sm text-muted-foreground">Chargement des conversations...</p>
           ) : conversations.length === 0 ? (
             <div className="p-5">
-              <h2 className="font-semibold text-black">Aucune conversation</h2>
-              <p className="mt-2 text-sm leading-6 text-black/60">
+              <h2 className="font-semibold text-foreground">Aucune conversation</h2>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 Vous pouvez contacter un vendeur depuis son profil ou depuis le catalogue avant d&#39;effectuer un achat.
               </p>
-              <Link className="mt-4 inline-flex text-sm font-medium text-black" href="/beats">
+              <Link className="mt-4 inline-flex text-sm font-medium text-foreground" href="/beats">
                 Explorer le catalogue
               </Link>
             </div>
           ) : (
-            <div className="divide-y divide-black/10">
+            <div className="divide-y divide-border">
               {conversations.map((conversation) => (
                 <button
-                  className={`grid w-full gap-2 p-4 text-left hover:bg-black/[0.03] ${
-                    selectedConversation?.id === conversation.id ? "bg-black/[0.04]" : ""
+                  className={`grid w-full gap-2 p-4 text-left hover:bg-muted ${
+                    selectedConversation?.id === conversation.id ? "bg-muted" : ""
                   }`}
                   key={conversation.id}
                   onClick={() => selectConversation(conversation.id)}
                   type="button"
                 >
                   <span className="flex items-center justify-between gap-3">
-                    <span className="truncate text-sm font-semibold text-black">
+                    <span className="truncate text-sm font-semibold text-foreground">
                       {conversationTitle(conversation)}
                     </span>
                     {conversation.unreadCount > 0 ? (
-                      <span className="min-w-6 rounded-full bg-black px-2 py-0.5 text-center text-xs font-semibold text-white">
+                      <Badge className="min-w-6 justify-center px-2 py-0" variant="primary">
                         {conversation.unreadCount}
-                      </span>
+                      </Badge>
                     ) : null}
                   </span>
                   {/*TODO: ajouter la photo de profil à coté du pseudo*/}
-                  <span className="line-clamp-2 text-sm leading-5 text-black/55">
+                  <span className="line-clamp-2 text-sm leading-5 text-muted-foreground">
                     {conversation.lastMessage?.body ?? "Conversation ouverte."}
                   </span>
                 </button>
@@ -357,13 +361,13 @@ export function MessagesClient() {
         <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]">
           {selectedConversation ? (
             <>
-              <header className="border-b border-black/10 p-5">
-                <h2 className="text-xl font-semibold text-black">
+              <header className="border-b border-border p-5">
+                <h2 className="text-xl font-semibold text-foreground">
                   {conversationTitle(selectedConversation)}
                 </h2>
                 {selectedConversation.beat ? (
                   <Link
-                    className="mt-1 inline-flex text-sm text-black/55 hover:text-black"
+                    className="mt-1 inline-flex text-sm text-muted-foreground hover:text-foreground"
                     href={`/beats/${selectedConversation.beat.slug}`}
                   >
                     Voir l&apos;instrumentale
@@ -373,19 +377,19 @@ export function MessagesClient() {
 
               <div className="min-h-0 space-y-4 overflow-y-auto p-5">
                 {messages.length === 0 ? (
-                  <p className="text-sm text-black/55">Aucun message pour le moment.</p>
+                  <p className="text-sm text-muted-foreground">Aucun message pour le moment.</p>
                 ) : (
                   messages.map((message) => (
                     <article className="max-w-2xl" key={message.id}>
                       <div className="flex items-baseline gap-3">
-                        <p className="text-sm font-semibold text-black">
+                        <p className="text-sm font-semibold text-foreground">
                           {message.sender?.displayName ?? message.sender?.slug ?? "Utilisateur"}
                         </p>
-                        <p className="text-xs text-black/40">
+                        <p className="text-xs text-muted-foreground">
                           {formatMessageDate(message.createdAt)}
                         </p>
                       </div>
-                      <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-black/70">
+                      <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
                         {message.body}
                       </p>
                     </article>
@@ -394,12 +398,12 @@ export function MessagesClient() {
                 <div ref={messagesEndRef} />
               </div>
 
-              <form className="border-t border-black/10 p-5" onSubmit={handleSubmit}>
+              <form className="border-t border-border p-5" onSubmit={handleSubmit}>
                 <label className="sr-only" htmlFor="chat-message">
                   Message
                 </label>
-                <textarea
-                  className="min-h-24 w-full resize-y border border-black/15 p-3 text-sm text-black outline-none focus:border-black"
+                <Textarea
+                  className="min-h-24 resize-y rounded-none"
                   id="chat-message"
                   maxLength={2000}
                   onChange={(event) => setDraft(event.target.value)}
@@ -408,19 +412,18 @@ export function MessagesClient() {
                   value={draft}
                 />
                 <div className="mt-3 flex items-center justify-between gap-4">
-                  <p className="text-xs text-black/40">{draft.trim().length}/2000</p>
-                  <button
-                    className="inline-flex h-10 items-center justify-center rounded-full bg-black px-5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-black/30"
+                  <p className="text-xs text-muted-foreground">{draft.trim().length}/2000</p>
+                  <Button
                     disabled={isSending || draft.trim().length === 0}
                     type="submit"
                   >
                     {isSending ? "Envoi..." : "Envoyer"}
-                  </button>
+                  </Button>
                 </div>
               </form>
             </>
           ) : (
-            <div className="flex items-center justify-center p-8 text-sm text-black/55">
+            <div className="flex items-center justify-center p-8 text-sm text-muted-foreground">
               Selectionne une conversation.
             </div>
           )}

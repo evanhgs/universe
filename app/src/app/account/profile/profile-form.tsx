@@ -5,6 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+
 type AccountSnapshot = {
   user: {
     email: string;
@@ -32,12 +40,7 @@ type JsonBody = {
   message?: unknown;
 };
 
-const inputClass =
-  "mt-2 h-11 w-full border border-black/15 bg-white px-3 text-sm text-black outline-none transition focus:border-black";
-const textareaClass =
-  "mt-2 min-h-32 w-full resize-y border border-black/15 bg-white px-3 py-3 text-sm text-black outline-none transition focus:border-black";
-const labelClass = "text-sm font-medium text-black";
-const helperClass = "mt-1 text-xs leading-5 text-black/45";
+const helperClass = "mt-1 text-xs leading-5 text-muted-foreground";
 
 /**
  * Lit une reponse JSON et remonte un message exploitable si l'API refuse la requete.
@@ -151,160 +154,157 @@ export function ProfileForm({ initialAccount }: ProfileFormProps) {
 
   return (
     <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-5xl px-6 py-10">
-      <div className="border-b border-black/10 pb-8">
-        <p className="text-sm font-medium uppercase tracking-[0.24em] text-black/45">
+      <div className="border-b border-border pb-8">
+        <p className="text-sm font-medium uppercase text-muted-foreground">
           Profil
         </p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-black">
+        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground">
           Modifier mon profil
         </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-black/60">
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
           Universe gere les infos publiques du marketplace. Clerk reste ton espace de reference
           pour email, mot de passe, sessions et securite du compte.
         </p>
       </div>
 
       {notice ? (
-        <p className="mt-6 border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+        <Alert className="mt-6 font-medium" variant="success">
           {notice}
-        </p>
+        </Alert>
       ) : null}
       {error ? (
-        <p className="mt-6 border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+        <Alert className="mt-6 font-medium" variant="destructive">
           {error}
-        </p>
+        </Alert>
       ) : null}
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_280px]">
-        <section className="border border-black/10 bg-white p-5">
+        <Card className="p-5">
           <div className="grid gap-5 md:grid-cols-2">
-            <label className={labelClass}>
+            <Label>
               Prenom
-              <input
-                className={inputClass}
+              <Input
+                className="mt-2"
                 onChange={(event) => setFirstName(event.target.value)}
                 value={firstName}
               />
-            </label>
-            <label className={labelClass}>
+            </Label>
+            <Label>
               Nom
-              <input
-                className={inputClass}
+              <Input
+                className="mt-2"
                 onChange={(event) => setLastName(event.target.value)}
                 value={lastName}
               />
-            </label>
-            <label className={labelClass}>
+            </Label>
+            <Label>
               Username Clerk
-              <input
-                className={inputClass}
+              <Input
+                className="mt-2"
                 onChange={(event) => setUsername(event.target.value.toLowerCase())}
                 value={username}
               />
               <span className={helperClass}>Lettres, chiffres, tirets et underscores.</span>
-            </label>
-            <label className={labelClass}>
+            </Label>
+            <Label>
               Nom public
-              <input
-                className={inputClass}
+              <Input
+                className="mt-2"
                 onChange={(event) => setDisplayName(event.target.value)}
                 required
                 value={displayName}
               />
-            </label>
-            <label className={labelClass}>
+            </Label>
+            <Label>
               Slug public
-              <input
-                className={inputClass}
+              <Input
+                className="mt-2"
                 onChange={(event) => setSlug(event.target.value.toLowerCase())}
                 required
                 value={slug}
               />
               <span className={helperClass}>URL publique: /profiles/{slug || "mon-profil"}</span>
-            </label>
+            </Label>
             <div className="grid gap-5 md:grid-cols-2">
-              <label className={labelClass}>
+              <Label>
                 Ville
-                <input
-                  className={inputClass}
+                <Input
+                  className="mt-2"
                   onChange={(event) => setCity(event.target.value)}
                   value={city}
                 />
-              </label>
-              <label className={labelClass}>
+              </Label>
+              <Label>
                 Pays
-                <input
-                  className={inputClass}
+                <Input
+                  className="mt-2"
                   maxLength={2}
                   onChange={(event) => setCountryCode(event.target.value.toUpperCase())}
                   placeholder="FR"
                   value={countryCode}
                 />
-              </label>
+              </Label>
             </div>
           </div>
 
-          <label className={`mt-5 block ${labelClass}`}>
+          <Label className="mt-5 block">
             Bio
-            <textarea
-              className={textareaClass}
+            <Textarea
+              className="mt-2 min-h-32 resize-y"
               maxLength={500}
               onChange={(event) => setBio(event.target.value)}
               value={bio}
             />
             <span className={helperClass}>{bio.length}/500 caracteres.</span>
-          </label>
+          </Label>
 
-          <div className="mt-6 grid gap-3 border-t border-black/10 pt-5">
-            <label className="flex items-start gap-3 text-sm text-black">
-              <input
+          <div className="mt-6 grid gap-3 border-t border-border pt-5">
+            <Label className="flex items-start gap-3 text-sm text-foreground">
+              <Switch
                 checked={isPublic}
-                className="mt-1 h-4 w-4"
-                onChange={(event) => setIsPublic(event.target.checked)}
-                type="checkbox"
+                className="mt-1"
+                onCheckedChange={setIsPublic}
               />
               <span>
                 Profil public
-                <span className="block text-xs leading-5 text-black/45">
+                <span className="block text-xs leading-5 text-muted-foreground">
                   Si le profil est prive, seul ton compte peut consulter la page publique.
                 </span>
               </span>
-            </label>
+            </Label>
           </div>
 
           <div className="mt-6 flex flex-wrap gap-3">
-            <button
-              className="inline-flex h-11 items-center justify-center rounded-full bg-black px-5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-black/35"
+            <Button
               disabled={isSaving}
               onClick={() => void saveProfile()}
+              size="lg"
               type="button"
             >
               {isSaving ? "Enregistrement..." : "Enregistrer"}
-            </button>
-            <Link
-              className="inline-flex h-11 items-center justify-center rounded-full border border-black/15 px-5 text-sm font-medium text-black"
-              href="/account"
-            >
-              Retour au compte
-            </Link>
+            </Button>
+            <Button asChild size="lg" variant="outline">
+              <Link href="/account">Retour au compte</Link>
+            </Button>
           </div>
-        </section>
+        </Card>
 
-        <aside className="border border-black/10 bg-black/[0.02] p-5">
-          <h2 className="text-lg font-semibold text-black">Parametres Clerk</h2>
-          <p className="mt-2 text-sm leading-6 text-black/60">
+        <Card className="p-5">
+          <h2 className="text-lg font-semibold text-foreground">Parametres Clerk</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Utilise Clerk pour gerer email, mot de passe, sessions actives et les
             controles de securite.
           </p>
-          <p className="mt-4 break-all text-sm text-black/55">{initialAccount.user.email}</p>
-          <button
-            className="mt-5 inline-flex h-10 items-center justify-center rounded-full border border-black/15 px-4 text-sm font-medium text-black"
+          <p className="mt-4 break-all text-sm text-muted-foreground">{initialAccount.user.email}</p>
+          <Button
+            className="mt-5"
             onClick={() => openUserProfile()}
             type="button"
+            variant="outline"
           >
             Ouvrir Clerk
-          </button>
-        </aside>
+          </Button>
+        </Card>
       </div>
     </main>
   );

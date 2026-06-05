@@ -86,10 +86,12 @@ describe("FeedClient", () => {
     await waitFor(() => {
       expect(screen.getByText("Beat 11")).toBeInTheDocument();
     });
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/feed?limit=10&cursor=cursor_1",
+    const feedCall = fetchMock.mock.calls.find(([url]) => String(url).startsWith("/api/feed?"));
+
+    expect(feedCall).toEqual([
+      expect.stringMatching(/^\/api\/feed\?limit=10&cursor=cursor_1&sessionId=/),
       expect.objectContaining({ cache: "no-store" }),
-    );
+    ]);
     expect(screen.getByText("Fin du feed disponible.")).toBeInTheDocument();
   });
 

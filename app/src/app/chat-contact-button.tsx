@@ -4,6 +4,9 @@ import { useAuth, useClerk, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+
 type ChatContactButtonProps = {
   beatSlug?: string;
   className?: string;
@@ -79,18 +82,20 @@ export function ChatContactButton({
 
   return (
     <div>
-      <button
-        className={
-          className ??
-          "inline-flex h-10 items-center justify-center rounded-full border border-black/15 px-4 text-sm font-medium text-black disabled:cursor-not-allowed disabled:opacity-50"
-        }
+      <Button
+        className={className}
         disabled={disabled || isPending}
         onClick={handleClick}
         type="button"
+        variant="outline"
       >
         {isPending ? "Ouverture..." : label}
-      </button>
-      {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+      </Button>
+      {error ? (
+        <Alert className="mt-2 py-2" variant="destructive">
+          {error}
+        </Alert>
+      ) : null}
     </div>
   );
 }

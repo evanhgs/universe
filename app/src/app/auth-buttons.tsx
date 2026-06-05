@@ -4,6 +4,11 @@ import { SignInButton, useAuth, useClerk, useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
 type HeaderAccount = {
   profile: {
     displayName: string;
@@ -22,13 +27,9 @@ export function SignedOutActions() {
   return (
     <>
       <SignInButton />
-      <button
-        className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white"
-        onClick={() => openSignUp()}
-        type="button"
-      >
+      <Button onClick={() => openSignUp()} type="button">
         Sign up
-      </button>
+      </Button>
     </>
   );
 }
@@ -176,52 +177,49 @@ export function SignedInActions() {
     };
   }, [isOpen]);
 
+  const menuItemClass =
+    "rounded-md px-3 py-2 text-foreground outline-none transition hover:bg-accent/12 focus:bg-accent/12";
+
   return (
     <div className="relative" ref={menuRef}>
       <button
         aria-expanded={isOpen}
         aria-haspopup="menu"
-        className="relative flex h-10 items-center gap-3 rounded-full border border-black/10 bg-white px-2 pr-4 text-left shadow-sm transition hover:border-black/25"
+        className="relative flex h-10 items-center gap-3 rounded-full border border-border bg-card px-2 pr-4 text-left shadow-sm outline-none transition hover:border-ring/60 focus-visible:ring-[3px] focus-visible:ring-ring/25"
         onClick={() => setIsOpen((value) => !value)}
         type="button"
       >
-        {user?.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            alt=""
-            className="h-8 w-8 rounded-full object-cover"
-            src={user.imageUrl}
-          />
-        ) : (
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black text-xs font-semibold text-white">
+        <Avatar>
+          {user?.imageUrl ? <AvatarImage alt="" src={user.imageUrl} /> : null}
+          <AvatarFallback>
             {initialsFor(displayName)}
-          </span>
-        )}
-        <span className="hidden max-w-36 truncate text-sm font-medium text-black md:block">
+          </AvatarFallback>
+        </Avatar>
+        <span className="hidden max-w-36 truncate text-sm font-medium text-foreground md:block">
           {displayName}
         </span>
         {unreadCount > 0 ? (
-          <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-black px-1.5 py-0.5 text-center text-[10px] font-semibold text-white">
+          <Badge className="absolute -right-1 -top-1 min-w-5 justify-center px-1.5 py-0 text-[10px]" variant="primary">
             {unreadCount}
-          </span>
+          </Badge>
         ) : null}
       </button>
 
       {isOpen ? (
         <div
-          className="absolute right-0 z-20 mt-3 w-72 border border-black/10 bg-white p-2 shadow-xl"
+          className="absolute right-0 z-20 mt-3 w-72 rounded-lg border border-border bg-popover p-2 text-popover-foreground shadow-xl"
           role="menu"
         >
-          <div className="border-b border-black/10 px-3 py-3">
-            <p className="truncate text-sm font-semibold text-black">{displayName}</p>
-            <p className="mt-1 truncate text-xs text-black/50">
+          <div className="border-b border-border px-3 py-3">
+            <p className="truncate text-sm font-semibold text-foreground">{displayName}</p>
+            <p className="mt-1 truncate text-xs text-muted-foreground">
               {user?.primaryEmailAddress?.emailAddress ?? "Compte Universe"}
             </p>
           </div>
 
           <div className="grid py-2 text-sm">
             <Link
-              className="px-3 py-2 text-black hover:bg-black/[0.04]"
+              className={menuItemClass}
               href="/account"
               onClick={() => setIsOpen(false)}
               role="menuitem"
@@ -229,7 +227,7 @@ export function SignedInActions() {
               Tableau de bord
             </Link>
             <Link
-              className="px-3 py-2 text-black hover:bg-black/[0.04]"
+              className={menuItemClass}
               href="/account/profile"
               onClick={() => setIsOpen(false)}
               role="menuitem"
@@ -237,7 +235,7 @@ export function SignedInActions() {
               Modifier mon profil
             </Link>
             <Link
-              className="px-3 py-2 text-black hover:bg-black/[0.04]"
+              className={menuItemClass}
               href={publicProfileHref}
               onClick={() => setIsOpen(false)}
               role="menuitem"
@@ -245,7 +243,7 @@ export function SignedInActions() {
               Voir mon profil public
             </Link>
             <Link
-              className="px-3 py-2 text-black hover:bg-black/[0.04]"
+              className={menuItemClass}
               href="/account/messages"
               onClick={() => setIsOpen(false)}
               role="menuitem"
@@ -253,14 +251,14 @@ export function SignedInActions() {
               <span className="flex items-center justify-between gap-3">
                 <span>Messages</span>
                 {unreadCount > 0 ? (
-                  <span className="min-w-6 rounded-full bg-black px-2 py-0.5 text-center text-xs font-semibold text-white">
+                  <Badge className="min-w-6 justify-center px-2 py-0 text-xs" variant="primary">
                     {unreadCount}
-                  </span>
+                  </Badge>
                 ) : null}
               </span>
             </Link>
             <Link
-              className="px-3 py-2 text-black hover:bg-black/[0.04]"
+              className={menuItemClass}
               href="/account/purchases"
               onClick={() => setIsOpen(false)}
               role="menuitem"
@@ -269,7 +267,7 @@ export function SignedInActions() {
             </Link>
             {isSeller ? (
               <Link
-                className="px-3 py-2 text-black hover:bg-black/[0.04]"
+                className={menuItemClass}
                 href="/account/sales"
                 onClick={() => setIsOpen(false)}
                 role="menuitem"
@@ -279,9 +277,9 @@ export function SignedInActions() {
             ) : null}
           </div>
 
-          <div className="grid border-t border-black/10 py-2 text-sm">
+          <div className="grid border-t border-border py-2 text-sm">
             <button
-              className="px-3 py-2 text-left text-black hover:bg-black/[0.04]"
+              className={cn(menuItemClass, "text-left")}
               onClick={() => {
                 setIsOpen(false);
                 openUserProfile();
@@ -292,7 +290,7 @@ export function SignedInActions() {
               Parametres Clerk
             </button>
             <button
-              className="px-3 py-2 text-left text-black hover:bg-black/[0.04]"
+              className={cn(menuItemClass, "text-left")}
               onClick={() => void signOut({ redirectUrl: "/" })}
               role="menuitem"
               type="button"
