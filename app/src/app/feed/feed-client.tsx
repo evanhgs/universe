@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AudioMeter } from "@/components/audio/audio-meter";
 import { AudioTimeline } from "@/components/audio/audio-timeline";
+import { FeedMoodBackdrop } from "@/components/feed/feed-mood-backdrop";
 import { VolumeControl } from "@/components/audio/volume-control";
 import { Button } from "@/components/ui/button";
 
@@ -121,17 +122,6 @@ function formatPrice(priceAmount: number | null, currency: string, isFree: boole
 
 function getBeatAsset(beat: FeedBeat, role: string) {
   return beat.assets.find((asset) => asset.role === role && asset.url);
-}
-
-function warmTone(index: number) {
-  const tones = [
-    "from-amber-400 via-rose-500 to-fuchsia-700",
-    "from-orange-300 via-red-500 to-violet-800",
-    "from-yellow-300 via-pink-500 to-stone-950",
-    "from-rose-300 via-orange-500 to-emerald-900",
-  ];
-
-  return tones[index % tones.length];
 }
 
 /**
@@ -451,6 +441,25 @@ export function FeedClient({
     return Boolean(target.closest("a, button, input, textarea, select, audio"));
   }, []);
 
+  const toggleBeatPlayback = useCallback(
+    (index: number) => {
+      const beat = items[index];
+
+      if (!beat) {
+        return;
+      }
+
+      if (playingBeatId === beat.id && isAudioPlaying) {
+        pauseAudio(true);
+        return;
+      }
+
+      setActiveIndex(index);
+      void playBeat(index, "manual");
+    },
+    [isAudioPlaying, items, pauseAudio, playBeat, playingBeatId],
+  );
+
   useEffect(() => {
     if (!preloadNode || !hasMore || isLoading) {
       return;
@@ -545,6 +554,21 @@ export function FeedClient({
         event.preventDefault();
         scrollToBeat(-1);
       }
+
+      if (event.key === "k") {
+        event.preventDefault();
+        toggleBeatPlayback(activeIndexRef.current);
+      }
+
+      if (event.key === "j") {
+        event.preventDefault();
+        //TODO reculer le son de 5 secondes
+      }
+
+      if (event.key === "l") {
+        event.preventDefault();
+        //TODO avancer le son de 5 secondes
+      }
     }
 
     function onWheel(event: WheelEvent) {
@@ -563,23 +587,7 @@ export function FeedClient({
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("wheel", onWheel);
     };
-  }, [scrollToBeat, shouldIgnoreNavigationTarget]);
-
-  function toggleBeatPlayback(index: number) {
-    const beat = items[index];
-
-    if (!beat) {
-      return;
-    }
-
-    if (playingBeatId === beat.id && isAudioPlaying) {
-      pauseAudio(true);
-      return;
-    }
-
-    setActiveIndex(index);
-    void playBeat(index, "manual");
-  }
+  }, [scrollToBeat, shouldIgnoreNavigationTarget, toggleBeatPlayback]);
 
   function seekTo(value: number) {
     const audio = audioRef.current;
@@ -599,12 +607,8 @@ export function FeedClient({
     setIsMuted(safeVolume === 0);
   }
 
-  const backgroundClass = isAudioPlaying
-    ? "bg-[radial-gradient(circle_at_50%_18%,rgba(251,146,60,0.20),transparent_35%),radial-gradient(circle_at_18%_72%,rgba(244,63,94,0.12),transparent_38%),linear-gradient(180deg,#fff7ed,#f8fafc)] dark:bg-[radial-gradient(circle_at_50%_18%,rgba(251,146,60,0.28),transparent_35%),radial-gradient(circle_at_18%_72%,rgba(244,63,94,0.2),transparent_38%),linear-gradient(180deg,#130c0a,#060404)]"
-    : "bg-[radial-gradient(circle_at_50%_18%,rgba(251,146,60,0.10),transparent_34%),linear-gradient(180deg,#fffaf4,#f8fafc)] dark:bg-[radial-gradient(circle_at_50%_18%,rgba(251,146,60,0.16),transparent_34%),linear-gradient(180deg,#110f0d,#070606)]";
-
   return (
-    <div className={`min-h-[calc(100vh-73px)] text-foreground transition-colors dark:text-white ${backgroundClass}`}>
+    <div className="relative min-h-[calc(100vh-73px)] overflow-hidden bg-background text-foreground transition-colors dark:text-white">
       <audio
         onDurationChange={(event) => setDuration(event.currentTarget.duration)}
         onEnded={() => {
@@ -657,13 +661,13 @@ export function FeedClient({
         ref={audioRef}
       />
 
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-3 py-4 md:px-5">
+      <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col gap-4 px-3 py-4 md:px-5">
         {items.length === 0 ? (
           <section className="flex min-h-[calc(100vh-120px)] items-center justify-center rounded-lg border border-border bg-card/70 p-8 text-center shadow-2xl shadow-black/10 dark:border-white/10 dark:bg-white/[0.05] dark:shadow-black/25">
             <div>
               <h1 className="text-2xl font-semibold">Aucun beat publie</h1>
               <p className="mt-3 text-sm leading-6 text-muted-foreground dark:text-white/60">
-                Lance le seed ou publie des beats pour remplir le feed decouverte.
+                {"C'est le désert musical ici..."}
               </p>
             </div>
           </section>
@@ -688,7 +692,13 @@ export function FeedClient({
                 key={beat.id}
                 ref={(node) => setCardRef(index, node)}
               >
-                <div className={`absolute inset-0 bg-gradient-to-br ${warmTone(index)}`} />
+                <FeedMoodBackdrop
+                  beatId={beat.id}
+                  bpm={beat.bpm}
+                  hasThumbnail={Boolean(thumbnail?.url)}
+                  isPlaying={isPlaying}
+                  primaryMood={beat.primaryMood}
+                />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   alt=""
@@ -698,11 +708,6 @@ export function FeedClient({
                   src={visualUrl}
                 />
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_26%,rgba(255,255,255,0.13),transparent_24%),linear-gradient(180deg,rgba(16,9,7,0.12),rgba(16,9,7,0.86))]" />
-                <div
-                  className={`absolute inset-x-[-18%] bottom-[-32%] h-2/3 rounded-full bg-orange-400/30 blur-3xl transition-opacity duration-500 ${
-                    isPlaying ? "opacity-100 animate-pulse" : "opacity-35"
-                  }`}
-                />
 
                 <div className="relative flex min-h-[calc(100vh-116px)] flex-col justify-end p-4 md:p-6">
                   <div className="max-w-2xl">

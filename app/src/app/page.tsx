@@ -12,17 +12,16 @@ export default async function Home() {
   const { isAuthenticated, userId } = await auth();
 
   return (
-    <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-4xl flex-col justify-center px-6 py-16">
+    <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-6xl flex-col justify-center px-6 py-16">
       <div className="space-y-4">
-        <p className="text-sm font-medium uppercase text-muted-foreground">
-          Marketplace musicale V1
-        </p>
-        <h1 className="text-4xl font-semibold tracking-tight text-foreground">
-          Les bases publication et catalogue sont branchees.
+        <h1 className="text-8xl font-semibold tracking-tight text-foreground uppercase">
+          {"Universe"}
+          <p className="text-5xl font-semibold tracking-tight text-foreground uppercase">
+            {"première marketplace FR "}
+          </p>
         </h1>
-        <p className="max-w-2xl text-base leading-7 text-muted-foreground">
-          Universe avance sur le flux inscription, profil vendeur, publication
-          d instrumentales et consultation publique du catalogue.
+        <p className="max-w-6xl font-medium leading-7 text-muted-foreground">
+          {"Grâce à universe faite plus de stream sur vos meilleurs beats et commencer dès maintenant à faire vos premiers sous*"}
         </p>
         <div className="flex flex-wrap gap-3">
           <Button asChild size="lg">
