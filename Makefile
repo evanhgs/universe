@@ -10,14 +10,38 @@ DEV_COMPOSE := docker compose -f infra/compose.dev.yml --env-file $(DEV_ENV_FILE
 STAGING_COMPOSE := docker compose -f infra/compose.staging.yml --env-file $(STAGING_ENV_FILE)
 PROD_COMPOSE := docker compose -f infra/compose.prod.yml --env-file $(PROD_ENV_FILE)
 
+SEED_ENV_ARGS :=
+ifneq ($(strip $(SEED_BEAT_COUNT)),)
+SEED_ENV_ARGS += -e SEED_BEAT_COUNT=$(SEED_BEAT_COUNT)
+endif
+ifneq ($(strip $(SEED_SELLER_COUNT)),)
+SEED_ENV_ARGS += -e SEED_SELLER_COUNT=$(SEED_SELLER_COUNT)
+endif
+ifneq ($(strip $(SEED_ANALYTICS_EVENTS)),)
+SEED_ENV_ARGS += -e SEED_ANALYTICS_EVENTS=$(SEED_ANALYTICS_EVENTS)
+endif
+ifneq ($(strip $(SEED_BUYER_COUNT)),)
+SEED_ENV_ARGS += -e SEED_BUYER_COUNT=$(SEED_BUYER_COUNT)
+endif
+ifneq ($(strip $(SEED_RANDOM_SEED)),)
+SEED_ENV_ARGS += -e SEED_RANDOM_SEED=$(SEED_RANDOM_SEED)
+endif
+ifneq ($(strip $(SEED_AUDIO_BUCKET)),)
+SEED_ENV_ARGS += -e SEED_AUDIO_BUCKET=$(SEED_AUDIO_BUCKET)
+endif
+ifneq ($(strip $(SEED_AUDIO_OBJECT_KEY)),)
+SEED_ENV_ARGS += -e SEED_AUDIO_OBJECT_KEY=$(SEED_AUDIO_OBJECT_KEY)
+endif
+
 .PHONY: \
 	dev dev-down dev-logs dev-ps \
 	dev-next-sh dev-prisma-generate dev-prisma-migrate dev-prisma-migrate-container \
 	dev-prisma-push dev-prisma-push-container dev-prisma-studio dev-prisma-studio-container \
+	dev-db-seed-benchmark \
 	dev-test dev-test-next dev-test-rust dev-test-python \
 	staging staging-down staging-logs staging-ps staging-prisma-migrate staging-prisma-push \
 	prod prod-down prod-logs prod-ps \
-	next-sh prisma-generate prisma-migrate prisma-push prisma-studio test
+	db-seed-benchmark next-sh prisma-generate prisma-migrate prisma-push prisma-studio test
 
 define require_env_file
 	@test -f $(1) || (echo "Missing $(1). Copy $(1).example to $(1) before running this target." >&2; exit 1)
@@ -93,6 +117,10 @@ dev-prisma-studio-container:
 	$(call require_env_file,$(DEV_ENV_FILE))
 	$(DEV_COMPOSE) exec nextjs npx prisma studio --port 5555
 
+dev-db-seed-benchmark:
+	$(call require_env_file,$(DEV_ENV_FILE))
+	$(DEV_COMPOSE) exec -T $(SEED_ENV_ARGS) nextjs npm run db:seed:benchmark
+
 # -----------------------------------------------------------------------------
 # Dev tests (run inside the dev compose containers — `make dev` must be up).
 # Each granular target executes the canonical test runner of its stack ; the
@@ -121,6 +149,7 @@ prisma-generate: dev-prisma-generate
 prisma-migrate: dev-prisma-migrate
 prisma-push: dev-prisma-push
 prisma-studio: dev-prisma-studio
+db-seed-benchmark: dev-db-seed-benchmark
 test: dev-test
 
 # -----------------------------------------------------------------------------
