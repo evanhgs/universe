@@ -25,17 +25,57 @@ const PRIVATE_JSON_HEADERS = {
   "X-Content-Type-Options": "nosniff",
 } as const;
 
+function rateLimitNumber(name: string, fallback: number) {
+  const raw = process.env[name]?.trim();
+
+  if (!raw) {
+    return fallback;
+  }
+
+  const parsed = Number(raw);
+
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 export const RATE_LIMITS = {
-  apiGlobal: { limit: 300, window: "1 m", prefix: "api-global" },
-  accountWrite: { limit: 20, window: "10 m", prefix: "account-write" },
-  storagePresign: { limit: 30, window: "10 m", prefix: "storage-presign" },
-  marketplaceWrite: { limit: 30, window: "10 m", prefix: "marketplace-write" },
-  marketplaceRead: { limit: 120, window: "10 m", prefix: "marketplace-read" },
-  analyticsWrite: { limit: 240, window: "1 m", prefix: "analytics-write" },
-  chatWrite: { limit: 60, window: "1 m", prefix: "chat-write" },
-  chatRead: { limit: 180, window: "1 m", prefix: "chat-read" },
-  publicEnumeration: { limit: 120, window: "1 m", prefix: "public-enumeration" },
-  accountTestBurst: { limit: 8, window: "10 s", prefix: "account-test-burst" },
+  apiGlobal: { limit: rateLimitNumber("REDIS_API_GLOBAL", 300), window: "1 m", prefix: "api-global" },
+  accountWrite: {
+    limit: rateLimitNumber("REDIS_ACCOUNT_WRITE", 20),
+    window: "10 m",
+    prefix: "account-write",
+  },
+  storagePresign: {
+    limit: rateLimitNumber("REDIS_STORAGE_PRESIGN", 30),
+    window: "10 m",
+    prefix: "storage-presign",
+  },
+  marketplaceWrite: {
+    limit: rateLimitNumber("REDIS_MARKETPLACE_WRITE", 30),
+    window: "10 m",
+    prefix: "marketplace-write",
+  },
+  marketplaceRead: {
+    limit: rateLimitNumber("REDIS_MARKETPLACE_READ", 120),
+    window: "10 m",
+    prefix: "marketplace-read",
+  },
+  analyticsWrite: {
+    limit: rateLimitNumber("REDIS_ANALYTICS_WRITE", 240),
+    window: "1 m",
+    prefix: "analytics-write",
+  },
+  chatWrite: { limit: rateLimitNumber("REDIS_CHAT_WRITE", 60), window: "1 m", prefix: "chat-write" },
+  chatRead: { limit: rateLimitNumber("REDIS_CHAT_READ", 180), window: "1 m", prefix: "chat-read" },
+  publicEnumeration: {
+    limit: rateLimitNumber("REDIS_PUBLIC_ENUMERATION", 120),
+    window: "1 m",
+    prefix: "public-enumeration",
+  },
+  accountTestBurst: {
+    limit: rateLimitNumber("REDIS_ACCOUNT_TEST_BURST", 8),
+    window: "10 s",
+    prefix: "account-test-burst",
+  },
 } as const satisfies Record<string, RateLimitPolicy>;
 
 const RATE_LIMIT_SCRIPT = `
