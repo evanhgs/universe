@@ -1,1 +1,195 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Universe brand tokens */
+  --color-brand: var(--brand);
+  --color-brand-light: var(--brand-light);
+  --color-brand-dark: var(--brand-dark);
+  --color-brand-muted: var(--brand-muted);
+  --color-brand-glow: var(--brand-glow);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  color-scheme: light;
+
+  --radius: 0.65rem;
+
+  /*
+    Universe palette
+    Deep violet: #5B2CFF
+    Lavender:    #B892FF
+    Near black:  #0B0B0F
+    White:       #FFFFFF
+  */
+
+  --brand: #5b2cff;
+  --brand-light: #b892ff;
+  --brand-dark: #32128f;
+  --brand-muted: #ede7ff;
+  --brand-glow: color-mix(in oklch, var(--brand) 34%, transparent);
+
+  --background: #fbfaff;
+  --foreground: #0b0b0f;
+
+  --card: #ffffff;
+  --card-foreground: var(--foreground);
+
+  --popover: #ffffff;
+  --popover-foreground: var(--foreground);
+
+  --primary: #5b2cff;
+  --primary-foreground: #ffffff;
+
+  --secondary: #f0eaff;
+  --secondary-foreground: #1b102f;
+
+  --muted: #f3f0fa;
+  --muted-foreground: #686174;
+
+  --accent: #b892ff;
+  --accent-foreground: #0b0b0f;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  --border: #e3dcf5;
+  --input: #e3dcf5;
+  --ring: #5b2cff;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --brand: #5b2cff;
+  --brand-light: #b892ff;
+  --brand-dark: #2a106f;
+  --brand-muted: #22183a;
+  --brand-glow: color-mix(in oklch, var(--brand) 42%, transparent);
+
+  --background: #0b0b0f;
+  --foreground: #ffffff;
+
+  --card: #12121a;
+  --card-foreground: var(--foreground);
+
+  --popover: #111118;
+  --popover-foreground: var(--foreground);
+
+  --primary: #5b2cff;
+  --primary-foreground: #ffffff;
+
+  --secondary: #191526;
+  --secondary-foreground: #f4f0ff;
+
+  --muted: #181620;
+  --muted-foreground: #a8a0b8;
+
+  --accent: #b892ff;
+  --accent-foreground: #0b0b0f;
+
+  --destructive: #ff4d5e;
+  --destructive-foreground: #ffffff;
+
+  --border: #29233a;
+  --input: #29233a;
+  --ring: #b892ff;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  background: var(--background);
+}
+
+body {
+  min-height: 100vh;
+  background:
+          radial-gradient(
+                  circle at top left,
+                  color-mix(in oklch, var(--brand) 18%, transparent),
+                  transparent 32rem
+          ),
+          var(--background);
+  color: var(--foreground);
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: color-mix(in oklch, var(--brand-light) 42%, transparent);
+  color: var(--foreground);
+}
+
+@keyframes feedMoodShift {
+  0% {
+    background-position: 0% 42%;
+    filter: saturate(1.05) hue-rotate(0deg);
+  }
+
+  50% {
+    background-position: 72% 28%;
+    filter: saturate(1.24) hue-rotate(10deg);
+  }
+
+  100% {
+    background-position: 100% 68%;
+    filter: saturate(1.14) hue-rotate(-8deg);
+  }
+}
+
+@keyframes feedMoodOrbit {
+  0% {
+    transform: translate3d(-2%, -1%, 0) scale(1);
+  }
+
+  100% {
+    transform: translate3d(3%, 2%, 0) scale(1.08);
+  }
+}
+
+@keyframes feedMoodPulse {
+  0% {
+    transform: scale(0.96);
+  }
+
+  100% {
+    transform: scale(1.08);
+  }
+}

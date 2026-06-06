@@ -64,9 +64,9 @@ type JsonBody = {
 };
 
 const buttonClass =
-  "inline-flex h-10 items-center justify-center rounded-full bg-black px-4 text-sm font-medium text-white";
+  "inline-flex h-10 items-center justify-center rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground";
 const secondaryButtonClass =
-  "inline-flex h-10 items-center justify-center rounded-full border border-black/15 px-4 text-sm font-medium text-black";
+  "inline-flex h-10 items-center justify-center rounded-full border border-input px-4 text-sm font-medium text-foreground";
 
 /**
  * Formate un montant de vente dans sa devise.
@@ -248,7 +248,7 @@ export function SalesClient() {
   if (!isLoaded || isLoading) {
     return (
       <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-5xl px-6 py-10">
-        <p className="text-sm text-black/60">Chargement des ventes...</p>
+        <p className="text-sm text-muted-foreground">Chargement des ventes...</p>
       </main>
     );
   }
@@ -256,8 +256,8 @@ export function SalesClient() {
   if (!isSignedIn) {
     return (
       <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-5xl px-6 py-10">
-        <h1 className="text-3xl font-semibold tracking-tight text-black">Mes ventes</h1>
-        <p className="mt-3 text-sm leading-6 text-black/60">
+        <h1 className="text-3xl font-semibold tracking-tight text-foreground">Mes ventes</h1>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
           Connecte-toi pour consulter ton historique vendeur.
         </p>
         <button className={`mt-6 ${buttonClass}`} onClick={() => openSignIn()} type="button">
@@ -269,14 +269,14 @@ export function SalesClient() {
 
   return (
     <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-6xl px-6 py-10">
-      <div className="border-b border-black/10 pb-8">
-        <p className="text-sm font-medium uppercase tracking-[0.24em] text-black/45">
+      <div className="border-b border-border pb-8">
+        <p className="text-sm font-medium uppercase tracking-[0.24em] text-muted-foreground">
           Marketplace
         </p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-black">
+        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground">
           Dashboard vendeur
         </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-black/60">
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
           Consulte tes ventes, tes revenus et l&apos;etat de tes instrumentales.
         </p>
       </div>
@@ -293,63 +293,63 @@ export function SalesClient() {
       ) : null}
 
       <section className="mt-8 grid gap-4 md:grid-cols-4">
-        <article className="border border-black/10 bg-white p-5">
-          <p className="text-sm text-black/45">Ventes payees</p>
-          <p className="mt-2 text-3xl font-semibold text-black">
+        <article className="border border-border bg-card p-5">
+          <p className="text-sm text-muted-foreground">Ventes payees</p>
+          <p className="mt-2 text-3xl font-semibold text-foreground">
             {summary?.paidSalesCount ?? sales.filter((sale) => sale.orderStatus === "PAID").length}
           </p>
         </article>
-        <article className="border border-black/10 bg-white p-5">
-          <p className="text-sm text-black/45">Revenu net vendeur</p>
-          <p className="mt-2 text-3xl font-semibold text-black">
+        <article className="border border-border bg-card p-5">
+          <p className="text-sm text-muted-foreground">Revenu net vendeur</p>
+          <p className="mt-2 text-3xl font-semibold text-foreground">
             {formatMoney(sellerEarning, currency)}
           </p>
         </article>
-        <article className="border border-black/10 bg-white p-5">
-          <p className="text-sm text-black/45">Revenu brut</p>
-          <p className="mt-2 text-3xl font-semibold text-black">
+        <article className="border border-border bg-card p-5">
+          <p className="text-sm text-muted-foreground">Revenu brut</p>
+          <p className="mt-2 text-3xl font-semibold text-foreground">
             {formatMoney(grossPaid, currency)}
           </p>
         </article>
-        <article className="border border-black/10 bg-white p-5">
-          <p className="text-sm text-black/45">Instrus</p>
-          <p className="mt-2 text-3xl font-semibold text-black">
+        <article className="border border-border bg-card p-5">
+          <p className="text-sm text-muted-foreground">Instrus</p>
+          <p className="mt-2 text-3xl font-semibold text-foreground">
             {summary?.beatCount ?? beats.length}
           </p>
         </article>
       </section>
 
       <section className="mt-4 grid gap-4 md:grid-cols-4">
-        <article className="border border-black/10 bg-white p-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-black/40">Publiees</p>
-          <p className="mt-1 text-xl font-semibold text-black">
+        <article className="border border-border bg-card p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Publiees</p>
+          <p className="mt-1 text-xl font-semibold text-foreground">
             {summary?.publishedBeatCount ?? beats.filter((beat) => beat.status === "PUBLISHED").length}
           </p>
         </article>
-        <article className="border border-black/10 bg-white p-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-black/40">Brouillons</p>
-          <p className="mt-1 text-xl font-semibold text-black">
+        <article className="border border-border bg-card p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Brouillons</p>
+          <p className="mt-1 text-xl font-semibold text-foreground">
             {summary?.draftBeatCount ?? beats.filter((beat) => beat.status === "DRAFT").length}
           </p>
         </article>
-        <article className="border border-black/10 bg-white p-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-black/40">Traitement</p>
-          <p className="mt-1 text-xl font-semibold text-black">
+        <article className="border border-border bg-card p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Traitement</p>
+          <p className="mt-1 text-xl font-semibold text-foreground">
             {summary?.processingBeatCount ?? beats.filter((beat) => beat.status === "PROCESSING").length}
           </p>
         </article>
-        <article className="border border-black/10 bg-white p-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-black/40">Masquees</p>
-          <p className="mt-1 text-xl font-semibold text-black">
+        <article className="border border-border bg-card p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Masquees</p>
+          <p className="mt-1 text-xl font-semibold text-foreground">
             {summary?.hiddenBeatCount ?? beats.filter((beat) => beat.status === "HIDDEN").length}
           </p>
         </article>
       </section>
 
       {sales.length === 0 && !error ? (
-        <div className="mt-8 border border-dashed border-black/20 p-8">
-          <h2 className="text-xl font-semibold text-black">Aucune vente</h2>
-          <p className="mt-2 text-sm leading-6 text-black/60">
+        <div className="mt-8 border border-dashed border-border p-8">
+          <h2 className="text-xl font-semibold text-foreground">Aucune vente</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Les achats payes par tes clients apparaitront ici.
           </p>
           <Link className={`mt-5 ${secondaryButtonClass}`} href="/beats">
@@ -359,10 +359,10 @@ export function SalesClient() {
       ) : null}
 
       <section className="mt-8">
-        <div className="flex flex-col gap-3 border-b border-black/10 pb-4 md:flex-row md:items-end md:justify-between">
+        <div className="flex flex-col gap-3 border-b border-border pb-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <h2 className="text-2xl font-semibold text-black">Mes instrus</h2>
-            <p className="mt-2 text-sm leading-6 text-black/60">
+            <h2 className="text-2xl font-semibold text-foreground">Mes instrus</h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
               Suis la visibilite, le prix et les ventes de chaque publication.
             </p>
           </div>
@@ -372,9 +372,9 @@ export function SalesClient() {
         </div>
 
         {beats.length === 0 && !error ? (
-          <div className="mt-5 border border-dashed border-black/20 p-8">
-            <h3 className="text-xl font-semibold text-black">Aucune instru</h3>
-            <p className="mt-2 text-sm leading-6 text-black/60">
+          <div className="mt-5 border border-dashed border-border p-8">
+            <h3 className="text-xl font-semibold text-foreground">Aucune instru</h3>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
               Publie ta premiere instrumentale pour commencer a vendre.
             </p>
             <Link className={`mt-5 ${secondaryButtonClass}`} href="/beats">
@@ -386,18 +386,18 @@ export function SalesClient() {
         {beats.length > 0 ? (
           <div className="mt-5 grid gap-4">
             {beats.map((beat) => (
-              <article className="border border-black/10 bg-white p-5" key={beat.id}>
+              <article className="border border-border bg-card p-5" key={beat.id}>
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
-                    <h3 className="text-lg font-semibold text-black">{beat.title}</h3>
-                    <p className="mt-1 text-sm text-black/60">
+                    <h3 className="text-lg font-semibold text-foreground">{beat.title}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
                       {beatStatusLabel(beat.status)} - {beat.visibility}
                     </p>
-                    <p className="mt-1 text-xs text-black/45">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       Mis a jour le {formatDate(beat.updatedAt)}
                     </p>
                   </div>
-                  <dl className="grid min-w-56 gap-1 text-sm text-black/65">
+                  <dl className="grid min-w-56 gap-1 text-sm text-muted-foreground">
                     <div className="flex justify-between gap-8">
                       <dt>Prix</dt>
                       <dd>
@@ -416,7 +416,7 @@ export function SalesClient() {
                     </div>
                   </dl>
                   <Link
-                    className="inline-flex text-sm font-medium text-black hover:text-black/65"
+                    className="inline-flex text-sm font-medium text-foreground hover:text-muted-foreground"
                     href={`/beats/${beat.slug}`}
                   >
                     Ouvrir
@@ -430,31 +430,31 @@ export function SalesClient() {
 
       {sales.length > 0 ? (
         <section className="mt-8">
-          <div className="border-b border-black/10 pb-4">
-            <h2 className="text-2xl font-semibold text-black">Historique des ventes</h2>
+          <div className="border-b border-border pb-4">
+            <h2 className="text-2xl font-semibold text-foreground">Historique des ventes</h2>
           </div>
           <div className="mt-5 grid gap-4">
           {sales.map((sale) => (
-            <article className="border border-black/10 bg-white p-5" key={sale.id}>
+            <article className="border border-border bg-card p-5" key={sale.id}>
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold text-black">{sale.title}</h2>
-                  <p className="mt-1 text-sm text-black/60">
+                  <h2 className="text-lg font-semibold text-foreground">{sale.title}</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
                     Licence {sale.licenseName ?? "Non renseignee"} - quantite {sale.quantity}
                   </p>
-                  <p className="mt-1 text-xs text-black/45">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     Commande {sale.orderId} - creee le {formatDate(sale.createdAt)}
                   </p>
                   {sale.beat ? (
                     <Link
-                      className="mt-3 inline-flex text-sm font-medium text-black hover:text-black/65"
+                      className="mt-3 inline-flex text-sm font-medium text-foreground hover:text-muted-foreground"
                       href={`/beats/${sale.beat.slug}`}
                     >
                       Ouvrir la fiche
                     </Link>
                   ) : null}
                 </div>
-                <dl className="grid min-w-48 gap-1 text-sm text-black/65">
+                <dl className="grid min-w-48 gap-1 text-sm text-muted-foreground">
                   <div className="flex justify-between gap-8">
                     <dt>Statut</dt>
                     <dd>{sale.orderStatus}</dd>
@@ -467,7 +467,7 @@ export function SalesClient() {
                     <dt>Payee le</dt>
                     <dd>{formatDate(sale.paidAt)}</dd>
                   </div>
-                  <div className="flex justify-between gap-8 font-semibold text-black">
+                  <div className="flex justify-between gap-8 font-semibold text-foreground">
                     <dt>Total</dt>
                     <dd>{formatMoney(sale.lineTotalAmount, sale.currency)}</dd>
                   </div>

@@ -29,7 +29,7 @@ When implementing features, default to product decisions that support trust, mon
 
 Expected stack from the client docs:
 
-* frontend: Next.js + React + TypeScript + Tailwindcss
+* frontend: Next.js + React + TypeScript + Tailwindcss + Shadcn
 * frontend architecture: App Router, hybrid SSR / CSR / ISR depending on page
 * backend direction: Next.js for core app flows, FastAPI for scoring / AI logic, Axum or Rust workers for heavy audio processing
 * product priorities: strong desktop UX first, mobile support is still important, feed scrolling and public page performance matter
@@ -80,6 +80,63 @@ These are specifically called out in the client material and should remain consi
 * free offers can carry mandatory platform branding / restrictions
 * contracts and license logic are part of the product, not an afterthought
 
+## Current implementation notes
+
+### Analytics, scoring, and feed V2
+
+The discovery feed now depends on first-party analytics events and recommendation scores.
+
+When changing tracking, scoring, feed ranking, or seller analytics:
+
+* treat PostgreSQL as the source of truth for analytics events and score snapshots
+* keep Redis focused on rate limits, short-lived counters, and future buffering/cache work
+* preserve the canonical analytics event names used by the client and API:
+  `beat_impression`, `beat_click`, `beat_play`, `beat_pause`, `beat_skip`,
+  `beat_like`, `beat_save`, `beat_share`, `beat_full_play`, `license_click`,
+  `seller_profile_view`, `seller_follow`, `add_to_cart`, `purchase`, `search`,
+  and `message_seller`
+* never accept client-side `purchase` analytics as proof of payment; purchases must be recorded from trusted server-side payment/order flows
+* keep anonymous tracking limited to low-risk listening/impression signals unless explicitly reviewed
+* update both event aggregation and recommendation score recomputation when adding new high-impact signals
+* keep recommendation outputs explainable enough for `/account-test` diagnostics and client demos
+
+Important local files:
+
+* `src/server/analytics/analytics.service.ts`: event validation, aggregation, taste profiles, scoring, and recommended feed payloads
+* `src/server/analytics/analytics.constants.ts`: event weights, feed mix, scoring version, and scoring component weights
+* `src/app/api/analytics/events/route.ts`: public analytics ingest endpoint
+* `src/app/api/feed/route.ts`: recommended feed endpoint
+* `src/app/api/account-test/analytics/route.ts`: authenticated dev/test diagnostics and manual score recomputation
+
+### Account test surface
+
+`/account-test` is a development and client-demo diagnostic page. Keep it useful but do not make it look like a separate product.
+
+When adding diagnostics there:
+
+* use the same layout conventions as account/catalog pages: `max-w-6xl`, border-bottom page header, cards, and restrained spacing
+* use existing shadcn-style components or local theme tokens (`bg-card`, `text-foreground`, `text-muted-foreground`, `border-border`, `bg-muted`, `bg-primary`)
+* avoid one-off gradients, hard-coded slate/amber palettes, and decorative debug styling
+* keep routes authenticated with Clerk and disabled in production unless an explicit `*_TEST_ENABLED=true` flag is set
+* expose raw JSON only as a secondary debugging aid after human-readable status, counts, and rankings
+
+### Prisma and local migrations
+
+Prisma commands should be run from the host for development migrations so generated migration files are written into the local workspace.
+
+The dev Compose database is reachable as:
+
+* from containers: `postgres:5432`
+* from the host: `localhost:5432`
+
+Prefer the Makefile targets:
+
+* `make prisma-migrate NAME=<migration_name>`
+* `make prisma-studio`
+* `make prisma-generate`
+
+Use container Prisma commands only when there is a specific reason and file synchronization is understood.
+
 ## Delivery guidance for AI agents
 
 Before coding:
@@ -93,6 +150,8 @@ While coding:
 * keep naming aligned with the marketplace domain
 * avoid building placeholder business logic that conflicts with the docs
 * preserve separation between simple web flows and future heavy processing services
+* build user interfaces with shadcn/ui conventions and the existing reusable components in `src/components/ui` before creating custom UI primitives
+* keep UI styling aligned with the local component system, Tailwind tokens, and existing app patterns
 
 When uncertain:
 

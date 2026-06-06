@@ -10,8 +10,18 @@ vi.mock("@/lib/redis", () => ({
 
 describe("rate limit helper", () => {
   beforeEach(() => {
+    vi.unstubAllEnvs();
     vi.resetModules();
     redisEvalMock.mockReset();
+  });
+
+  it("loads rate limit values from Redis environment variables with safe fallback", async () => {
+    vi.stubEnv("REDIS_MARKETPLACE_WRITE", "7");
+    vi.stubEnv("REDIS_CHAT_READ", "bad");
+    const { RATE_LIMITS } = await import("@/server/security/rate-limit");
+
+    expect(RATE_LIMITS.marketplaceWrite.limit).toBe(7);
+    expect(RATE_LIMITS.chatRead.limit).toBe(180);
   });
 
   it("allows requests when Redis counter is under the policy limit", async () => {

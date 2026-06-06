@@ -13,7 +13,7 @@ export default function PurchasesPage() {
     <Suspense
       fallback={
         <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-5xl px-6 py-10">
-          <p className="text-sm text-black/60">Chargement des achats...</p>
+          <p className="text-sm text-muted-foreground">Chargement des achats...</p>
         </main>
       }
     >

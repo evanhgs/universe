@@ -288,6 +288,10 @@ export async function getPublicAssetUrl(asset: {
     return null;
   }
 
+  if (/^https?:\/\//i.test(asset.objectKey)) {
+    return asset.objectKey;
+  }
+
   const config = optionalStorageConfig();
 
   if (!config) {

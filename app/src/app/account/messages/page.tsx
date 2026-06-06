@@ -15,10 +15,10 @@ export default async function AccountMessagesPage() {
   if (!isAuthenticated) {
     return (
       <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-5xl px-6 py-10">
-        <p className="text-sm font-medium uppercase tracking-[0.24em] text-black/45">
+        <p className="text-sm font-medium uppercase text-muted-foreground">
           Messagerie
         </p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-black">
+        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground">
           Connecte-toi pour consulter tes messages.
         </h1>
       </main>
@@ -29,7 +29,7 @@ export default async function AccountMessagesPage() {
     <Suspense
       fallback={
         <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-6xl px-6 py-10">
-          <p className="text-sm text-black/60">Chargement de la messagerie...</p>
+          <p className="text-sm text-muted-foreground">Chargement de la messagerie...</p>
         </main>
       }
     >

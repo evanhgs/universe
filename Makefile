@@ -1,19 +1,49 @@
 DEV_ENV_FILE ?= infra/env/stack.dev.env
 STAGING_ENV_FILE ?= infra/env/stack.staging.env
 PROD_ENV_FILE ?= infra/env/stack.prod.env
+ENV ?= staging
+RUNTIME_ENV_FILE ?= infra/env/stack.$(ENV).env
 APP_DIR ?= app
+DEV_DB_HOST ?= localhost
+DEV_DB_PORT ?= 5432
+PRISMA_STUDIO_PORT ?= 5555
 
 DEV_COMPOSE := docker compose -f infra/compose.dev.yml --env-file $(DEV_ENV_FILE)
-STAGING_COMPOSE := docker compose -f infra/compose.staging.yml --env-file $(STAGING_ENV_FILE)
-PROD_COMPOSE := docker compose -f infra/compose.prod.yml --env-file $(PROD_ENV_FILE)
+RUNTIME_COMPOSE = docker compose -f infra/compose.runtime.yml --env-file $(RUNTIME_ENV_FILE)
+
+SEED_ENV_ARGS :=
+ifneq ($(strip $(SEED_BEAT_COUNT)),)
+SEED_ENV_ARGS += -e SEED_BEAT_COUNT=$(SEED_BEAT_COUNT)
+endif
+ifneq ($(strip $(SEED_SELLER_COUNT)),)
+SEED_ENV_ARGS += -e SEED_SELLER_COUNT=$(SEED_SELLER_COUNT)
+endif
+ifneq ($(strip $(SEED_ANALYTICS_EVENTS)),)
+SEED_ENV_ARGS += -e SEED_ANALYTICS_EVENTS=$(SEED_ANALYTICS_EVENTS)
+endif
+ifneq ($(strip $(SEED_BUYER_COUNT)),)
+SEED_ENV_ARGS += -e SEED_BUYER_COUNT=$(SEED_BUYER_COUNT)
+endif
+ifneq ($(strip $(SEED_RANDOM_SEED)),)
+SEED_ENV_ARGS += -e SEED_RANDOM_SEED=$(SEED_RANDOM_SEED)
+endif
+ifneq ($(strip $(SEED_AUDIO_BUCKET)),)
+SEED_ENV_ARGS += -e SEED_AUDIO_BUCKET=$(SEED_AUDIO_BUCKET)
+endif
+ifneq ($(strip $(SEED_AUDIO_OBJECT_KEY)),)
+SEED_ENV_ARGS += -e SEED_AUDIO_OBJECT_KEY=$(SEED_AUDIO_OBJECT_KEY)
+endif
 
 .PHONY: \
 	dev dev-down dev-logs dev-ps \
-	dev-next-sh dev-prisma-generate dev-prisma-migrate dev-prisma-push dev-prisma-studio \
+	dev-next-sh dev-prisma-generate dev-prisma-migrate dev-prisma-migrate-container \
+	dev-prisma-push dev-prisma-push-container dev-prisma-studio dev-prisma-studio-container \
+	dev-db-seed-benchmark \
 	dev-test dev-test-next dev-test-rust dev-test-python \
+	runtime runtime-down runtime-logs runtime-ps runtime-prisma-migrate runtime-prisma-push \
 	staging staging-down staging-logs staging-ps staging-prisma-migrate staging-prisma-push \
 	prod prod-down prod-logs prod-ps \
-	next-sh prisma-generate prisma-migrate prisma-push prisma-studio test
+	db-seed-benchmark next-sh prisma-generate prisma-migrate prisma-push prisma-studio test
 
 define require_env_file
 	@test -f $(1) || (echo "Missing $(1). Copy $(1).example to $(1) before running this target." >&2; exit 1)
@@ -30,6 +60,12 @@ define run_prisma_tooling
 		-e NPM_CONFIG_CACHE=/tmp/.npm \
 		"$${project_name}-nextjs-prisma" \
 		$(3)
+endef
+
+define run_dev_prisma_host
+	set -a; . $(DEV_ENV_FILE); set +a; \
+	DATABASE_URL="postgresql://$${POSTGRES_USER:-universe}:$${POSTGRES_PASSWORD:-universe_dev_password}@$(DEV_DB_HOST):$(DEV_DB_PORT)/$${POSTGRES_DB:-universe_dev}?schema=public"; \
+	cd $(APP_DIR) && DATABASE_URL="$$DATABASE_URL" $(1)
 endef
 
 # -----------------------------------------------------------------------------
@@ -61,15 +97,31 @@ dev-prisma-generate:
 
 dev-prisma-migrate:
 	$(call require_env_file,$(DEV_ENV_FILE))
+	$(call run_dev_prisma_host,npx prisma migrate dev $(if $(NAME),--name $(NAME),))
+
+dev-prisma-migrate-container:
+	$(call require_env_file,$(DEV_ENV_FILE))
 	$(DEV_COMPOSE) exec nextjs npx prisma migrate dev
 
 dev-prisma-push:
+	$(call require_env_file,$(DEV_ENV_FILE))
+	$(call run_dev_prisma_host,npx prisma db push)
+
+dev-prisma-push-container:
 	$(call require_env_file,$(DEV_ENV_FILE))
 	$(DEV_COMPOSE) exec nextjs npx prisma db push
 
 dev-prisma-studio:
 	$(call require_env_file,$(DEV_ENV_FILE))
-	$(DEV_COMPOSE) exec nextjs npx prisma studio --hostname 0.0.0.0 --port 5555
+	$(call run_dev_prisma_host,npx prisma studio --port $(PRISMA_STUDIO_PORT) --url "$$DATABASE_URL")
+
+dev-prisma-studio-container:
+	$(call require_env_file,$(DEV_ENV_FILE))
+	$(DEV_COMPOSE) exec nextjs npx prisma studio --port 5555
+
+dev-db-seed-benchmark:
+	$(call require_env_file,$(DEV_ENV_FILE))
+	$(DEV_COMPOSE) exec -T $(SEED_ENV_ARGS) nextjs npm run db:seed:benchmark
 
 # -----------------------------------------------------------------------------
 # Dev tests (run inside the dev compose containers — `make dev` must be up).
@@ -99,56 +151,76 @@ prisma-generate: dev-prisma-generate
 prisma-migrate: dev-prisma-migrate
 prisma-push: dev-prisma-push
 prisma-studio: dev-prisma-studio
+db-seed-benchmark: dev-db-seed-benchmark
 test: dev-test
 
 # -----------------------------------------------------------------------------
-# Staging
+# Runtime stacks (staging / production)
+# -----------------------------------------------------------------------------
+
+runtime:
+	$(call require_env_file,$(RUNTIME_ENV_FILE))
+	$(RUNTIME_COMPOSE) up --build -d
+
+runtime-down:
+	$(call require_env_file,$(RUNTIME_ENV_FILE))
+	$(RUNTIME_COMPOSE) down
+
+runtime-logs:
+	$(call require_env_file,$(RUNTIME_ENV_FILE))
+	$(RUNTIME_COMPOSE) logs -f
+
+runtime-ps:
+	$(call require_env_file,$(RUNTIME_ENV_FILE))
+	$(RUNTIME_COMPOSE) ps
+
+runtime-prisma-migrate:
+	$(call require_env_file,$(RUNTIME_ENV_FILE))
+	$(RUNTIME_COMPOSE) up -d --wait postgres
+	$(call run_prisma_tooling,$(RUNTIME_ENV_FILE),universe-$(ENV),./node_modules/.bin/prisma migrate deploy)
+
+runtime-prisma-push:
+	$(call require_env_file,$(RUNTIME_ENV_FILE))
+	$(call run_prisma_tooling,$(RUNTIME_ENV_FILE),universe-$(ENV),./node_modules/.bin/prisma db push)
+
+# -----------------------------------------------------------------------------
+# Staging aliases
 # -----------------------------------------------------------------------------
 
 staging:
-	$(call require_env_file,$(STAGING_ENV_FILE))
-	$(STAGING_COMPOSE) up --build -d
+	$(MAKE) runtime ENV=staging RUNTIME_ENV_FILE=$(STAGING_ENV_FILE)
 
 staging-down:
-	$(call require_env_file,$(STAGING_ENV_FILE))
-	$(STAGING_COMPOSE) down
+	$(MAKE) runtime-down ENV=staging RUNTIME_ENV_FILE=$(STAGING_ENV_FILE)
 
 staging-logs:
-	$(call require_env_file,$(STAGING_ENV_FILE))
-	$(STAGING_COMPOSE) logs -f
+	$(MAKE) runtime-logs ENV=staging RUNTIME_ENV_FILE=$(STAGING_ENV_FILE)
 
 staging-ps:
-	$(call require_env_file,$(STAGING_ENV_FILE))
-	$(STAGING_COMPOSE) ps
+	$(MAKE) runtime-ps ENV=staging RUNTIME_ENV_FILE=$(STAGING_ENV_FILE)
 
 staging-prisma-migrate:
-	$(call require_env_file,$(STAGING_ENV_FILE))
-	$(STAGING_COMPOSE) up -d --wait postgres
-	$(call run_prisma_tooling,$(STAGING_ENV_FILE),universe-staging,./node_modules/.bin/prisma migrate deploy)
+	$(MAKE) runtime-prisma-migrate ENV=staging RUNTIME_ENV_FILE=$(STAGING_ENV_FILE)
 
 staging-prisma-push:
-	$(call require_env_file,$(STAGING_ENV_FILE))
-	$(call run_prisma_tooling,$(STAGING_ENV_FILE),universe-staging,./node_modules/.bin/prisma db push)
+	$(MAKE) runtime-prisma-push ENV=staging RUNTIME_ENV_FILE=$(STAGING_ENV_FILE)
 
 # -----------------------------------------------------------------------------
-# Production
+# Production aliases
 # -----------------------------------------------------------------------------
 
 prod:
-	$(call require_env_file,$(PROD_ENV_FILE))
-	$(PROD_COMPOSE) up --build -d
+	$(MAKE) runtime ENV=prod RUNTIME_ENV_FILE=$(PROD_ENV_FILE)
 
 prod-down:
 	$(call require_env_file,$(PROD_ENV_FILE))
 	@printf "About to bring DOWN the production stack. Type 'yes-i-am-sure' to confirm: "; \
 		read confirm; \
 		[ "$$confirm" = "yes-i-am-sure" ] || { echo "Aborted." >&2; exit 1; }
-	$(PROD_COMPOSE) down
+	$(MAKE) runtime-down ENV=prod RUNTIME_ENV_FILE=$(PROD_ENV_FILE)
 
 prod-logs:
-	$(call require_env_file,$(PROD_ENV_FILE))
-	$(PROD_COMPOSE) logs -f
+	$(MAKE) runtime-logs ENV=prod RUNTIME_ENV_FILE=$(PROD_ENV_FILE)
 
 prod-ps:
-	$(call require_env_file,$(PROD_ENV_FILE))
-	$(PROD_COMPOSE) ps
+	$(MAKE) runtime-ps ENV=prod RUNTIME_ENV_FILE=$(PROD_ENV_FILE)

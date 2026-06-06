@@ -37,23 +37,155 @@ type SaturationRun = {
   samples: SaturationSample[];
 };
 
+type BreakdownItem = {
+  type?: string;
+  source?: string;
+  count: number;
+};
+
+type ScoreBreakdown = {
+  engagement: number;
+  keyword: number;
+  similarity: number;
+  sales: number;
+  freshness: number;
+  seller: number;
+  diversity: number;
+};
+
+type TopRecommendation = {
+  beatId: string;
+  title: string;
+  slug: string;
+  seller: string;
+  genre: string | null;
+  mood: string | null;
+  bpm: number | null;
+  reason: string | null;
+  organicScore: number;
+  computedAt: string;
+  scores: ScoreBreakdown;
+  stats: {
+    impressions: number;
+    plays: number;
+    fullPlays: number;
+    skips: number;
+    likes: number;
+    licenseClicks: number;
+    addToCart: number;
+    purchases: number;
+    conversionRate: number;
+  } | null;
+};
+
+type TopStats = {
+  beatId: string;
+  title: string;
+  slug: string;
+  seller: string;
+  genre: string | null;
+  impressions: number;
+  plays: number;
+  fullPlays: number;
+  skips: number;
+  likes: number;
+  licenseClicks: number;
+  addToCart: number;
+  purchases: number;
+  revenue: number;
+  conversionRate: number;
+  updatedAt: string;
+};
+
+type TasteEntry = {
+  label: string;
+  score: number;
+};
+
+type TasteProfile = {
+  userId: string;
+  displayName: string;
+  slug: string | null;
+  eventCount: number;
+  favoriteGenres: TasteEntry[];
+  favoriteMoods: TasteEntry[];
+  favoriteTags: TasteEntry[];
+  preferredBpmRange: [number, number] | null;
+  updatedAt: string;
+};
+
+type LatestAnalyticsEvent = {
+  id: string;
+  type: string;
+  source: string | null;
+  beatTitle: string | null;
+  beatSlug: string | null;
+  user: string | null;
+  occurredAt: string;
+};
+
+type AnalyticsSnapshot = {
+  generatedAt: string;
+  queryDurationMs: number;
+  scoreVersion: string;
+  health: {
+    score: number;
+    status: "ready" | "warming_up" | "needs_data";
+    statsCoverage: number;
+    scoreCoverage: number;
+    latestScoreComputedAt: string | null;
+    latestScoreAgeMs: number | null;
+  };
+  counts: {
+    users: number;
+    sellers: number;
+    publishedBeats: number;
+    analyticsEvents: number;
+    analyticsEvents24h: number;
+    analyticsEvents7d: number;
+    beatStats: number;
+    recommendationScores: number;
+    tasteProfiles: number;
+    sellerStats: number;
+  };
+  algorithm: {
+    eventWeights: Record<string, number>;
+    organicWeights: Record<string, number>;
+    feedMix: Record<string, number>;
+  };
+  eventBreakdown: BreakdownItem[];
+  sourceBreakdown: BreakdownItem[];
+  topRecommendations: TopRecommendation[];
+  topStats: TopStats[];
+  tasteProfiles: TasteProfile[];
+  latestEvents: LatestAnalyticsEvent[];
+};
+
+type AnalyticsRecomputeResult = {
+  ok: boolean;
+  recomputedScores: number;
+  durationMs: number;
+  snapshot: AnalyticsSnapshot;
+};
+
 const initialState: ApiState = {
   status: null,
   body: null,
 };
 
 const sectionClass =
-  "rounded-2xl border border-black/10 bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,0.08)]";
+  "rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm";
 const buttonClass =
-  "rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700";
+  "rounded-full border border-primary bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90";
 const secondaryButtonClass =
-  "rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50";
+  "rounded-full border border-input bg-card px-4 py-2 text-sm font-medium text-foreground transition hover:border-ring hover:bg-muted";
 const inputClass =
-  "w-full rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 outline-none transition focus:border-amber-400";
+  "w-full rounded-full border border-input bg-background px-4 py-2 text-sm font-medium text-foreground outline-none transition focus:border-ring";
 const textareaClass =
-  "mt-3 block w-full rounded-2xl border border-slate-200 bg-slate-950 p-4 text-sm leading-6 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-amber-400";
+  "mt-3 block w-full rounded-lg border border-input bg-background p-4 text-sm leading-6 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-ring";
 const preClass =
-  "mt-3 overflow-x-auto rounded-2xl border border-slate-200 bg-slate-950 p-4 text-sm leading-6 text-slate-100";
+  "mt-3 overflow-x-auto rounded-lg border border-border bg-muted p-4 text-sm leading-6 text-foreground";
+const miniCardClass = "rounded-lg border border-border bg-muted px-4 py-3";
 
 /**
  * Appelle une route API locale avec headers JSON par defaut.
@@ -79,6 +211,93 @@ async function request(path: string, init?: RequestInit) {
   };
 }
 
+function formatPercent(value: number) {
+  return `${Math.round(value * 10) / 10}%`;
+}
+
+function formatScore(value: number) {
+  return Math.round(value * 1000) / 1000;
+}
+
+function formatAge(milliseconds: number | null) {
+  if (milliseconds === null) {
+    return "jamais";
+  }
+
+  const minutes = Math.floor(milliseconds / 60000);
+
+  if (minutes < 1) return "maintenant";
+  if (minutes < 60) return `${minutes} min`;
+
+  const hours = Math.floor(minutes / 60);
+
+  if (hours < 24) return `${hours} h`;
+
+  return `${Math.floor(hours / 24)} j`;
+}
+
+function scoreTone(score: number) {
+  if (score >= 80) {
+    return "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/70 dark:bg-emerald-950/60 dark:text-emerald-300";
+  }
+
+  if (score >= 45) {
+    return "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/60 dark:text-amber-300";
+  }
+
+  return "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/70 dark:bg-rose-950/60 dark:text-rose-300";
+}
+
+function ScoreBar({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between gap-3 text-xs font-medium text-muted-foreground">
+        <span>{label}</span>
+        <span>{formatScore(value)}</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-border">
+        <div
+          className="h-full rounded-full bg-primary"
+          style={{ width: `${Math.min(100, Math.max(0, value * 100))}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function BreakdownBars({
+  items,
+  labelKey,
+}: {
+  items: BreakdownItem[];
+  labelKey: "type" | "source";
+}) {
+  const max = Math.max(...items.map((item) => item.count), 1);
+
+  return (
+    <div className="grid gap-2">
+      {items.slice(0, 8).map((item) => {
+        const label = item[labelKey] ?? "unknown";
+
+        return (
+          <div key={label}>
+            <div className="mb-1 flex items-center justify-between gap-3 text-xs font-medium text-muted-foreground">
+              <span className="truncate">{label}</span>
+              <span>{item.count}</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-border">
+              <div
+                className="h-full rounded-full bg-accent"
+                style={{ width: `${Math.max(4, (item.count / max) * 100)}%` }}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /**
  * Page outil pour tester les endpoints account depuis le navigateur.
  * @returns Interface de diagnostic Clerk/account.
@@ -91,6 +310,12 @@ export default function AccountTestPage() {
   const [emailTest, setEmailTest] = useState<ApiState>(initialState);
   const [emailConfig, setEmailConfig] = useState<ApiState>(initialState);
   const [sentryTest, setSentryTest] = useState<ApiState>(initialState);
+  const [analyticsStatus, setAnalyticsStatus] = useState<number | null>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsSnapshot | null>(null);
+  const [analyticsRaw, setAnalyticsRaw] = useState<JsonValue | null>(null);
+  const [analyticsAction, setAnalyticsAction] = useState<string | null>(null);
+  const [isAnalyticsLoading, setIsAnalyticsLoading] = useState(false);
+  const [isRecomputingAnalytics, setIsRecomputingAnalytics] = useState(false);
   const [sessionToken, setSessionToken] = useState<string>("");
   const [profilePayload, setProfilePayload] = useState(
     JSON.stringify(
@@ -266,6 +491,63 @@ export default function AccountTestPage() {
     }
   }
 
+  async function loadAnalyticsBenchmark() {
+    setError(null);
+    setAnalyticsAction(null);
+    setIsAnalyticsLoading(true);
+
+    try {
+      const response = await request("/api/account-test/analytics");
+
+      setAnalyticsStatus(response.status);
+      setAnalyticsRaw(response.body);
+      setAnalytics(response.status >= 200 && response.status < 300 ? (response.body as AnalyticsSnapshot) : null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setIsAnalyticsLoading(false);
+    }
+  }
+
+  async function recomputeAnalyticsBenchmark() {
+    setError(null);
+    setAnalyticsAction(null);
+    setIsRecomputingAnalytics(true);
+
+    try {
+      const response = await request("/api/account-test/analytics", {
+        method: "POST",
+        body: JSON.stringify({ action: "recompute" }),
+      });
+      const result = response.body as AnalyticsRecomputeResult | JsonValue;
+
+      setAnalyticsStatus(response.status);
+      setAnalyticsRaw(response.body);
+
+      if (
+        response.status >= 200 &&
+        response.status < 300 &&
+        result &&
+        typeof result === "object" &&
+        !Array.isArray(result) &&
+        "snapshot" in result
+      ) {
+        const typedResult = result as AnalyticsRecomputeResult;
+
+        setAnalytics(typedResult.snapshot);
+        setAnalyticsAction(
+          `${typedResult.recomputedScores} scores recalcules en ${typedResult.durationMs} ms.`,
+        );
+      } else {
+        setAnalytics(null);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setIsRecomputingAnalytics(false);
+    }
+  }
+
   /**
    * Affiche un badge de statut HTTP pour un appel de test.
    * @param status Code HTTP retourne ou null si non appele.
@@ -273,7 +555,7 @@ export default function AccountTestPage() {
   function renderStatus(status: number | null) {
     if (status === null) {
       return (
-        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+        <span className="rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
           not called
         </span>
       );
@@ -281,48 +563,50 @@ export default function AccountTestPage() {
 
     const tone =
       status >= 200 && status < 300
-        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-        : "border-rose-200 bg-rose-50 text-rose-700";
+        ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/60 dark:text-emerald-300"
+        : "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/70 dark:bg-rose-950/60 dark:text-rose-300";
 
     return <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${tone}`}>{status}</span>;
   }
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#fff9ed_100%)] px-4 py-10 text-slate-900 sm:px-6">
-      <div className="mx-auto max-w-5xl space-y-6">
-        <section className="overflow-hidden rounded-[28px] border border-black/10 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.10)]">
-          <div className="bg-[radial-gradient(circle_at_top_left,#f59e0b_0%,transparent_35%),linear-gradient(135deg,#0f172a_0%,#1e293b_100%)] px-6 py-8 text-white sm:px-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-200">Debug Surface</p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight">Account API test</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-200">
-              Routes testees: <code>/api/account/me</code>, <code>/api/account/me/profile</code>,{" "}
-              <code>/api/account/me/roles</code>. Connecte-toi avec Clerk dans le navigateur puis reutilise un
-              vrai session token dans Bruno.
-            </p>
-          </div>
-          <div className="grid gap-4 border-t border-slate-200 bg-white px-6 py-5 text-sm sm:grid-cols-3 sm:px-8">
+    <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-6xl px-6 py-10 text-foreground">
+      <div className="space-y-6">
+        <section className="border-b border-border pb-8">
+          <p className="text-sm font-medium uppercase text-muted-foreground">
+            Debug surface
+          </p>
+          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground">
+            Account API test
+          </h1>
+          <p className="mt-3 max-w-3xl text-base leading-7 text-muted-foreground">
+            Routes testees: <code>/api/account/me</code>, <code>/api/account/me/profile</code>,{" "}
+            <code>/api/account/me/roles</code>. Connecte-toi avec Clerk dans le navigateur puis reutilise un
+            vrai session token dans Bruno.
+          </p>
+          <div className="mt-6 grid gap-4 text-sm md:grid-cols-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Workflow Bruno</p>
-              <p className="mt-2 leading-6 text-slate-700">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Workflow Bruno</p>
+              <p className="mt-2 leading-6 text-foreground">
                 Charge un token Clerk ici, colle-le dans <code>clerkSessionToken</code>, puis appelle les routes{" "}
                 <code>/api/account/...</code>.
               </p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Etat Clerk</p>
-              <p className="mt-2 leading-6 text-slate-700">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Etat Clerk</p>
+              <p className="mt-2 leading-6 text-foreground">
                 {isLoaded ? (userId ? `connecte (${userId})` : "non connecte") : "chargement"}
               </p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Acces</p>
-              <p className="mt-2 leading-6 text-slate-700">Ces routes doivent repondre en 200 seulement si la session est valide.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Acces</p>
+              <p className="mt-2 leading-6 text-foreground">Ces routes doivent repondre en 200 seulement si la session est valide.</p>
             </div>
           </div>
         </section>
 
         {error ? (
-          <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+          <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 dark:border-rose-900/70 dark:bg-rose-950/60 dark:text-rose-300">
             {error}
           </p>
         ) : null}
@@ -331,7 +615,7 @@ export default function AccountTestPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold">Bruno session token</h2>
-              <p className="mt-1 text-sm leading-6 text-slate-600">
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
                 Charge un vrai token de session depuis Clerk puis copie-le dans Bruno pour tester les endpoints locaux.
               </p>
             </div>
@@ -344,7 +628,7 @@ export default function AccountTestPage() {
               </button>
             </div>
           </div>
-          <p className="mt-4 text-sm text-slate-600">
+          <p className="mt-4 text-sm text-muted-foreground">
             {tokenStatus ?? "Charge un token si tu veux tester Bruno avec Authorization: Bearer."}
           </p>
           <textarea className={textareaClass} readOnly rows={8} value={sessionToken} />
@@ -354,7 +638,7 @@ export default function AccountTestPage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <h2 className="text-lg font-semibold">Rate limit saturation</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
                 Lance un burst sur <code>/api/account-test/rate-limit</code>. La policy de test est{" "}
                 <code>8 requetes / 10 s</code>, donc un burst au-dessus doit produire des <code>429</code> avec{" "}
                 <code>Retry-After</code>.
@@ -371,7 +655,7 @@ export default function AccountTestPage() {
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <label className="text-sm font-medium text-slate-700">
+            <label className="text-sm font-medium text-foreground">
               Total requests
               <input
                 className={`mt-2 ${inputClass}`}
@@ -382,7 +666,7 @@ export default function AccountTestPage() {
                 value={saturationTotal}
               />
             </label>
-            <label className="text-sm font-medium text-slate-700">
+            <label className="text-sm font-medium text-foreground">
               Concurrency
               <input
                 className={`mt-2 ${inputClass}`}
@@ -393,44 +677,298 @@ export default function AccountTestPage() {
                 value={saturationConcurrency}
               />
             </label>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Progress</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">
+            <div className="rounded-lg border border-border bg-muted px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Progress</p>
+              <p className="mt-2 text-2xl font-semibold text-foreground">
                 {saturationRun ? `${saturationRun.completed}/${saturationRun.total}` : "0/0"}
               </p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Duration</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">
+            <div className="rounded-lg border border-border bg-muted px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Duration</p>
+              <p className="mt-2 text-2xl font-semibold text-foreground">
                 {saturationRun ? `${saturationRun.durationMs} ms` : "-"}
               </p>
             </div>
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">2xx</p>
-              <p className="mt-2 text-2xl font-semibold text-emerald-900">{saturationRun?.ok ?? 0}</p>
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/70 dark:bg-emerald-950/60">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">2xx</p>
+              <p className="mt-2 text-2xl font-semibold text-emerald-900 dark:text-emerald-200">{saturationRun?.ok ?? 0}</p>
             </div>
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">429</p>
-              <p className="mt-2 text-2xl font-semibold text-amber-900">{saturationRun?.limited ?? 0}</p>
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/70 dark:bg-amber-950/60">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">429</p>
+              <p className="mt-2 text-2xl font-semibold text-amber-900 dark:text-amber-200">{saturationRun?.limited ?? 0}</p>
             </div>
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700">503</p>
-              <p className="mt-2 text-2xl font-semibold text-rose-900">{saturationRun?.unavailable ?? 0}</p>
+            <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 dark:border-rose-900/70 dark:bg-rose-950/60">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700 dark:text-rose-300">503</p>
+              <p className="mt-2 text-2xl font-semibold text-rose-900 dark:text-rose-200">{saturationRun?.unavailable ?? 0}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">401</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">{saturationRun?.unauthorized ?? 0}</p>
+            <div className="rounded-lg border border-border bg-muted px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">401</p>
+              <p className="mt-2 text-2xl font-semibold text-foreground">{saturationRun?.unauthorized ?? 0}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Network</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">{saturationRun?.failed ?? 0}</p>
+            <div className="rounded-lg border border-border bg-muted px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Network</p>
+              <p className="mt-2 text-2xl font-semibold text-foreground">{saturationRun?.failed ?? 0}</p>
             </div>
           </div>
 
           <pre className={preClass}>{JSON.stringify(saturationRun?.samples ?? [], null, 2)}</pre>
+        </section>
+
+        <section className={sectionClass}>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="text-lg font-semibold">Analytics benchmark</h2>
+                {renderStatus(analyticsStatus)}
+              </div>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                Controle la couverture du tracking, les scores recommandes, les profils utilisateurs et les signaux qui nourrissent le feed.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className={isAnalyticsLoading ? `${secondaryButtonClass} cursor-wait opacity-70` : secondaryButtonClass}
+                disabled={isAnalyticsLoading || isRecomputingAnalytics}
+                onClick={() => void loadAnalyticsBenchmark()}
+                type="button"
+              >
+                {isAnalyticsLoading ? "Loading" : "Load benchmark"}
+              </button>
+              <button
+                className={isRecomputingAnalytics ? `${secondaryButtonClass} cursor-wait opacity-70` : buttonClass}
+                disabled={isAnalyticsLoading || isRecomputingAnalytics}
+                onClick={() => void recomputeAnalyticsBenchmark()}
+                type="button"
+              >
+                {isRecomputingAnalytics ? "Recomputing" : "Recompute scores"}
+              </button>
+            </div>
+          </div>
+
+          {analyticsAction ? (
+            <p className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/60 dark:text-emerald-300">
+              {analyticsAction}
+            </p>
+          ) : null}
+
+          {analytics ? (
+            <div className="mt-5 space-y-5">
+              <div className="grid gap-3 lg:grid-cols-[1.1fr_2fr]">
+                <div className={`rounded-lg border px-5 py-4 ${scoreTone(analytics.health.score)}`}>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em]">Algo health</p>
+                  <div className="mt-3 flex items-end justify-between gap-4">
+                    <p className="text-5xl font-semibold">{analytics.health.score}</p>
+                    <p className="rounded-full bg-card/70 px-3 py-1 text-xs font-semibold uppercase">
+                      {analytics.health.status}
+                    </p>
+                  </div>
+                  <p className="mt-4 text-sm leading-6">
+                    Version {analytics.scoreVersion}, dernier calcul {formatAge(analytics.health.latestScoreAgeMs)}.
+                  </p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className={miniCardClass}>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Events</p>
+                    <p className="mt-2 text-2xl font-semibold text-foreground">{analytics.counts.analyticsEvents}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{analytics.counts.analyticsEvents24h} sur 24 h</p>
+                  </div>
+                  <div className={miniCardClass}>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Beats publics</p>
+                    <p className="mt-2 text-2xl font-semibold text-foreground">{analytics.counts.publishedBeats}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{formatPercent(analytics.health.statsCoverage)} avec stats</p>
+                  </div>
+                  <div className={miniCardClass}>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Scores</p>
+                    <p className="mt-2 text-2xl font-semibold text-foreground">{analytics.counts.recommendationScores}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{formatPercent(analytics.health.scoreCoverage)} couverts</p>
+                  </div>
+                  <div className={miniCardClass}>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Users</p>
+                    <p className="mt-2 text-2xl font-semibold text-foreground">{analytics.counts.users}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {analytics.counts.sellers} vendeurs, {analytics.counts.tasteProfiles} profils
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-5 lg:grid-cols-2">
+                <div className="rounded-lg border border-border bg-card p-4">
+                  <h3 className="font-semibold text-foreground">Top recommandations</h3>
+                  <div className="mt-4 grid gap-3">
+                    {analytics.topRecommendations.length > 0 ? (
+                      analytics.topRecommendations.map((item, index) => (
+                        <div className="rounded-lg border border-border bg-muted p-4" key={item.beatId}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                                #{index + 1} {item.reason ?? "organic"}
+                              </p>
+                              <p className="mt-1 truncate font-semibold text-foreground">{item.title}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {item.seller} · {item.genre ?? "genre n/a"} · {item.bpm ?? "-"} BPM
+                              </p>
+                            </div>
+                            <p className="rounded-full bg-primary px-3 py-1 text-sm font-semibold text-primary-foreground">
+                              {formatScore(item.organicScore)}
+                            </p>
+                          </div>
+                          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                            <ScoreBar label="engagement" value={item.scores.engagement} />
+                            <ScoreBar label="sales" value={item.scores.sales} />
+                            <ScoreBar label="freshness" value={item.scores.freshness} />
+                            <ScoreBar label="seller" value={item.scores.seller} />
+                          </div>
+                          {item.stats ? (
+                            <p className="mt-3 text-xs text-muted-foreground">
+                              {item.stats.plays} plays · {item.stats.likes} likes · {item.stats.addToCart} carts · {item.stats.purchases} purchases
+                            </p>
+                          ) : null}
+                        </div>
+                      ))
+                    ) : (
+                      <p className="rounded-lg border border-dashed border-input p-4 text-sm text-muted-foreground">
+                        Aucun score disponible. Lance le seed benchmark ou recalcule les scores.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-5">
+                  <div className="rounded-lg border border-border bg-card p-4">
+                    <h3 className="font-semibold text-foreground">Events par type</h3>
+                    <div className="mt-4">
+                      <BreakdownBars items={analytics.eventBreakdown} labelKey="type" />
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-border bg-card p-4">
+                    <h3 className="font-semibold text-foreground">Sources</h3>
+                    <div className="mt-4">
+                      <BreakdownBars items={analytics.sourceBreakdown} labelKey="source" />
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-border bg-card p-4">
+                    <h3 className="font-semibold text-foreground">Mix du feed</h3>
+                    <div className="mt-4 grid gap-2">
+                      {Object.entries(analytics.algorithm.feedMix).map(([label, value]) => (
+                        <ScoreBar key={label} label={label} value={value} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-5 lg:grid-cols-2">
+                <div className="rounded-lg border border-border bg-card p-4">
+                  <h3 className="font-semibold text-foreground">Profils utilisateurs</h3>
+                  <div className="mt-4 grid gap-3">
+                    {analytics.tasteProfiles.length > 0 ? (
+                      analytics.tasteProfiles.map((profile) => (
+                        <div className="rounded-lg border border-border bg-muted p-4" key={profile.userId}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-foreground">{profile.displayName}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {profile.eventCount} events · BPM{" "}
+                                {profile.preferredBpmRange ? profile.preferredBpmRange.join("-") : "n/a"}
+                              </p>
+                            </div>
+                            <span className="rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold text-muted-foreground">
+                              taste
+                            </span>
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {[...profile.favoriteGenres, ...profile.favoriteMoods, ...profile.favoriteTags]
+                              .slice(0, 8)
+                              .map((entry) => (
+                                <span
+                                  className="rounded-full bg-card px-3 py-1 text-xs font-medium text-foreground"
+                                  key={`${profile.userId}-${entry.label}`}
+                                >
+                                  {entry.label} {formatScore(entry.score)}
+                                </span>
+                              ))}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="rounded-lg border border-dashed border-input p-4 text-sm text-muted-foreground">
+                        Aucun profil de goût disponible. Il faut des interactions positives utilisateur.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border bg-card p-4">
+                  <h3 className="font-semibold text-foreground">Stats commerciales</h3>
+                  <div className="mt-4 grid gap-3">
+                    {analytics.topStats.length > 0 ? (
+                      analytics.topStats.map((item) => (
+                        <div className="rounded-lg border border-border bg-muted p-4" key={item.beatId}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold text-foreground">{item.title}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {item.seller} · {item.genre ?? "genre n/a"}
+                              </p>
+                            </div>
+                            <p className="text-sm font-semibold text-foreground">{item.revenue} EUR</p>
+                          </div>
+                          <div className="mt-3 grid grid-cols-4 gap-2 text-center text-xs">
+                            <div className="rounded-xl bg-card p-2">
+                              <p className="font-semibold text-foreground">{item.plays}</p>
+                              <p className="text-muted-foreground">plays</p>
+                            </div>
+                            <div className="rounded-xl bg-card p-2">
+                              <p className="font-semibold text-foreground">{item.addToCart}</p>
+                              <p className="text-muted-foreground">carts</p>
+                            </div>
+                            <div className="rounded-xl bg-card p-2">
+                              <p className="font-semibold text-foreground">{item.purchases}</p>
+                              <p className="text-muted-foreground">sales</p>
+                            </div>
+                            <div className="rounded-xl bg-card p-2">
+                              <p className="font-semibold text-foreground">{formatPercent(item.conversionRate * 100)}</p>
+                              <p className="text-muted-foreground">conv.</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="rounded-lg border border-dashed border-input p-4 text-sm text-muted-foreground">
+                        Aucune stats beat disponible.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border bg-card p-4">
+                <h3 className="font-semibold text-foreground">Derniers signaux trackes</h3>
+                <div className="mt-4 grid gap-2">
+                  {analytics.latestEvents.map((event) => (
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted px-4 py-3 text-sm" key={event.id}>
+                      <div>
+                        <p className="font-semibold text-foreground">{event.type}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {event.beatTitle ?? "sans beat"} · {event.user ?? "anonyme"} · {event.source ?? "unknown"}
+                        </p>
+                      </div>
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {new Date(event.occurredAt).toLocaleString("fr-FR")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <pre className={preClass}>{JSON.stringify(analyticsRaw, null, 2)}</pre>
+          )}
         </section>
 
         <div className="grid gap-6 lg:grid-cols-2">
@@ -439,7 +977,7 @@ export default function AccountTestPage() {
               <h2 className="text-lg font-semibold">GET /api/account/me</h2>
               {renderStatus(me.status)}
             </div>
-            <p className="mt-2 text-sm text-slate-600">Recupere le snapshot du compte courant.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Recupere le snapshot du compte courant.</p>
             <button
               className={`mt-4 ${buttonClass}`}
               onClick={() =>
@@ -459,7 +997,7 @@ export default function AccountTestPage() {
               <h2 className="text-lg font-semibold">GET /api/account/me/profile</h2>
               {renderStatus(profile.status)}
             </div>
-            <p className="mt-2 text-sm text-slate-600">Charge le profil public/prive du compte courant.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Charge le profil public/prive du compte courant.</p>
             <button
               className={`mt-4 ${buttonClass}`}
               onClick={() =>
@@ -478,7 +1016,7 @@ export default function AccountTestPage() {
         <div className="grid gap-6 lg:grid-cols-2">
           <section className={sectionClass}>
             <h2 className="text-lg font-semibold">PATCH /api/account/me/profile</h2>
-            <p className="mt-2 text-sm text-slate-600">Edite le payload puis envoie la mise a jour du profil.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Edite le payload puis envoie la mise a jour du profil.</p>
             <textarea
               className={textareaClass}
               onChange={(event) => setProfilePayload(event.target.value)}
@@ -508,7 +1046,7 @@ export default function AccountTestPage() {
               <h2 className="text-lg font-semibold">GET /api/account/me/roles</h2>
               {renderStatus(roles.status)}
             </div>
-            <p className="mt-2 text-sm text-slate-600">Liste les roles actuellement attaches au compte.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Liste les roles actuellement attaches au compte.</p>
             <button
               className={`mt-4 ${buttonClass}`}
               onClick={() =>
@@ -526,7 +1064,7 @@ export default function AccountTestPage() {
 
         <section className={sectionClass}>
           <h2 className="text-lg font-semibold">PUT /api/account/me/roles</h2>
-          <p className="mt-2 text-sm text-slate-600">Teste la mise a jour self-service des roles avec un payload JSON.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Teste la mise a jour self-service des roles avec un payload JSON.</p>
           <textarea
             className={textareaClass}
             onChange={(event) => setRolesPayload(event.target.value)}
@@ -555,7 +1093,7 @@ export default function AccountTestPage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold">POST /api/account-test/sentry</h2>
-              <p className="mt-2 text-sm text-slate-600">
+              <p className="mt-2 text-sm text-muted-foreground">
                 Capture une exception de test dans Sentry puis retourne un <code>500</code> JSON avec l&apos;event id.
               </p>
             </div>
@@ -586,7 +1124,7 @@ export default function AccountTestPage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold">POST /api/account-test/email</h2>
-              <p className="mt-2 text-sm text-slate-600">
+              <p className="mt-2 text-sm text-muted-foreground">
                 Envoie un email Resend reel avec un template transactionnel de test. Templates disponibles:{" "}
                 <code>PURCHASE_CONFIRMED</code>, <code>SALE_CONFIRMED</code>,{" "}
                 <code>SELLER_ACCESS_GRANTED</code>, <code>CHAT_UNREAD_REMINDER</code>.

@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { listPublishedBeatsPayload } from "@/server/beats/beat.service";
 import { BeatUploadTester } from "./beat-upload-tester";
 
@@ -51,54 +54,46 @@ export default async function BeatsPage({ searchParams }: BeatsPageProps) {
 
   return (
     <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-6xl px-6 py-10">
-      <div className="flex flex-col gap-6 border-b border-black/10 pb-8 md:flex-row md:items-end md:justify-between">
+      <div className="flex flex-col gap-6 border-b border-border pb-8 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-sm font-medium uppercase tracking-[0.24em] text-black/45">
+          <p className="text-sm font-medium uppercase text-muted-foreground">
             Catalogue V1
           </p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-black">
+          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground">
             Instrumentales publiees
           </h1>
-          <p className="mt-3 max-w-2xl text-base leading-7 text-black/65">
+          <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">
             Les beats publics de la marketplace, branches aux premiers modeles
             publication, profil vendeur et assets.
           </p>
         </div>
-        <Link
-          className="inline-flex h-11 items-center justify-center rounded-full bg-black px-5 text-sm font-medium text-white"
-          href="/account-test"
-        >
-          Tester mon compte
-        </Link>
+        <Button asChild size="lg">
+          <Link href="/account-test">Tester mon compte</Link>
+        </Button>
       </div>
 
       <BeatUploadTester />
 
       <form className="mt-6 grid gap-3 md:grid-cols-[1fr_180px_auto]" action="/beats">
-        <input
-          className="h-11 rounded-lg border border-black/15 px-4 text-sm outline-none focus:border-black"
+        <Input
           defaultValue={params.search ?? ""}
           name="search"
           placeholder="Rechercher par titre, description ou tag"
         />
-        <input
-          className="h-11 rounded-lg border border-black/15 px-4 text-sm outline-none focus:border-black"
+        <Input
           defaultValue={params.genre ?? ""}
           name="genre"
           placeholder="Style"
         />
-        <button
-          className="h-11 rounded-full border border-black bg-black px-5 text-sm font-medium text-white"
-          type="submit"
-        >
+        <Button size="lg" type="submit">
           Filtrer
-        </button>
+        </Button>
       </form>
 
       {beats.length === 0 ? (
-        <div className="mt-10 border border-dashed border-black/20 p-8">
-          <h2 className="text-xl font-semibold text-black">Aucune instrumentale publiee</h2>
-          <p className="mt-2 text-sm leading-6 text-black/60">
+        <div className="mt-10 rounded-lg border border-dashed border-border p-8">
+          <h2 className="text-xl font-semibold text-foreground">Aucune instrumentale publiee</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Cree une publication via l API <code>/api/beats</code>, avec
             <code> publish: true</code>, pour alimenter ce catalogue.
           </p>
@@ -109,9 +104,9 @@ export default async function BeatsPage({ searchParams }: BeatsPageProps) {
             const thumbnail = beat.assets.find((asset) => asset.role === "IMAGE_THUMBNAIL");
 
             return (
-              <article key={beat.id} className="border border-black/10 bg-white">
+              <Card className="overflow-hidden" key={beat.id}>
                 <Link href={`/beats/${beat.slug}`}>
-                  <div className="aspect-video bg-black/[0.04]">
+                  <div className="aspect-video bg-muted">
                     {thumbnail?.url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -121,26 +116,26 @@ export default async function BeatsPage({ searchParams }: BeatsPageProps) {
                       />
                     ) : null}
                   </div>
-                  <div className="space-y-3 p-5">
+                  <CardContent className="space-y-3 p-5">
                     <div className="flex items-start justify-between gap-3">
-                      <h2 className="text-lg font-semibold text-black">{beat.title}</h2>
-                      <p className="shrink-0 text-sm font-semibold text-black">
+                      <h2 className="text-lg font-semibold text-foreground">{beat.title}</h2>
+                      <p className="shrink-0 text-sm font-semibold text-foreground">
                         A partir de {formatPriceHT(beat.priceAmount, beat.currency, beat.isFree)}
                       </p>
                     </div>
-                    <p className="line-clamp-2 text-sm leading-6 text-black/60">
+                    <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
                       {beat.description ?? "Sans description."}
                     </p>
-                    <div className="flex flex-wrap gap-2 text-xs text-black/50">
+                    <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                       {beat.primaryGenre ? <span>{beat.primaryGenre}</span> : null}
                       {beat.seller.slug ? <span>par {beat.seller.displayName}</span> : null}
                     </div>
-                    <span className="inline-flex h-10 items-center justify-center rounded-full border border-black px-4 text-sm font-medium text-black">
+                    <span className="inline-flex h-10 items-center justify-center rounded-full border border-input px-4 text-sm font-medium text-foreground">
                       Voir licences
                     </span>
-                  </div>
+                  </CardContent>
                 </Link>
-              </article>
+              </Card>
             );
           })}
         </div>

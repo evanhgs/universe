@@ -29,12 +29,12 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
   return (
     <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-6xl px-6 py-10">
-      <section className="border-b border-black/10 pb-8">
-        <p className="text-sm font-medium uppercase tracking-[0.24em] text-black/45">
+      <section className="border-b border-border pb-8">
+        <p className="text-sm font-medium uppercase tracking-[0.24em] text-muted-foreground">
           {profile.roles.includes('SELLER') ? "profile vendeur" : "profile utilisateur"}
         </p>
         <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <h1 className="text-4xl font-semibold tracking-tight text-black">
+          <h1 className="text-4xl font-semibold tracking-tight text-foreground">
             {profile.displayName}
           </h1>
           {!profile.visibility.viewerCanEdit ? (
@@ -44,10 +44,10 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
             />
           ) : null}
         </div>
-        <p className="mt-4 max-w-3xl text-base leading-7 text-black/65">
+        <p className="mt-4 max-w-3xl text-base leading-7 text-muted-foreground">
           {profile.bio ?? "Cet utilisateur n'a pas encore ajoute de description."}
         </p>
-        <div className="mt-5 flex flex-wrap gap-4 text-sm text-black/55">
+        <div className="mt-5 flex flex-wrap gap-4 text-sm text-muted-foreground">
           <span>{profile.stats.beatCount} instrumentales publiees</span>
           <span>{profile.stats.saleCount} ventes</span>
           <span>{profile.stats.followerCount} followers</span>
@@ -56,25 +56,25 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
       <section className="mt-8">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="text-2xl font-semibold text-black">Catalogue</h2>
-          <Link className="text-sm font-medium text-black/55 hover:text-black" href={`/beats?sellerSlug=${profile.slug}`}>
+          <h2 className="text-2xl font-semibold text-foreground">Catalogue</h2>
+          <Link className="text-sm font-medium text-muted-foreground hover:text-foreground" href={`/beats?sellerSlug=${profile.slug}`}>
             Voir tout
           </Link>
         </div>
         {profile.beats.length === 0 ? (
-          <p className="mt-5 border border-dashed border-black/20 p-6 text-sm text-black/60">
+          <p className="mt-5 border border-dashed border-border p-6 text-sm text-muted-foreground">
             Aucune instrumentale publique pour le moment.
           </p>
         ) : (
           <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {profile.beats.map((beat) => (
               <Link
-                className="border border-black/10 bg-white p-4"
+                className="border border-border bg-card p-4"
                 href={`/beats/${beat.slug}`}
                 key={beat.id}
               >
-                <h3 className="font-semibold text-black">{beat.title}</h3>
-                <p className="mt-2 line-clamp-2 text-sm leading-6 text-black/60">
+                <h3 className="font-semibold text-foreground">{beat.title}</h3>
+                <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
                   {beat.description ?? "Sans description."}
                 </p>
               </Link>
