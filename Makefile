@@ -1,14 +1,15 @@
 DEV_ENV_FILE ?= infra/env/stack.dev.env
 STAGING_ENV_FILE ?= infra/env/stack.staging.env
 PROD_ENV_FILE ?= infra/env/stack.prod.env
+ENV ?= staging
+RUNTIME_ENV_FILE ?= infra/env/stack.$(ENV).env
 APP_DIR ?= app
 DEV_DB_HOST ?= localhost
 DEV_DB_PORT ?= 5432
 PRISMA_STUDIO_PORT ?= 5555
 
 DEV_COMPOSE := docker compose -f infra/compose.dev.yml --env-file $(DEV_ENV_FILE)
-STAGING_COMPOSE := docker compose -f infra/compose.staging.yml --env-file $(STAGING_ENV_FILE)
-PROD_COMPOSE := docker compose -f infra/compose.prod.yml --env-file $(PROD_ENV_FILE)
+RUNTIME_COMPOSE = docker compose -f infra/compose.runtime.yml --env-file $(RUNTIME_ENV_FILE)
 
 SEED_ENV_ARGS :=
 ifneq ($(strip $(SEED_BEAT_COUNT)),)
@@ -39,6 +40,7 @@ endif
 	dev-prisma-push dev-prisma-push-container dev-prisma-studio dev-prisma-studio-container \
 	dev-db-seed-benchmark \
 	dev-test dev-test-next dev-test-rust dev-test-python \
+	runtime runtime-down runtime-logs runtime-ps runtime-prisma-migrate runtime-prisma-push \
 	staging staging-down staging-logs staging-ps staging-prisma-migrate staging-prisma-push \
 	prod prod-down prod-logs prod-ps \
 	db-seed-benchmark next-sh prisma-generate prisma-migrate prisma-push prisma-studio test
@@ -153,53 +155,72 @@ db-seed-benchmark: dev-db-seed-benchmark
 test: dev-test
 
 # -----------------------------------------------------------------------------
-# Staging
+# Runtime stacks (staging / production)
+# -----------------------------------------------------------------------------
+
+runtime:
+	$(call require_env_file,$(RUNTIME_ENV_FILE))
+	$(RUNTIME_COMPOSE) up --build -d
+
+runtime-down:
+	$(call require_env_file,$(RUNTIME_ENV_FILE))
+	$(RUNTIME_COMPOSE) down
+
+runtime-logs:
+	$(call require_env_file,$(RUNTIME_ENV_FILE))
+	$(RUNTIME_COMPOSE) logs -f
+
+runtime-ps:
+	$(call require_env_file,$(RUNTIME_ENV_FILE))
+	$(RUNTIME_COMPOSE) ps
+
+runtime-prisma-migrate:
+	$(call require_env_file,$(RUNTIME_ENV_FILE))
+	$(RUNTIME_COMPOSE) up -d --wait postgres
+	$(call run_prisma_tooling,$(RUNTIME_ENV_FILE),universe-$(ENV),./node_modules/.bin/prisma migrate deploy)
+
+runtime-prisma-push:
+	$(call require_env_file,$(RUNTIME_ENV_FILE))
+	$(call run_prisma_tooling,$(RUNTIME_ENV_FILE),universe-$(ENV),./node_modules/.bin/prisma db push)
+
+# -----------------------------------------------------------------------------
+# Staging aliases
 # -----------------------------------------------------------------------------
 
 staging:
-	$(call require_env_file,$(STAGING_ENV_FILE))
-	$(STAGING_COMPOSE) up --build -d
+	$(MAKE) runtime ENV=staging RUNTIME_ENV_FILE=$(STAGING_ENV_FILE)
 
 staging-down:
-	$(call require_env_file,$(STAGING_ENV_FILE))
-	$(STAGING_COMPOSE) down
+	$(MAKE) runtime-down ENV=staging RUNTIME_ENV_FILE=$(STAGING_ENV_FILE)
 
 staging-logs:
-	$(call require_env_file,$(STAGING_ENV_FILE))
-	$(STAGING_COMPOSE) logs -f
+	$(MAKE) runtime-logs ENV=staging RUNTIME_ENV_FILE=$(STAGING_ENV_FILE)
 
 staging-ps:
-	$(call require_env_file,$(STAGING_ENV_FILE))
-	$(STAGING_COMPOSE) ps
+	$(MAKE) runtime-ps ENV=staging RUNTIME_ENV_FILE=$(STAGING_ENV_FILE)
 
 staging-prisma-migrate:
-	$(call require_env_file,$(STAGING_ENV_FILE))
-	$(STAGING_COMPOSE) up -d --wait postgres
-	$(call run_prisma_tooling,$(STAGING_ENV_FILE),universe-staging,./node_modules/.bin/prisma migrate deploy)
+	$(MAKE) runtime-prisma-migrate ENV=staging RUNTIME_ENV_FILE=$(STAGING_ENV_FILE)
 
 staging-prisma-push:
-	$(call require_env_file,$(STAGING_ENV_FILE))
-	$(call run_prisma_tooling,$(STAGING_ENV_FILE),universe-staging,./node_modules/.bin/prisma db push)
+	$(MAKE) runtime-prisma-push ENV=staging RUNTIME_ENV_FILE=$(STAGING_ENV_FILE)
 
 # -----------------------------------------------------------------------------
-# Production
+# Production aliases
 # -----------------------------------------------------------------------------
 
 prod:
-	$(call require_env_file,$(PROD_ENV_FILE))
-	$(PROD_COMPOSE) up --build -d
+	$(MAKE) runtime ENV=prod RUNTIME_ENV_FILE=$(PROD_ENV_FILE)
 
 prod-down:
 	$(call require_env_file,$(PROD_ENV_FILE))
 	@printf "About to bring DOWN the production stack. Type 'yes-i-am-sure' to confirm: "; \
 		read confirm; \
 		[ "$$confirm" = "yes-i-am-sure" ] || { echo "Aborted." >&2; exit 1; }
-	$(PROD_COMPOSE) down
+	$(MAKE) runtime-down ENV=prod RUNTIME_ENV_FILE=$(PROD_ENV_FILE)
 
 prod-logs:
-	$(call require_env_file,$(PROD_ENV_FILE))
-	$(PROD_COMPOSE) logs -f
+	$(MAKE) runtime-logs ENV=prod RUNTIME_ENV_FILE=$(PROD_ENV_FILE)
 
 prod-ps:
-	$(call require_env_file,$(PROD_ENV_FILE))
-	$(PROD_COMPOSE) ps
+	$(MAKE) runtime-ps ENV=prod RUNTIME_ENV_FILE=$(PROD_ENV_FILE)

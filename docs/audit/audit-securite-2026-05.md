@@ -77,7 +77,7 @@ L'analyse couvre **5 domaines** : application Next.js, worker Rust, service Fast
 | # | Faille | Fichier:Ligne | Impact | Recommandation |
 |---|--------|---------------|--------|----------------|
 | C10 | **Secrets dev en clair dans le repo** | `infra/env/stack.dev.env:6-8` | Leak Clerk/Stripe keys sur git push | Committer `.example`, ajouter `.env*` dans `.gitignore`, rotation keys |
-| H8 | **Caddy : HSTS / X-Frame / nosniff manquants** | `infra/proxy/Caddyfile.prod:1-13` | Clickjacking, MIME sniffing, downgrade attacks | Bloc `header { Strict-Transport-Security … X-Frame-Options DENY X-Content-Type-Options nosniff }` |
+| H8 | **Caddy : HSTS / X-Frame / nosniff manquants** | `infra/proxy/Caddyfile.runtime:1-13` | Clickjacking, MIME sniffing, downgrade attacks | Bloc `header { Strict-Transport-Security … X-Frame-Options DENY X-Content-Type-Options nosniff }` |
 | H9 | **Caddy AI-prod : pas de CORS** | `infra/proxy/Caddyfile.ai-prod:7` | Browser bypass possible | Restreindre `Access-Control-Allow-Origin` |
 | H10 | **Postgres dev exposé sur 0.0.0.0** | `infra/compose.dev.yml:8-9` | Accessible réseau local développeur | Bind sur `127.0.0.1:5432` |
 | H11 | **GitHub Actions tierces non pinnées par SHA** | `.github/workflows/staging-ci-cd.yml:99,108,282` | Supply chain attack si action compromise | Pinner `astral-sh/setup-uv@<sha>`, `appleboy/ssh-action@<sha>` |
