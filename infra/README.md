@@ -11,10 +11,9 @@ It is intentionally split from the application code so you can later add sibling
 ## Layout
 
 - `compose.dev.yml`: local development with Compose Watch
-- `compose.staging.yml`: hardened pre-production stack for Next.js + FastAPI + Rust audio worker
-- `compose.prod.yml`: hardened production stack for Next.js + FastAPI
+- `compose.runtime.yml`: hardened runtime stack used by both staging and production
 - `env/`: runtime environment files plus versioned templates
-- `proxy/`: Caddy reverse-proxy configs for staging and production
+- `proxy/`: Caddy reverse-proxy config for runtime deployments
 
 ## Current assumptions
 
@@ -24,7 +23,7 @@ It is intentionally split from the application code so you can later add sibling
 - The FastAPI service lives at `../ai-services`
 - The Rust audio worker lives at `../audio-worker`
 
-If you later move this folder into a separate Git repository, update the `NEXTJS_*`, `AI_SERVICES_*`, and `AUDIO_WORKER_*` build-path variables in the runtime env files or your shell environment.
+If you later move this folder into a separate Git repository, update the static build contexts in `compose.dev.yml` and `compose.runtime.yml`.
 
 ## Quick start
 
@@ -50,8 +49,8 @@ Equivalent raw commands remain:
 
 ```bash
 docker compose -f infra/compose.dev.yml --env-file infra/env/stack.dev.env up --build --watch
-docker compose -f infra/compose.staging.yml --env-file infra/env/stack.staging.env up --build -d
-docker compose -f infra/compose.prod.yml --env-file infra/env/stack.prod.env up --build -d
+docker compose -f infra/compose.runtime.yml --env-file infra/env/stack.staging.env up --build -d
+docker compose -f infra/compose.runtime.yml --env-file infra/env/stack.prod.env up --build -d
 ```
 
 Versioned `*.example` files are templates only. Copy them to the matching `*.env` file before using the stack.
@@ -72,14 +71,14 @@ make prisma-studio
 
 `make prisma-generate` is the exception: it runs from `app/` on the host so the generated client is written back into the repository at `app/generated/prisma`.
 
-For staging, push the schema after the stack is up:
+For staging, apply migrations after the stack is up:
 
 ```bash
 make staging
-make staging-prisma-push
+make staging-prisma-migrate
 ```
 
-`make staging-prisma-push` builds the Next.js `tooling` Docker stage and runs the local Prisma CLI from that image on the staging Compose network. It does not run `npx prisma` from a blank Node image, so a temporary npm/DNS issue on the VPS does not block schema pushes after the app image dependencies have been built.
+`make staging-prisma-migrate` builds the Next.js `tooling` Docker stage and runs the local Prisma CLI from that image on the staging Compose network. It does not run `npx prisma` from a blank Node image, so a temporary npm/DNS issue on the VPS does not block migrations after the app image dependencies have been built.
 
 Or directly:
 
@@ -96,13 +95,14 @@ Each environment is started with one ignored runtime env file:
 - `env/stack.staging.env`
 - `env/stack.prod.env`
 
-For staging on a VPS, copy `env/stack.staging.env.example` to `env/stack.staging.env`, fill all `replace_me` values, then restrict local permissions:
+For staging or production on a VPS, copy the matching template, fill all `replace_me` values, then restrict local permissions:
 
 ```bash
 chmod 600 infra/env/stack.staging.env
+chmod 600 infra/env/stack.prod.env
 ```
 
-The staging file contains both regular config and secrets, including:
+The runtime files contain both regular config and secrets, including:
 
 - `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY`
 - `DATABASE_URL`
@@ -118,19 +118,32 @@ Keep `POSTGRES_PASSWORD` aligned with the password embedded in `DATABASE_URL`.
 
 - The Next.js encryption key must be a base64-encoded AES key as documented by Next.js for multi-instance deployments.
 - The database URL must contain the full Postgres connection string on a single line.
-- In staging, secrets are injected through the Compose environment for operational simplicity. This is easier to manage on a single VPS, but the values are visible to Docker metadata for users with Docker access. Treat Docker group access as root-equivalent.
+- Secrets are injected through the Compose environment for operational simplicity. This is easier to manage on a single VPS, but the values are visible to Docker metadata for users with Docker access. Treat Docker group access as root-equivalent.
 
-Templates are present for env files and production secret filenames, but real runtime values should live only in ignored `*.env` and `secrets/**/*.txt` files.
+Templates are present for env files, but real runtime values should live only in ignored `*.env` files.
+
+### Migrating existing runtime volumes
+
+The unified runtime stack uses generic Compose volume keys:
+
+- `postgres_data`
+- `redis_data`
+- `caddy_data`
+- `caddy_config`
+
+Compose still prefixes them with `COMPOSE_PROJECT_NAME`, so staging and production remain isolated. For example, staging uses `universe-staging_postgres_data` while production uses `universe-prod_postgres_data`.
+
+If a previous staging or production deployment already used `postgres_staging_data`, `postgres_prod_data`, or similar environment-specific volume keys, the first `make staging` or `make prod` with `compose.runtime.yml` will create new empty volumes. Copy or rename the old Docker volumes before the first runtime deployment if you need to preserve existing data.
 
 ## S3-compatible storage
 
-Development and staging can use a RustFS bucket through the S3-compatible API.
+Development, staging, and production can use a RustFS bucket through the S3-compatible API.
 
 - `S3_PUBLIC_ENDPOINT`: S3 endpoint reachable by the browser, Next.js, and the audio worker, for example `https://s3.evanhgs.fr`
 - `S3_REGION`: signing region, defaults to `us-east-1`
 - `S3_BUCKET_BEATS`: bucket used for beat audio and images
 - `S3_FORCE_PATH_STYLE`: keep `true` for RustFS-style URLs such as `/bucket/key`
-- `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY`: development and staging read these from `stack.*.env`; production can keep using Docker secrets
+- `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY`: read from the protected `stack.*.env` file
 
 The app does not proxy upload bytes through Next.js. It generates a short-lived presigned `PUT` URL at `/api/storage/uploads/presign`, then the browser uploads directly to RustFS. Public beat thumbnails and audio previews are returned as short-lived presigned `GET` URLs in beat payloads.
 
@@ -147,13 +160,7 @@ The Next.js service now expects these runtime variables from `infra/env/stack.*.
 - `CLERK_SECRET_KEY`: Clerk server secret
 - `CLERK_WEBHOOK_SIGNING_SECRET`: Clerk webhook secret
 
-Stripe marketplace payments use the same environment split:
-
-- Development and staging read `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_AUTOMATIC_TAX_ENABLED` from `infra/env/stack.*.env`.
-- Production reads `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` from Docker secrets:
-  - `infra/secrets/prod/stripe_secret_key.txt`
-  - `infra/secrets/prod/stripe_webhook_secret.txt`
-- `STRIPE_AUTOMATIC_TAX_ENABLED` stays in `stack.*.env` because it is configuration, not a secret.
+Stripe marketplace payments read `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_AUTOMATIC_TAX_ENABLED` from `infra/env/stack.*.env`.
 
 The Stripe webhook endpoint is `/api/webhooks/stripe`. In local development, use Stripe CLI forwarding and copy the printed `whsec_...` value into `STRIPE_WEBHOOK_SECRET`.
 
@@ -191,13 +198,13 @@ The chat unread reminder cron route is instrumented with a Sentry Cron Monitor:
 
 - Development uses one Compose file and one env file for both services.
 - Compose Watch avoids large bind mounts for `node_modules`, and Python development keeps `.venv` inside the image instead of syncing a host virtualenv.
-- Staging and production place a reverse proxy in front of Next.js, which aligns with Next.js self-hosting guidance.
-- The staging stack boots Next.js, internal FastAPI, Postgres, Caddy, and the Rust audio worker together.
-- The production stack boots Next.js, FastAPI, and Caddy together.
-- In staging, Caddy is exposed only in front of Next.js; FastAPI is reachable only on the internal Docker network.
-- Each environment now uses one ignored runtime `stack.*.env` file, with a versioned `stack.*.env.example` template kept alongside it.
+- Staging and production use the same hardened runtime stack, with different protected env files.
+- The runtime stack boots Next.js, internal FastAPI, Postgres, Redis, Caddy, and the Rust audio worker together.
+- Caddy is exposed only in front of Next.js; FastAPI is reachable only on the internal Docker network.
+- Runtime volumes use generic names inside Compose and are isolated by `COMPOSE_PROJECT_NAME`.
+- Each environment uses one ignored runtime `stack.*.env` file, with a compact versioned `stack.*.env.example` template kept alongside it.
 - Hardened stacks use a non-root runtime image, read-only root filesystem, dropped Linux capabilities, `no-new-privileges`, `tmpfs`, health checks, and a graceful shutdown window.
-- Runtime config is injected at container start. Staging favors one protected env file for simple VPS operations; production can mount sensitive values as Docker secrets.
+- Runtime config is injected at container start. Staging is production-mode runtime with explicit diagnostic flags such as `ANALYTICS_TEST_ENABLED=true`; production keeps those flags disabled by default.
 
 ## Notes for future FastAPI and Rust services
 
@@ -207,7 +214,7 @@ Keep the same pattern per service:
 - runtime target for staging/production
 - internal-only service networking
 - proxy publishes ports, app containers do not
-- secrets mounted as files for production, or kept in one protected env file for simpler staging VPS operations
+- secrets kept in one protected env file for simple VPS operations
 - health checks on every dependency, then `depends_on.condition: service_healthy`
 
 ## Start the staging server (fr)
@@ -220,7 +227,7 @@ La je vais partir du principe qu'on teste en local avant de déployer sur un ser
 
 Il nous faudra un environnemenet Clerk, un environnement Stripe, Ngrok et Stripe CLI pour les redirection de webhook en local, un S3 en local ou ailleurs le seul changement est l'endpoint. La bdd et les services rust et python sont gérés dans le compose aussi.
 
-La premiere étape est de copier le fichier staging.env.example choisir ses mdp et changer les valeurs par défaut dans les variables et normalement il restera plus que les variables des webhooks
+La premiere étape est de copier `infra/env/stack.staging.env.example` vers `infra/env/stack.staging.env`, choisir ses mots de passe, remplir les valeurs `replace_me`, puis lancer `chmod 600 infra/env/stack.staging.env`.
 
 Pour le premier webhook de stripe, hyper simple il suffit de lancer `stripe listen --forward-to localhost:3050/api/webhooks/stripe` et le programme nous retourne un signing secret.
 Une version optimisée pour l'essentiel
