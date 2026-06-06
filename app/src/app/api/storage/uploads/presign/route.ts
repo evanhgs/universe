@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { syncCurrentAccountFromClerk } from "@/server/account/account.sync";
 import { PRIVATE_JSON_HEADERS } from "@/server/http/response-headers";
+import { actorFromAccount, assertCan } from "@/server/security/permissions";
 import {
   createPresignedStorageUrl,
   createStorageObjectKey,
@@ -144,11 +145,8 @@ export async function POST(request: Request) {
 
   try {
     const account = await syncCurrentAccountFromClerk();
-    const roles = account.roles.map(({ role }) => role);
 
-    if (!roles.includes("SELLER")) {
-      throw new Error("seller_role_required");
-    }
+    assertCan(actorFromAccount(account), "beat:create");
 
     const limited = await enforceRateLimit({
       request,

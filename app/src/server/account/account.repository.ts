@@ -98,7 +98,7 @@ export async function upsertAccountIdentity(args: {
     displayName: string;
     slug: string;
   };
-  defaultRole: RoleCode;
+  defaultRoles: RoleCode[];
 }) {
   return getPrisma().$transaction(async (tx) => {
     const buildIdentityData = async (targetUserId?: string) => {
@@ -185,11 +185,18 @@ export async function upsertAccountIdentity(args: {
               id: true,
             },
           });
-
-    await tx.userRoleAssignment.createMany({
-      data: [{ userId: user.id, role: args.defaultRole }],
-      skipDuplicates: true,
+    const roleCount = await tx.userRoleAssignment.count({
+      where: {
+        userId: user.id,
+      },
     });
+
+    if (roleCount === 0) {
+      await tx.userRoleAssignment.createMany({
+        data: args.defaultRoles.map((role) => ({ userId: user.id, role })),
+        skipDuplicates: true,
+      });
+    }
 
     await tx.userProfile.upsert({
       where: {
@@ -299,6 +306,43 @@ export async function replaceSelfServiceRolesByClerkUserId(args: {
 
     await tx.userRoleAssignment.createMany({
       data: args.replaceWith.map((role) => ({
+        userId: user.id,
+        role,
+      })),
+      skipDuplicates: true,
+    });
+
+    return tx.user.findUniqueOrThrow({
+      where: { id: user.id },
+      select: accountSelect,
+    });
+  });
+}
+
+/**
+ * Remplace tous les roles d'un compte depuis une source serveur de confiance
+ * comme les metadata privees Clerk ou une future route admin.
+ * @param args.clerkUserId Identifiant Clerk du compte cible.
+ * @param args.roles Roles domaine deja valides.
+ */
+export async function replaceAccountRolesByClerkUserId(args: {
+  clerkUserId: string;
+  roles: RoleCode[];
+}) {
+  return getPrisma().$transaction(async (tx) => {
+    const user = await tx.user.findUniqueOrThrow({
+      where: { clerkUserId: args.clerkUserId },
+      select: { id: true },
+    });
+
+    await tx.userRoleAssignment.deleteMany({
+      where: {
+        userId: user.id,
+      },
+    });
+
+    await tx.userRoleAssignment.createMany({
+      data: args.roles.map((role) => ({
         userId: user.id,
         role,
       })),

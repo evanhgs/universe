@@ -2,6 +2,11 @@ import "server-only";
 
 import { emailService } from "@/server/email/email.service";
 import { syncCurrentAccountFromClerk } from "@/server/account/account.sync";
+import {
+  actorFromAccount,
+  assertCan,
+  getPayoutEligibility,
+} from "@/server/security/permissions";
 import { createProtectedAssetUrl } from "@/server/storage/s3";
 import type Stripe from "stripe";
 
@@ -13,6 +18,7 @@ import {
   findActiveEntitlementForOffering,
   findBuyerOrder,
   findDownloadEntitlement,
+  findLatestKycVerificationForUser,
   findLatestPendingStripePayment,
   findPurchasableOffering,
   findStripePaymentForConfirmation,
@@ -535,11 +541,7 @@ export async function listCurrentBuyerPurchases(clerkUserId: string) {
  */
 export async function listCurrentSellerSales(clerkUserId: string) {
   const account = await assertMarketplaceAccount(clerkUserId);
-  const roles = account.roles.map(({ role }) => role);
-
-  if (!roles.includes("SELLER")) {
-    throw new Error("seller_role_required");
-  }
+  assertCan(actorFromAccount(account), "sellerDashboard:read:own");
 
   const items = await listSellerOrderItems(account.id);
 
@@ -574,18 +576,20 @@ export async function getCurrentSellerDashboard(
   clerkUserId: string,
 ): Promise<SellerDashboardPayload> {
   const account = await assertMarketplaceAccount(clerkUserId);
-  const roles = account.roles.map(({ role }) => role);
+  const actor = actorFromAccount(account);
+  assertCan(actor, "sellerDashboard:read:own");
 
-  if (!roles.includes("SELLER")) {
-    throw new Error("seller_role_required");
-  }
-
-  const [items, beats, paidCounts, ledgerEntries] = await Promise.all([
+  const [items, beats, paidCounts, ledgerEntries, kycVerification] = await Promise.all([
     listSellerOrderItems(account.id),
     listSellerBeats(account.id),
     countPaidSellerOrderItemsByBeat(account.id),
     listSellerRevenueLedgerEntries(account.id),
+    findLatestKycVerificationForUser(account.id),
   ]);
+  const payoutEligibility = getPayoutEligibility(actor, {
+    kycStatus: kycVerification?.status ?? "NOT_STARTED",
+    payoutAccountReady: false,
+  });
   const sales = items.map((item) => ({
     id: item.id,
     orderId: item.orderId,
@@ -656,6 +660,7 @@ export async function getCurrentSellerDashboard(
       processingBeatCount: beats.filter((beat) => beat.status === "PROCESSING").length,
       hiddenBeatCount: beats.filter((beat) => beat.status === "HIDDEN").length,
       revenueByCurrency: Array.from(revenueByCurrency.values()),
+      payoutEligibility,
     },
     beats: beats.map((beat) => ({
       id: beat.id,

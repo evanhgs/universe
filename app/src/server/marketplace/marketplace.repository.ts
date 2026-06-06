@@ -699,6 +699,26 @@ export async function listSellerRevenueLedgerEntries(sellerId: string) {
 }
 
 /**
+ * Charge la derniere verification KYC d'un utilisateur pour l'eligibilite payout.
+ * @param userId Identifiant utilisateur interne.
+ */
+export async function findLatestKycVerificationForUser(userId: string) {
+  return getPrisma().kycVerification.findFirst({
+    where: {
+      userId,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    select: {
+      status: true,
+      reviewedAt: true,
+      expiresAt: true,
+    },
+  });
+}
+
+/**
  * Charge un entitlement actif appartenant a un acheteur avec ses assets telechargeables.
  * @param args.entitlementId Identifiant du droit d'achat.
  * @param args.buyerId Identifiant utilisateur interne acheteur.

@@ -49,7 +49,7 @@ function mutationErrorResponse(error: unknown) {
         : 400;
   const message =
     code === "beat_forbidden"
-      ? "You do not have permission to modify this beat."
+      ? "You do not have permissions to modify this beat."
       : code === "seller_role_required"
         ? "A seller account is required to modify beats."
       : code === "beat_asset_duplicate"

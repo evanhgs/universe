@@ -41,6 +41,12 @@ type SalesResponse = {
       platformCommissionAmount: number;
       sellerEarningAmount: number;
     }>;
+    payoutEligibility?: {
+      canReceivePayouts: boolean;
+      kycStatus: string | null;
+      payoutAccountReady: boolean;
+      reason: string | null;
+    };
   };
   beats?: SellerBeat[];
 };
@@ -159,6 +165,30 @@ function errorMessage(error: string) {
   }
 
   return error;
+}
+
+/**
+ * Traduit l'etat payout en message actionnable pour le vendeur.
+ * @param reason Code serveur d'eligibilite payout.
+ */
+function payoutStatusLabel(reason: string | null | undefined) {
+  if (reason === null) {
+    return "Retraits disponibles";
+  }
+
+  if (reason === "PENDING_KYC") {
+    return "Verification d'identite requise avant retrait";
+  }
+
+  if (reason === "PAYOUT_ACCOUNT_REQUIRED") {
+    return "Compte de retrait a configurer";
+  }
+
+  if (reason === "ACCOUNT_NOT_ACTIVE") {
+    return "Compte inactif";
+  }
+
+  return "Retrait indisponible";
 }
 
 /**
@@ -344,6 +374,23 @@ export function SalesClient() {
             {summary?.hiddenBeatCount ?? beats.filter((beat) => beat.status === "HIDDEN").length}
           </p>
         </article>
+      </section>
+
+      <section className="mt-4 border border-border bg-card p-5">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              {payoutStatusLabel(summary?.payoutEligibility?.reason)}
+            </p>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              Tu peux publier et vendre maintenant. Les revenus restent comptabilises ici; le retrait
+              demande une identite verifiee et un compte payout pret.
+            </p>
+          </div>
+          <span className="inline-flex w-fit border border-border px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+            {summary?.payoutEligibility?.canReceivePayouts ? "Payout ready" : "Payout bloque"}
+          </span>
+        </div>
       </section>
 
       {sales.length === 0 && !error ? (

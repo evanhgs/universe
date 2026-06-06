@@ -1,6 +1,7 @@
 import "server-only";
 
 import { syncCurrentAccountFromClerk } from "@/server/account/account.sync";
+import { actorFromAccount, assertCan } from "@/server/security/permissions";
 import { getPublicAssetUrl } from "@/server/storage/s3";
 
 import type { AssetType } from "../../../generated/prisma/enums";
@@ -153,11 +154,7 @@ async function assertSellerAccount(clerkUserId: string) {
     throw new Error("account_not_found");
   }
 
-  const roles = account.roles.map(({ role }) => role);
-
-  if (!roles.includes("SELLER")) {
-    throw new Error("seller_role_required");
-  }
+  assertCan(actorFromAccount(account), "beat:create");
 
   return account;
 }

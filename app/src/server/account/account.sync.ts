@@ -2,7 +2,7 @@ import "server-only";
 
 import { currentUser } from "@clerk/nextjs/server";
 
-import { DEFAULT_ACCOUNT_ROLE, PROFILE_SLUG_PATTERN } from "./account.constants";
+import { DEFAULT_ACCOUNT_ROLES, PROFILE_SLUG_PATTERN } from "./account.constants";
 import {
   findAccountByEmail,
   findAccountByProfileSlug,
@@ -130,7 +130,7 @@ export function normalizeClerkAccount(user: {
 export async function syncAccountFromNormalizedClerkData(account: NormalizedClerkAccount) {
   return upsertAccountIdentity({
     ...account,
-    defaultRole: DEFAULT_ACCOUNT_ROLE,
+    defaultRoles: [...DEFAULT_ACCOUNT_ROLES],
     profileDefaults: {
       displayName: buildDisplayName(account),
       slug: await buildUniqueProfileSlug(account),
