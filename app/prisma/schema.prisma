@@ -143,6 +143,7 @@ enum MessageType {
 enum ModerationStatus {
   CLEAN
   FLAGGED
+  RESTRICTED
   BLOCKED
 }
 
@@ -161,8 +162,8 @@ enum SubscriptionStatus {
 }
 
 enum ReviewTargetType {
-  SELLER
-  BUYER
+  CERTIFIED_SELLER // change pour un nouveau terme car tout le monde peut vendre sans vérification, maintenant ce role sert uniquement pour plus tard lors des versements stripe il devra etre certifié par l'équipe de modération
+  BUYER // become the classic user with permission to sell
   ENGINEER
   BEAT
 }
@@ -227,6 +228,248 @@ enum AnalyticsEventType {
   SEARCH
   MESSAGE_SELLER
 }
+
+enum MainGenres {
+  RAP
+  HIP_HOP
+  R_AND_B
+  POP
+  AFRO
+  DANCEHALL
+  REGGAETON
+  ELECTRONIC_EDM
+  HOUSE
+  TECHNO
+  DRILL
+  TRAP
+  BOOM_BAP
+  LO_FI
+  SOUL
+  FUNK
+  JAZZ
+  ROCK
+  ALTERNATIVE
+  LATIN
+  K_POP_J_POP
+  GOSPEL
+  CINEMATIC_TRAILER
+  AMBIENT
+  PHONK
+  HYPERPOP
+  JERSEY_CLUB
+  AMAPIANO
+  UK_GARAGE
+  GRIME
+  DUBSTEP
+  DRUM_AND_BASS
+  EXPERIMENTAL
+}
+
+enum SecondGenres {
+  // Pour le rap / hip-hop
+  TRAP
+  DARK_TRAP
+  MELODIC_TRAP
+  PLUGGNB
+  DRILL
+  UK_DRILL
+  NY_DRILL
+  BOOM_BAP
+  OLD_SCHOOL
+  WEST_COAST
+  EAST_COAST
+  CLOUD_RAP
+  LO_FI_RAP
+  EMO_RAP
+  RAGE
+  JERK
+  PLUGG
+  PHONK
+  MEMPHIS_RAP
+  JERSEY_CLUB_RAP
+  GRIME
+  RAP_CONSCIENT
+  FREESTYLE_BEAT
+
+  // Pour R&B / Pop :
+  R_AND_B_MODERNE
+  ALTERNATIVE_R_AND_B
+  TRAP_SOUL
+  NEO_SOUL
+  POP_RAP
+  POP_URBAINE
+  INDIE_POP
+  SYNTH_POP
+  DARK_POP
+  AFRO_POP
+  LATIN_POP
+  K_POP_STYLE
+  J_POP_STYLE
+
+  // Pour Afro / Dancehall / Latin :
+  AFROBEATS
+  AFROTRAP
+  AMAPIANO
+  KIZOMBA
+  ZOUK
+  DANCEHALL
+  REGGAETON
+  DEMBOW
+  BAILE_FUNK
+  MOOMBAHTON
+  SOCA
+  KOMPA
+
+  // Pour électronique :
+  HOUSE
+  DEEP_HOUSE
+  TECH_HOUSE
+  AFRO_HOUSE
+  FUTURE_HOUSE
+  TECHNO
+  MELODIC_TECHNO
+  TRANCE
+  DUBSTEP
+  DRUM_AND_BASS
+  GARAGE
+  UK_GARAGE
+  JUNGLE
+  HARDSTYLE
+  SYNTHWAVE
+  CHILLWAVE
+  AMBIENT_ELECTRONIC
+}
+
+enum Moods {
+  DARK
+  SAD
+  MELOANCHOLIC
+  EMOTIONAL
+  ROMANTIC
+  CHILL
+  SMOOTH
+  DREAMY
+  ENERGETIC
+  AGGRESSIVE
+  EPIC
+  CINEMATIC
+  HAPPY
+  SUMMER
+  NOSTALGIC
+  LUXURY
+  SEXY
+  SPIRITUAL
+  MOTIVATIONAL
+  INSPIRATIONAL
+  ANGRY
+  MYSTERIOUS
+  MINIMAL
+  BOUNCY
+  HARD
+  SOFT
+  COLD
+  WARM
+  EUPHORIC
+  HYPNOTIC
+  STREET
+  GANGSTA
+  CLUB
+  UNDERGROUND
+  EXPERIMENTAL
+  VINTAGE
+  FUTURISTIC
+}
+
+enum Tags {
+  // Instruments
+  INSTRUMENTS_808
+  KICK
+  SNARE
+  CLAP
+  HI_HATS
+  OPEN_HAT
+  PIANO
+  GUITAR
+  ELECTRIC_GUITAR
+  ACOUSTIC_GUITAR
+  STRINGS
+  VIOLIN
+  BRASS
+  CHOIR
+  SYNTH
+  PAD
+  PLUCK
+  BELL
+  FLUTE
+  SAXOPHONE
+  BASS
+  SUB_BASS
+  ORGAN
+  RHODES
+  MALLETS
+  ETHNIC_INSTRUMENTS
+  VOCAL_CHOPS
+  SAMPLE
+
+  // Rhythm / groove
+  BOUNCY
+  SWING
+  STRAIGHT
+  SYNCOPATED
+  GROOVY
+  MINIMAL_DRUMS
+  HEAVY_DRUMS
+  FAST_HI_HATS
+  DRILL_BOUNCE
+  TRAP_BOUNCE
+  FOUR_ON_THE_FLOOR
+  SHUFFLE
+  HALF_TIME
+  DOUBLE_TIME
+
+  // Mix / texture
+  CLEAN
+  DIRTY
+  DISTORTED
+  WARM
+  ANALOG
+  LO_FI
+  WIDE
+  AMBIENT
+  REVERB_HEAVY
+  DRY
+  PUNCHY
+  SOFT
+  CRISP
+  VINTAGE
+  FUTURISTIC
+}
+
+enum UsageTags {
+  FREESTYLE
+  STORYTELLING
+  CLUB
+  RADIO
+  SAD_SONG
+  LOVE_SONG
+  DRILL_SONG
+  TRAP_BANGER
+  MELODIC_RAP
+  STREET_RAP
+  COMMERCIAL
+  INTRO
+  OUTRO
+  TYPE_BEAT
+  SYNC_LICENSING
+  YOUTUBE
+  TIKTOK
+  FILM
+  TRAILER
+  GAMING
+  PODCAST
+  ADVERTISING
+}
+
 
 /// -------------------------
 /// CORE IDENTITY
@@ -365,7 +608,6 @@ model BeatAssetLink {
   @@index([licenseOfferingId])
 }
 
-/// -------------------------
 /// CATALOG / BEATS
 /// -------------------------
 
@@ -380,9 +622,12 @@ model Beat {
   durationSec          Int?
   basePriceAmount      Decimal?  @db.Decimal(10,2)
   currency             String    @default("EUR")
-  primaryGenre         String?
-  primaryMood          String?
-  tags                 String[]
+  mainGenres           MainGenres[] @default([])
+  secondGenres         SecondGenres[] @default([])
+  moods                Moods[] @default([])
+  tags                 Tags[] @default([])
+  usageTags            UsageTags[] @default([])
+  bpmFeel              String?
   status               BeatStatus @default(DRAFT)
   visibility           Visibility @default(PUBLIC)
   moderationStatus     ModerationStatus @default(CLEAN)
@@ -411,7 +656,7 @@ model Beat {
 
   @@index([ownerId, status, publishedAt])
   @@index([status, visibility, publishedAt])
-  @@index([primaryGenre, publishedAt])
+  @@index([status, visibility, moderationStatus, publishedAt])
 }
 
 model AudioProcessingJob {

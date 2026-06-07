@@ -64,8 +64,12 @@ export type BeatScoringInput = {
   title: string;
   description: string | null;
   tags: string[];
+  usageTags: string[];
   genre: string | null;
+  genres: string[];
+  secondGenres: string[];
   mood: string | null;
+  moods: string[];
   bpm: number | null;
   musicalKey: string | null;
   priceAmount: number | null;

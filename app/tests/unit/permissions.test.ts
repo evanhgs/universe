@@ -14,11 +14,19 @@ const activeSeller: Actor = {
   status: "ACTIVE",
   roles: ["BUYER", "SELLER"],
 };
+const activeBuyer: Actor = {
+  id: "user_buyer",
+  clerkUserId: "clerk_buyer",
+  status: "ACTIVE",
+  roles: ["BUYER"],
+};
 
 describe("permissions", () => {
-  it("allows an active seller to publish without KYC", () => {
+  it("allows any active authenticated account to publish without KYC", () => {
     expect(can(activeSeller, "beat:create")).toBe(true);
+    expect(can(activeBuyer, "beat:create")).toBe(true);
     expect(can(activeSeller, "sellerDashboard:read:own")).toBe(true);
+    expect(can(activeBuyer, "sellerDashboard:read:own")).toBe(false);
   });
 
   it("uses resource attributes for own beat mutations", () => {
@@ -47,7 +55,7 @@ describe("permissions", () => {
     ).toMatchObject({
       allowed: true,
       effect: "allow",
-      matchedPolicyIds: ["allow-seller-beat-create"],
+      matchedPolicyIds: ["allow-active-beat-create"],
     });
   });
 

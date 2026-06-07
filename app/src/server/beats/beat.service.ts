@@ -91,9 +91,13 @@ export async function serializeBeat(beat: BeatRecord): Promise<BeatApiPayload> {
     durationSec: beat.durationSec,
     priceAmount: decimalToNumber(beat.basePriceAmount),
     currency: beat.currency,
-    primaryGenre: beat.primaryGenre,
-    primaryMood: beat.primaryMood,
+    primaryGenre: beat.mainGenres[0] ?? null,
+    primaryMood: beat.moods[0] ?? null,
+    mainGenres: beat.mainGenres,
+    secondGenres: beat.secondGenres,
+    moods: beat.moods,
     tags: beat.tags,
+    usageTags: beat.usageTags,
     status: beat.status,
     visibility: beat.visibility,
     isFree: beat.isFree,
@@ -160,7 +164,7 @@ async function assertSellerAccount(clerkUserId: string) {
 }
 
 /**
- * Cree un beat pour le vendeur authentifie.
+ * Cree un beat. A la place un simple check pour voir si le compte n'est pas restreint par la modération
  * @param clerkUserId Identifiant Clerk de la session.
  * @param input Donnees de creation validees.
  */
@@ -171,6 +175,7 @@ export async function createBeatForCurrentSeller(clerkUserId: string, input: Cre
 }
 
 /**
+ * TODO: ajouter la pagination dans le marketplace 20 / 35 / 50
  * Liste les beats publics sous forme de payloads API.
  * @param query Filtres catalogue valides.
  */

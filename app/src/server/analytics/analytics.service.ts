@@ -332,6 +332,27 @@ function normalizeMap(value: unknown): TasteMap {
   );
 }
 
+function normalizedMetadataValues(values: Array<string | null | undefined>) {
+  return Array.from(
+    new Set(
+      values
+        .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+        .map((value) => value.toLowerCase()),
+    ),
+  );
+}
+
+function intersectionRatio(left: string[], right: string[]) {
+  if (left.length === 0 || right.length === 0) {
+    return 0;
+  }
+
+  const rightValues = new Set(right.map((value) => value.toLowerCase()));
+  const common = normalizedMetadataValues(left).filter((value) => rightValues.has(value));
+
+  return common.length / Math.max(left.length, right.length);
+}
+
 export function computeKeywordScore(userProfile: UserTasteProfileInput | null, beat: BeatScoringInput) {
   if (!userProfile) {
     return 0;
@@ -340,18 +361,18 @@ export function computeKeywordScore(userProfile: UserTasteProfileInput | null, b
   let score = 0;
   let maxScore = 1;
 
-  for (const tag of beat.tags) {
+  for (const tag of normalizedMetadataValues([...beat.tags, ...beat.usageTags])) {
     score += userProfile.favoriteTags[tag.toLowerCase()] ?? 0;
     maxScore += 1;
   }
 
-  if (beat.genre) {
-    score += userProfile.favoriteGenres[beat.genre.toLowerCase()] ?? 0;
+  for (const genre of normalizedMetadataValues([beat.genre, ...beat.genres, ...beat.secondGenres])) {
+    score += userProfile.favoriteGenres[genre] ?? 0;
     maxScore += 1;
   }
 
-  if (beat.mood) {
-    score += userProfile.favoriteMoods[beat.mood.toLowerCase()] ?? 0;
+  for (const mood of normalizedMetadataValues([beat.mood, ...beat.moods])) {
+    score += userProfile.favoriteMoods[mood] ?? 0;
     maxScore += 1;
   }
 
@@ -372,16 +393,26 @@ export function computeSimilarityScore(userLikedBeats: BeatScoringInput[], candi
   const bestScore = userLikedBeats.reduce((best, likedBeat) => {
     let score = 0;
 
-    if (likedBeat.genre && likedBeat.genre === candidateBeat.genre) score += 0.3;
+    const genreSimilarity = intersectionRatio(
+      normalizedMetadataValues([likedBeat.genre, ...likedBeat.genres, ...likedBeat.secondGenres]),
+      normalizedMetadataValues([candidateBeat.genre, ...candidateBeat.genres, ...candidateBeat.secondGenres]),
+    );
+    const moodSimilarity = intersectionRatio(
+      normalizedMetadataValues([likedBeat.mood, ...likedBeat.moods]),
+      normalizedMetadataValues([candidateBeat.mood, ...candidateBeat.moods]),
+    );
+    const tagSimilarity = intersectionRatio(
+      normalizedMetadataValues([...likedBeat.tags, ...likedBeat.usageTags]),
+      normalizedMetadataValues([...candidateBeat.tags, ...candidateBeat.usageTags]),
+    );
+
+    score += genreSimilarity * 0.3;
+    score += moodSimilarity * 0.15;
     if (likedBeat.bpm && candidateBeat.bpm && Math.abs(likedBeat.bpm - candidateBeat.bpm) <= 10) {
       score += 0.2;
     }
     if (likedBeat.musicalKey && likedBeat.musicalKey === candidateBeat.musicalKey) score += 0.1;
-
-    const candidateTags = new Set(candidateBeat.tags);
-    const commonTags = likedBeat.tags.filter((tag) => candidateTags.has(tag));
-
-    score += Math.min(commonTags.length * 0.1, 0.4);
+    score += tagSimilarity * 0.25;
 
     return Math.max(best, score);
   }, 0);
@@ -481,8 +512,12 @@ function toBeatScoringInput(candidate: BeatCandidate): BeatScoringInput {
     title: candidate.title,
     description: candidate.description,
     tags: candidate.tags,
-    genre: candidate.primaryGenre,
-    mood: candidate.primaryMood,
+    usageTags: candidate.usageTags,
+    genre: candidate.mainGenres[0] ?? null,
+    genres: candidate.mainGenres,
+    secondGenres: candidate.secondGenres,
+    mood: candidate.moods[0] ?? null,
+    moods: candidate.moods,
     bpm: candidate.bpm,
     musicalKey: candidate.musicalKey,
     priceAmount: decimalToNumber(candidate.basePriceAmount),
@@ -763,9 +798,11 @@ export async function recomputeUserTasteProfile(userId: string) {
     include: {
       beat: {
         select: {
-          primaryGenre: true,
-          primaryMood: true,
+          mainGenres: true,
+          secondGenres: true,
+          moods: true,
           tags: true,
+          usageTags: true,
           bpm: true,
         },
       },
@@ -786,10 +823,15 @@ export async function recomputeUserTasteProfile(userId: string) {
       | undefined;
     const weight = eventName ? Math.max(EVENT_WEIGHTS[eventName], 0.5) : 1;
 
-    addWeightedCount(genres, event.beat.primaryGenre, weight);
-    addWeightedCount(moods, event.beat.primaryMood, weight);
+    for (const genre of [...event.beat.mainGenres, ...event.beat.secondGenres]) {
+      addWeightedCount(genres, genre, weight);
+    }
 
-    for (const tag of event.beat.tags) {
+    for (const mood of event.beat.moods) {
+      addWeightedCount(moods, mood, weight);
+    }
+
+    for (const tag of [...event.beat.tags, ...event.beat.usageTags]) {
       addWeightedCount(tags, tag, weight);
     }
 

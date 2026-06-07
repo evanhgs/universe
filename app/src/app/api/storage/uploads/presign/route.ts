@@ -114,7 +114,7 @@ function extensionFromFilename(filename: string) {
 function errorResponse(error: unknown) {
   const message = error instanceof Error ? error.message : "Unknown error.";
   const status =
-    message === "seller_role_required"
+    message === "account_not_active"
       ? 403
       : message === "unauthorized"
         ? 401

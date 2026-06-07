@@ -1,6 +1,16 @@
 import "server-only";
 
-import type { AssetType, BeatStatus, LicenseScope, Visibility } from "../../../generated/prisma/enums";
+import type {
+  AssetType,
+  BeatStatus,
+  LicenseScope,
+  MainGenres,
+  Moods,
+  SecondGenres,
+  Tags,
+  UsageTags,
+  Visibility,
+} from "../../../generated/prisma/enums";
 
 export type BeatAssetInput = {
   bucket: string;
@@ -17,9 +27,11 @@ export type CreateBeatInput = {
   description?: string | null;
   priceAmount: number;
   currency: string;
-  primaryGenre?: string | null;
-  primaryMood?: string | null;
-  tags: string[];
+  mainGenres: MainGenres[];
+  secondGenres: SecondGenres[];
+  moods: Moods[];
+  tags: Tags[];
+  usageTags: UsageTags[];
   bpm?: number | null;
   musicalKey?: string | null;
   visibility: Visibility;
@@ -38,9 +50,11 @@ export type UpdateBeatInput = Partial<
     | "description"
     | "priceAmount"
     | "currency"
-    | "primaryGenre"
-    | "primaryMood"
+    | "mainGenres"
+    | "secondGenres"
+    | "moods"
     | "tags"
+    | "usageTags"
     | "bpm"
     | "musicalKey"
     | "visibility"
@@ -85,7 +99,11 @@ export type BeatApiPayload = {
   currency: string;
   primaryGenre: string | null;
   primaryMood: string | null;
+  mainGenres: MainGenres[];
+  secondGenres: SecondGenres[];
+  moods: Moods[];
   tags: string[];
+  usageTags: UsageTags[];
   status: BeatStatus;
   visibility: Visibility;
   isFree: boolean;
@@ -104,15 +122,15 @@ export type BeatApiPayload = {
 
 export type BeatListQuery = {
   search?: string;
-  genre?: string;
-  mood?: string;
+  genre?: MainGenres;
+  mood?: Moods;
   bpm?: number;
   bpmMin?: number;
   bpmMax?: number;
   key?: string;
   priceMin?: number;
   priceMax?: number;
-  tags?: string[];
+  tags?: Tags[];
   producer?: string;
   sellerSlug?: string;
   licenseType?: LicenseScope;

@@ -77,7 +77,7 @@ type Policy = {
 };
 
 const DEFAULT_PERMISSION_ERROR: Record<Permission, string> = {
-  "beat:create": "seller_role_required",
+  "beat:create": "account_not_active",
   "beat:update:own": "beat_forbidden",
   "beat:delete:own": "beat_forbidden",
   "sellerDashboard:read:own": "seller_role_required",
@@ -159,17 +159,17 @@ const POLICIES = [
       (hasRole(subject, "BUYER") || hasRole(subject, "SELLER") || hasRole(subject, "ENGINEER")),
   },
   {
-    id: "allow-seller-beat-create",
+    id: "allow-active-beat-create",
     effect: "allow",
     actions: ["beat:create"],
-    condition: ({ subject }) => isActive(subject) && hasRole(subject, "SELLER"),
+    condition: ({ subject }) => isActive(subject),
   },
   {
-    id: "allow-seller-own-beat-write",
+    id: "allow-active-owner-beat-write",
     effect: "allow",
     actions: ["beat:update:own", "beat:delete:own"],
     condition: ({ subject, resource }) =>
-      isActive(subject) && hasRole(subject, "SELLER") && resource.kind === "beat" && owns(subject, resource),
+      isActive(subject) && resource.kind === "beat" && owns(subject, resource),
   },
   {
     id: "allow-seller-own-dashboard",

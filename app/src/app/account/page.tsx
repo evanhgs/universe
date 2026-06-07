@@ -29,10 +29,10 @@ export default async function AccountPage() {
           Compte
         </p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground">
-          Connecte-toi pour gerer ton profil.
+          {"Connecte-toi pour gérer ton profil."}
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-          Le header ouvre Clerk pour la connexion et Universe charge ensuite ton profil local.
+          {"Le header ouvre Clerk pour la connexion et Universe charge ensuite ton profil local."}
         </p>
       </main>
     );
@@ -141,9 +141,9 @@ export default async function AccountPage() {
 
       <Card className="mt-8">
         <CardHeader>
-          <CardTitle>Preferences d&apos;interface</CardTitle>
+          <CardTitle>{"Préférences d'interface"}</CardTitle>
           <CardDescription>
-            Le theme reste stocke dans ce navigateur et suit l&apos;ordinateur par defaut.
+            {"Le thème reste stocké dans ce navigateur et suit l'ordinateur par defaut."}
           </CardDescription>
         </CardHeader>
         <CardContent>

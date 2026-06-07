@@ -4,7 +4,17 @@ import { getPrisma } from "@/lib/prisma";
 import { createStorageObjectKey } from "@/server/storage/s3";
 
 import { Prisma } from "../../../generated/prisma/client";
-import type { AssetType, LicenseScope, ProcessingStatus } from "../../../generated/prisma/enums";
+import {
+  MainGenres,
+  Moods,
+  Tags,
+  type AssetType,
+  type LicenseScope,
+  type MainGenres as MainGenre,
+  type Moods as Mood,
+  type ProcessingStatus,
+  type Tags as Tag,
+} from "../../../generated/prisma/enums";
 import {
   BEAT_SLUG_PATTERN,
   DEFAULT_BASIC_LICENSE_CODE,
@@ -41,6 +51,9 @@ const beatInclude = {
 } as const;
 
 const DUPLICATE_BEAT_ASSET_ERROR = "beat_asset_duplicate";
+const searchableMainGenres = new Set<string>(Object.values(MainGenres));
+const searchableMoods = new Set<string>(Object.values(Moods));
+const searchableTags = new Set<string>(Object.values(Tags));
 
 /**
  * Transforme un titre en slug beat compatible avec BEAT_SLUG_PATTERN.
@@ -295,9 +308,11 @@ export async function createBeat(ownerId: string, input: CreateBeatInput) {
         musicalKey: input.musicalKey,
         basePriceAmount: input.priceAmount,
         currency: input.currency,
-        primaryGenre: input.primaryGenre,
-        primaryMood: input.primaryMood,
+        mainGenres: input.mainGenres,
+        secondGenres: input.secondGenres,
+        moods: input.moods,
         tags: input.tags,
+        usageTags: input.usageTags,
         status: createdStatus,
         visibility: input.visibility,
         isFree: input.isFree,
@@ -492,6 +507,16 @@ export async function findPublishedBeats(query: BeatListQuery) {
           : query.sort === "bpm_desc"
             ? [{ bpm: "desc" as const }, { publishedAt: "desc" as const }]
             : [{ publishedAt: "desc" as const }, { createdAt: "desc" as const }];
+  const normalizedSearch = query.search?.trim().toUpperCase();
+  const searchGenre = normalizedSearch && searchableMainGenres.has(normalizedSearch)
+    ? (normalizedSearch as MainGenre)
+    : null;
+  const searchMood = normalizedSearch && searchableMoods.has(normalizedSearch)
+    ? (normalizedSearch as Mood)
+    : null;
+  const searchTag = normalizedSearch && searchableTags.has(normalizedSearch)
+    ? (normalizedSearch as Tag)
+    : null;
 
   return getPrisma().beat.findMany({
     where: {
@@ -503,15 +528,17 @@ export async function findPublishedBeats(query: BeatListQuery) {
             OR: [
               { title: { contains: query.search, mode: "insensitive" } },
               { description: { contains: query.search, mode: "insensitive" } },
-              { tags: { has: query.search.toLowerCase() } },
+              ...(searchGenre ? [{ mainGenres: { has: searchGenre } }] : []),
+              ...(searchMood ? [{ moods: { has: searchMood } }] : []),
+              ...(searchTag ? [{ tags: { has: searchTag } }] : []),
             ],
           }
         : {}),
       ...(query.genre
-        ? { primaryGenre: { equals: query.genre, mode: "insensitive" } }
+        ? { mainGenres: { has: query.genre } }
         : {}),
       ...(query.mood
-        ? { primaryMood: { equals: query.mood, mode: "insensitive" } }
+        ? { moods: { has: query.mood } }
         : {}),
       ...(query.bpm ? { bpm: query.bpm } : {}),
       ...(query.bpmMin !== undefined || query.bpmMax !== undefined
@@ -708,9 +735,11 @@ export async function updateBeatBySlug(ownerId: string, slug: string, input: Upd
           : {}),
         ...(priceAmount !== undefined ? { basePriceAmount: priceAmount } : {}),
         ...(input.currency !== undefined ? { currency: input.currency } : {}),
-        ...(input.primaryGenre !== undefined ? { primaryGenre: input.primaryGenre } : {}),
-        ...(input.primaryMood !== undefined ? { primaryMood: input.primaryMood } : {}),
+        ...(input.mainGenres !== undefined ? { mainGenres: input.mainGenres } : {}),
+        ...(input.secondGenres !== undefined ? { secondGenres: input.secondGenres } : {}),
+        ...(input.moods !== undefined ? { moods: input.moods } : {}),
         ...(input.tags !== undefined ? { tags: input.tags } : {}),
+        ...(input.usageTags !== undefined ? { usageTags: input.usageTags } : {}),
         ...(input.bpm !== undefined ? { bpm: input.bpm } : {}),
         ...(input.musicalKey !== undefined ? { musicalKey: input.musicalKey } : {}),
         ...(input.visibility !== undefined ? { visibility: input.visibility } : {}),

@@ -157,8 +157,8 @@ async function buildAnalyticsSnapshot() {
             id: true,
             slug: true,
             title: true,
-            primaryGenre: true,
-            primaryMood: true,
+            mainGenres: true,
+            moods: true,
             bpm: true,
             owner: {
               select: {
@@ -184,7 +184,7 @@ async function buildAnalyticsSnapshot() {
             id: true,
             slug: true,
             title: true,
-            primaryGenre: true,
+            mainGenres: true,
             owner: {
               select: {
                 profile: {
@@ -307,8 +307,8 @@ async function buildAnalyticsSnapshot() {
       title: item.beat.title,
       slug: item.beat.slug,
       seller: item.beat.owner.profile?.displayName ?? item.beat.owner.profile?.slug ?? "Vendeur",
-      genre: item.beat.primaryGenre,
-      mood: item.beat.primaryMood,
+      genre: item.beat.mainGenres[0] ?? null,
+      mood: item.beat.moods[0] ?? null,
       bpm: item.beat.bpm,
       reason: item.reason,
       organicScore: decimalToNumber(item.organicScore),
@@ -341,7 +341,7 @@ async function buildAnalyticsSnapshot() {
       title: item.beat.title,
       slug: item.beat.slug,
       seller: item.beat.owner.profile?.displayName ?? item.beat.owner.profile?.slug ?? "Vendeur",
-      genre: item.beat.primaryGenre,
+      genre: item.beat.mainGenres[0] ?? null,
       impressions: item.impressions,
       plays: item.plays,
       fullPlays: item.fullPlays,

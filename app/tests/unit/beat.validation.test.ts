@@ -15,6 +15,14 @@ const audioAsset = {
   extension: "wav",
   sizeBytes: 1024,
 };
+const thumbnailAsset = {
+  bucket: "beats",
+  objectKey: "uploads/thumb.webp",
+  originalFilename: "thumb.webp",
+  mimeType: "image/webp",
+  extension: "webp",
+  sizeBytes: 2048,
+};
 
 describe("beat validation", () => {
   it("creates a normalized beat with a default basic license", () => {
@@ -23,16 +31,25 @@ describe("beat validation", () => {
         title: " First Beat ",
         priceAmount: "19.999",
         currency: "eur",
-        tags: [" Trap ", "trap", " Drill "],
+        mainGenres: [" trap ", "DRILL"],
+        secondGenres: ["DARK_TRAP"],
+        moods: ["Dark", "ENERGETIC"],
+        tags: [" Piano ", "PIANO", "SYNTH"],
+        usageTags: ["type_beat"],
         bpm: "140",
         publish: true,
         audioAsset,
+        thumbnailAsset,
       }),
     ).toMatchObject({
       title: "First Beat",
       priceAmount: 20,
       currency: "EUR",
-      tags: ["trap", "drill"],
+      mainGenres: ["TRAP", "DRILL"],
+      secondGenres: ["DARK_TRAP"],
+      moods: ["DARK", "ENERGETIC"],
+      tags: ["PIANO", "SYNTH"],
+      usageTags: ["TYPE_BEAT"],
       bpm: 140,
       publish: true,
       isFree: false,
@@ -69,6 +86,37 @@ describe("beat validation", () => {
     ).toThrow("previewAsset is generated automatically.");
   });
 
+  it("validates enum metadata limits and subgenre compatibility", () => {
+    expect(() =>
+      parseCreateBeatInput({
+        title: "Too many genres",
+        priceAmount: 10,
+        audioAsset,
+        mainGenres: ["TRAP", "DRILL", "POP", "AFRO"],
+      }),
+    ).toThrow("mainGenres cannot contain more than 3 values.");
+
+    expect(() =>
+      parseCreateBeatInput({
+        title: "Bad metadata",
+        priceAmount: 10,
+        audioAsset,
+        mainGenres: ["POP"],
+        secondGenres: ["UK_DRILL"],
+      }),
+    ).toThrow("secondGenres contains a value incompatible with mainGenres.");
+
+    expect(() =>
+      parseCreateBeatInput({
+        title: "Published without thumbnail",
+        priceAmount: 10,
+        publish: true,
+        audioAsset,
+        mainGenres: ["TRAP"],
+      }),
+    ).toThrow("thumbnailAsset is required to publish.");
+  });
+
   it("validates explicit license offerings", () => {
     expect(() =>
       parseCreateBeatInput({
@@ -103,7 +151,7 @@ describe("beat validation", () => {
     expect(
       parseBeatListQuery(
         new URL(
-          "https://example.com/beats?tags=Trap,Drill&sort=price_desc&limit=100&sellerSlug=prod&licenseType=basic",
+          "https://example.com/beats?tags=Piano,Synth&sort=price_desc&limit=100&sellerSlug=prod&licenseType=basic",
         ),
       ),
     ).toEqual({
@@ -118,7 +166,7 @@ describe("beat validation", () => {
       priceMax: undefined,
       producer: undefined,
       sellerSlug: "prod",
-      tags: ["trap", "drill"],
+      tags: ["PIANO", "SYNTH"],
       licenseType: "BASIC",
       sort: "price_desc",
       limit: 50,
