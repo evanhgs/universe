@@ -1,13 +1,29 @@
 "use client";
 
-import { FileAudio, ImagePlus, Plus, Trash2, UploadCloud } from "lucide-react";
+import {
+  ChevronDown,
+  FileAudio,
+  Filter,
+  ImagePlus,
+  Pencil,
+  Plus,
+  Trash2,
+  UploadCloud,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -246,38 +262,211 @@ function MetadataChecklist<T extends string>({
   disabledValues?: readonly T[];
   onChange: (values: T[]) => void;
 }) {
+  const [isOpen, setIsOpen] = useState(title === "Genres principaux");
+  const [query, setQuery] = useState("");
+  const [sortAlpha, setSortAlpha] = useState(false);
   const disabledSet = new Set(disabledValues);
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleValues = useMemo(() => {
+    const filtered = values.filter((value) =>
+      labelForBeatMetadata(value).toLowerCase().includes(normalizedQuery),
+    );
+
+    return sortAlpha
+      ? [...filtered].sort((a, b) =>
+          labelForBeatMetadata(a).localeCompare(labelForBeatMetadata(b), "fr"),
+        )
+      : filtered;
+  }, [normalizedQuery, sortAlpha, values]);
 
   return (
-    <div className="rounded-lg border border-border">
-      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-        <p className="text-sm font-medium text-foreground">{title}</p>
-        <Badge variant={selected.length >= limit ? "warning" : "muted"}>
+    <div className="overflow-hidden rounded-lg border border-foreground/15 bg-card shadow-sm">
+      <button
+        aria-expanded={isOpen}
+        className="flex w-full items-center justify-between gap-3 border-b border-foreground/10 bg-muted/35 px-4 py-3 text-left transition hover:bg-muted"
+        onClick={() => setIsOpen((current) => !current)}
+        type="button"
+      >
+        <span className="flex min-w-0 items-center gap-3">
+          <ChevronDown
+            className={`size-4 shrink-0 text-muted-foreground transition ${isOpen ? "rotate-0" : "-rotate-90"}`}
+          />
+          <span className="truncate text-sm font-semibold text-foreground">{title}</span>
+        </span>
+        <Badge variant={selected.length >= limit ? "warning" : selected.length > 0 ? "primary" : "muted"}>
           {selected.length}/{limit}
         </Badge>
-      </div>
-      <div className="grid max-h-56 gap-2 overflow-y-auto p-3 sm:grid-cols-2">
-        {values.map((value) => {
-          const checked = selected.includes(value);
-          const disabled = disabledSet.has(value) || (!checked && selected.length >= limit);
-
-          return (
-            <label
-              className="flex min-h-9 cursor-pointer items-center gap-2 rounded-md px-2 text-sm text-foreground hover:bg-muted data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-45"
-              data-disabled={disabled}
-              key={value}
+      </button>
+      {isOpen ? (
+        <div className="grid gap-3 p-3">
+          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+            <Input
+              className="h-10"
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Filtrer les valeurs"
+              value={query}
+            />
+            <Button
+              aria-pressed={sortAlpha}
+              className={sortAlpha ? "border-primary text-primary" : undefined}
+              onClick={() => setSortAlpha((current) => !current)}
+              title="Trier les valeurs"
+              type="button"
+              variant="outline"
             >
-              <Checkbox
-                checked={checked}
-                disabled={disabled}
-                onCheckedChange={() => onChange(toggleValue(selected, value, limit))}
-              />
-              <span className="truncate">{labelForBeatMetadata(value)}</span>
-            </label>
-          );
-        })}
-      </div>
+              <Filter className="size-4" />
+              A-Z
+            </Button>
+          </div>
+          {visibleValues.length === 0 ? (
+            <p className="rounded-md border border-dashed border-foreground/20 bg-background px-3 py-4 text-sm text-muted-foreground">
+              Aucune valeur disponible.
+            </p>
+          ) : (
+            <div className="grid max-h-60 gap-2 overflow-y-auto rounded-md border border-foreground/10 bg-background p-2 sm:grid-cols-2">
+              {visibleValues.map((value) => {
+                const checked = selected.includes(value);
+                const disabled = disabledSet.has(value) || (!checked && selected.length >= limit);
+
+                return (
+                  <label
+                    className="flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-transparent px-2 text-sm text-foreground transition hover:border-foreground/15 hover:bg-muted data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-45"
+                    data-disabled={disabled}
+                    key={value}
+                  >
+                    <Checkbox
+                      checked={checked}
+                      className="border-foreground/40 bg-background shadow-sm data-[state=checked]:border-primary"
+                      disabled={disabled}
+                      onCheckedChange={() => onChange(toggleValue(selected, value, limit))}
+                    />
+                    <span className="truncate">{labelForBeatMetadata(value)}</span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+function LicenseEditorDialog({
+  draft,
+  open,
+  usedScopes,
+  onOpenChange,
+  onSave,
+}: {
+  draft: LicenseDraft | null;
+  open: boolean;
+  usedScopes: Set<LicenseScope>;
+  onOpenChange: (open: boolean) => void;
+  onSave: (draft: LicenseDraft) => void;
+}) {
+  const [localDraft, setLocalDraft] = useState<LicenseDraft | null>(draft);
+
+  useEffect(() => {
+    setLocalDraft(draft);
+  }, [draft]);
+
+  if (!localDraft) {
+    return null;
+  }
+
+  function updateLocal(changes: Partial<LicenseDraft>) {
+    setLocalDraft((current) => (current ? { ...current, ...changes } : current));
+  }
+
+  function saveLicense() {
+    if (!localDraft) {
+      return;
+    }
+
+    onSave(localDraft);
+    onOpenChange(false);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Configurer une licence</DialogTitle>
+          <DialogDescription>
+            Definis le type, le prix et le fichier livre avec cette offre.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-5">
+          <div className="grid gap-2">
+            <Label>Type de licence</Label>
+            <Select
+              onValueChange={(value) => updateLocal({ scope: value as LicenseScope })}
+              value={localDraft.scope}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {licenseScopes.map((scope) => (
+                  <SelectItem
+                    disabled={scope !== localDraft.scope && usedScopes.has(scope)}
+                    key={scope}
+                    value={scope}
+                  >
+                    {licenseLabels[scope]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {localDraft.scope === "CUSTOM" ? (
+            <div className="grid gap-2">
+              <Label htmlFor="license-dialog-title">Nom de la licence</Label>
+              <Input
+                id="license-dialog-title"
+                onChange={(event) => updateLocal({ customTitle: event.target.value })}
+                placeholder="Licence studio"
+                value={localDraft.customTitle}
+              />
+            </div>
+          ) : null}
+          <div className="grid gap-2">
+            <Label htmlFor="license-dialog-price">Prix EUR</Label>
+            <Input
+              id="license-dialog-price"
+              min="0"
+              onChange={(event) => updateLocal({ priceAmount: event.target.value })}
+              step="0.01"
+              type="number"
+              value={localDraft.priceAmount}
+            />
+          </div>
+          <label className="grid cursor-pointer gap-2 rounded-lg border border-dashed border-foreground/25 bg-background p-4">
+            <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <FileAudio className="size-4" />
+              Fichier de livraison
+            </span>
+            <Input
+              accept="audio/mpeg,audio/wav,application/zip,application/vnd.rar"
+              onChange={(event) => updateLocal({ file: event.target.files?.[0] ?? null })}
+              type="file"
+            />
+            {localDraft.file ? (
+              <span className="truncate text-xs text-muted-foreground">{localDraft.file.name}</span>
+            ) : null}
+          </label>
+          <div className="flex justify-end gap-3 border-t border-border pt-4">
+            <Button onClick={() => onOpenChange(false)} type="button" variant="outline">
+              Annuler
+            </Button>
+            <Button onClick={saveLicense} type="button">
+              Enregistrer
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -296,6 +485,8 @@ export function BeatUpload() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [usageTags, setUsageTags] = useState<UsageTag[]>([]);
   const [licenses, setLicenses] = useState<LicenseDraft[]>([createLicenseDraft("BASIC")]);
+  const [licenseDialogOpen, setLicenseDialogOpen] = useState(false);
+  const [licenseDialogDraft, setLicenseDialogDraft] = useState<LicenseDraft | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -310,26 +501,45 @@ export function BeatUpload() {
     [availableSecondGenres, secondGenres],
   );
   const usedScopes = useMemo(() => new Set(licenses.map((license) => license.scope)), [licenses]);
+  const usedScopesForDialog = useMemo(
+    () =>
+      new Set(
+        licenses
+          .filter((license) => license.id !== licenseDialogDraft?.id)
+          .map((license) => license.scope),
+      ),
+    [licenseDialogDraft?.id, licenses],
+  );
   const submitLabel = isSubmitting
     ? "Upload en cours"
     : publish
       ? "Uploader et publier"
       : "Uploader en brouillon";
 
-  function updateLicense(id: string, changes: Partial<LicenseDraft>) {
-    setLicenses((current) =>
-      current.map((license) => (license.id === id ? { ...license, ...changes } : license)),
-    );
-  }
-
-  function addLicense() {
+  function openAddLicenseDialog() {
     const nextScope = licenseScopes.find((scope) => !usedScopes.has(scope));
 
     if (!nextScope || licenses.length >= MAX_LICENSES) {
       return;
     }
 
-    setLicenses((current) => [...current, createLicenseDraft(nextScope, "49.99")]);
+    setLicenseDialogDraft(createLicenseDraft(nextScope, "49.99"));
+    setLicenseDialogOpen(true);
+  }
+
+  function openEditLicenseDialog(license: LicenseDraft) {
+    setLicenseDialogDraft({ ...license });
+    setLicenseDialogOpen(true);
+  }
+
+  function saveLicenseDialog(draft: LicenseDraft) {
+    setLicenses((current) => {
+      const exists = current.some((license) => license.id === draft.id);
+
+      return exists
+        ? current.map((license) => (license.id === draft.id ? draft : license))
+        : [...current, draft];
+    });
   }
 
   function removeLicense(id: string) {
@@ -484,7 +694,7 @@ export function BeatUpload() {
   }
 
   return (
-    <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-6xl px-6 py-10">
+    <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-7xl px-6 py-10">
       <div className="border-b border-border pb-8">
         <p className="text-sm font-medium uppercase text-muted-foreground">Publication</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground">
@@ -562,6 +772,75 @@ export function BeatUpload() {
                   </Select>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-foreground/15">
+            <CardHeader>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle>Licences et fichiers livres</CardTitle>
+                  <CardDescription>
+                    Configure les offres qui seront visibles sur la page du beat.
+                  </CardDescription>
+                </div>
+                <Button
+                  disabled={licenses.length >= MAX_LICENSES || usedScopes.size >= licenseScopes.length}
+                  onClick={openAddLicenseDialog}
+                  type="button"
+                  variant="outline"
+                >
+                  <Plus className="size-4" />
+                  Ajouter
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              {licenses.map((license, index) => {
+                const price = parsePriceAmount(license.priceAmount);
+
+                return (
+                  <div
+                    className="grid gap-3 rounded-lg border border-foreground/15 bg-background p-4 shadow-sm md:grid-cols-[1fr_auto]"
+                    key={license.id}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant={index === 0 ? "primary" : "secondary"}>
+                          {index === 0 ? "Source preview" : "Livraison"}
+                        </Badge>
+                        <h3 className="truncate text-base font-semibold text-foreground">
+                          {licenseTitle(license) || "Licence sans nom"}
+                        </h3>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                        <span>{price === null ? "Prix invalide" : `${price.toFixed(2)} EUR`}</span>
+                        <span>{license.file ? license.file.name : "Aucun fichier selectionne"}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={() => openEditLicenseDialog(license)}
+                        type="button"
+                        variant="outline"
+                      >
+                        <Pencil className="size-4" />
+                        Modifier
+                      </Button>
+                      <Button
+                        disabled={licenses.length === 1}
+                        onClick={() => removeLicense(license.id)}
+                        size="icon"
+                        title="Supprimer la licence"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
 
@@ -645,116 +924,6 @@ export function BeatUpload() {
           </Card>
 
           <Card>
-            <CardHeader>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <CardTitle>Licences</CardTitle>
-                  <CardDescription>Maximum {MAX_LICENSES} offres par beat.</CardDescription>
-                </div>
-                <Button
-                  disabled={licenses.length >= MAX_LICENSES || usedScopes.size >= licenseScopes.length}
-                  onClick={addLicense}
-                  size="icon"
-                  title="Ajouter une licence"
-                  type="button"
-                  variant="outline"
-                >
-                  <Plus className="size-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {licenses.map((license, index) => (
-                <div className="grid gap-3 rounded-lg border border-border p-4" key={license.id}>
-                  <div className="flex items-center justify-between gap-3">
-                    <Badge variant={index === 0 ? "primary" : "secondary"}>
-                      {index === 0 ? "Preview source" : "Archive"}
-                    </Badge>
-                    <Button
-                      disabled={licenses.length === 1}
-                      onClick={() => removeLicense(license.id)}
-                      size="icon"
-                      title="Supprimer la licence"
-                      type="button"
-                      variant="ghost"
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Type</Label>
-                    <Select
-                      onValueChange={(value) =>
-                        updateLicense(license.id, { scope: value as LicenseScope })
-                      }
-                      value={license.scope}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {licenseScopes.map((scope) => (
-                          <SelectItem
-                            disabled={scope !== license.scope && usedScopes.has(scope)}
-                            key={scope}
-                            value={scope}
-                          >
-                            {licenseLabels[scope]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {license.scope === "CUSTOM" ? (
-                    <div className="grid gap-2">
-                      <Label htmlFor={`license-title-${license.id}`}>Nom</Label>
-                      <Input
-                        id={`license-title-${license.id}`}
-                        onChange={(event) =>
-                          updateLicense(license.id, { customTitle: event.target.value })
-                        }
-                        placeholder="Licence studio"
-                        value={license.customTitle}
-                      />
-                    </div>
-                  ) : null}
-                  <div className="grid gap-2">
-                    <Label htmlFor={`license-price-${license.id}`}>Prix EUR</Label>
-                    <Input
-                      id={`license-price-${license.id}`}
-                      min="0"
-                      onChange={(event) =>
-                        updateLicense(license.id, { priceAmount: event.target.value })
-                      }
-                      step="0.01"
-                      type="number"
-                      value={license.priceAmount}
-                    />
-                  </div>
-                  <label className="grid cursor-pointer gap-2 rounded-lg border border-dashed border-border p-3">
-                    <span className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <FileAudio className="size-4" />
-                      {index === 0 ? "MP3/WAV source" : "Fichier livre"}
-                    </span>
-                    <Input
-                      accept={index === 0 ? "audio/mpeg,audio/wav" : "audio/mpeg,audio/wav,application/zip,application/vnd.rar"}
-                      onChange={(event) =>
-                        updateLicense(license.id, { file: event.target.files?.[0] ?? null })
-                      }
-                      type="file"
-                    />
-                    {license.file ? (
-                      <span className="truncate text-xs text-muted-foreground">
-                        {license.file.name}
-                      </span>
-                    ) : null}
-                  </label>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card>
             <CardContent className="space-y-4 p-5">
               {status ? (
                 <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">{status}</p>
@@ -776,6 +945,19 @@ export function BeatUpload() {
             </CardContent>
           </Card>
         </aside>
+        <LicenseEditorDialog
+          draft={licenseDialogDraft}
+          onOpenChange={(open) => {
+            setLicenseDialogOpen(open);
+
+            if (!open) {
+              setLicenseDialogDraft(null);
+            }
+          }}
+          onSave={saveLicenseDialog}
+          open={licenseDialogOpen}
+          usedScopes={usedScopesForDialog}
+        />
       </form>
     </main>
   );
