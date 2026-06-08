@@ -359,31 +359,19 @@ function LicenseEditorDialog({
   onOpenChange,
   onSave,
 }: {
-  draft: LicenseDraft | null;
+  draft: LicenseDraft;
   open: boolean;
   usedScopes: Set<LicenseScope>;
   onOpenChange: (open: boolean) => void;
   onSave: (draft: LicenseDraft) => void;
 }) {
-  const [localDraft, setLocalDraft] = useState<LicenseDraft | null>(draft);
-
-  useEffect(() => {
-    setLocalDraft(draft);
-  }, [draft]);
-
-  if (!localDraft) {
-    return null;
-  }
+  const [localDraft, setLocalDraft] = useState<LicenseDraft>(draft);
 
   function updateLocal(changes: Partial<LicenseDraft>) {
     setLocalDraft((current) => (current ? { ...current, ...changes } : current));
   }
 
   function saveLicense() {
-    if (!localDraft) {
-      return;
-    }
-
     onSave(localDraft);
     onOpenChange(false);
   }
@@ -945,19 +933,21 @@ export function BeatUpload() {
             </CardContent>
           </Card>
         </aside>
-        <LicenseEditorDialog
-          draft={licenseDialogDraft}
-          onOpenChange={(open) => {
-            setLicenseDialogOpen(open);
+        {licenseDialogDraft ? (
+          <LicenseEditorDialog
+            draft={licenseDialogDraft}
+            onOpenChange={(open) => {
+              setLicenseDialogOpen(open);
 
-            if (!open) {
-              setLicenseDialogDraft(null);
-            }
-          }}
-          onSave={saveLicenseDialog}
-          open={licenseDialogOpen}
-          usedScopes={usedScopesForDialog}
-        />
+              if (!open) {
+                setLicenseDialogDraft(null);
+              }
+            }}
+            onSave={saveLicenseDialog}
+            open={licenseDialogOpen}
+            usedScopes={usedScopesForDialog}
+          />
+        ) : null}
       </form>
     </main>
   );
