@@ -2,8 +2,15 @@ import "server-only";
 
 import type { RoleCode } from "../../../generated/prisma/enums";
 
-export const DEFAULT_ACCOUNT_ROLE: RoleCode = "BUYER";
-export const SELF_SERVICE_ROLE_CODES = ["BUYER"] as const satisfies RoleCode[];
+export const ROLE_CODES = [
+  "BUYER",
+  "SELLER",
+  "ENGINEER",
+  "ADMIN",
+  "MODERATOR",
+] as const satisfies RoleCode[];
+export const DEFAULT_ACCOUNT_ROLES = ["BUYER", "SELLER"] as const satisfies RoleCode[];
+export const SELF_SERVICE_ROLE_CODES = ["BUYER", "SELLER"] as const satisfies RoleCode[];
 
 export type SelfServiceRoleCode = (typeof SELF_SERVICE_ROLE_CODES)[number];
 

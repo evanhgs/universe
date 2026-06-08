@@ -3,6 +3,7 @@ import "server-only";
 import { clerkClient } from "@clerk/nextjs/server";
 
 import {
+  ROLE_CODES,
   SELF_SERVICE_ROLE_CODES,
   USERNAME_PATTERN,
   type SelfServiceRoleCode,
@@ -10,6 +11,7 @@ import {
 import {
   findAccountByClerkUserId,
   markAccountDeletedByClerkUserId,
+  replaceAccountRolesByClerkUserId,
   replaceSelfServiceRolesByClerkUserId,
   updateAccountProfileByClerkUserId,
 } from "./account.repository";
@@ -21,6 +23,7 @@ import {
 import type { AccountSnapshot, UpdateAccountProfileInput } from "./account.types";
 
 type PersistedAccount = Awaited<ReturnType<typeof findAccountByClerkUserId>>;
+type ClerkMetadata = Record<string, unknown> | null | undefined;
 
 /**
  * Convertit un compte Prisma en payload API stable pour le frontend.
@@ -56,6 +59,50 @@ function serializeAccount(account: NonNullable<PersistedAccount>): AccountSnapsh
     },
     roles: account.roles.map(({ role }) => role),
   };
+}
+
+function serializeRolesForMetadata(account: NonNullable<PersistedAccount>) {
+  return account.roles.map(({ role }) => role);
+}
+
+function buildUniverseRoleMetadata(roles: string[]) {
+  return {
+    universe: {
+      roles,
+      rolesVersion: 1,
+    },
+  };
+}
+
+function parseUniverseRolesMetadata(metadata: ClerkMetadata) {
+  if (!metadata || typeof metadata !== "object") {
+    return null;
+  }
+
+  const universe = metadata.universe;
+
+  if (!universe || typeof universe !== "object" || Array.isArray(universe)) {
+    return null;
+  }
+
+  const roles = (universe as { roles?: unknown }).roles;
+
+  if (!Array.isArray(roles)) {
+    return null;
+  }
+
+  const normalized = Array.from(
+    new Set(
+      roles
+        .filter((role): role is string => typeof role === "string")
+        .map((role) => role.trim().toUpperCase())
+        .filter((role): role is (typeof ROLE_CODES)[number] =>
+          ROLE_CODES.includes(role as (typeof ROLE_CODES)[number]),
+        ),
+    ),
+  );
+
+  return normalized.length > 0 ? normalized : null;
 }
 
 /**
@@ -118,10 +165,12 @@ export async function updateCurrentAccountRoles(
     allowedRoles: [...SELF_SERVICE_ROLE_CODES],
     replaceWith: roles,
   });
+  const finalRoles = serializeRolesForMetadata(account);
 
   await client.users.updateUserMetadata(clerkUserId, {
+    privateMetadata: buildUniverseRoleMetadata(finalRoles),
     publicMetadata: {
-      marketplaceRoles: roles,
+      marketplaceRoles: finalRoles,
     },
   });
 
@@ -156,6 +205,8 @@ export async function syncAccountFromClerkWebhookPayload(payload: {
   }>;
   primary_email_address_id?: string | null;
   primaryEmailAddressId?: string | null;
+  private_metadata?: ClerkMetadata;
+  privateMetadata?: ClerkMetadata;
 }) {
   const normalized = normalizeClerkAccount({
     id: payload.id,
@@ -174,7 +225,19 @@ export async function syncAccountFromClerkWebhookPayload(payload: {
       payload.primaryEmailAddressId ?? payload.primary_email_address_id ?? null,
   });
 
-  return syncAccountFromNormalizedClerkData(normalized);
+  const account = await syncAccountFromNormalizedClerkData(normalized);
+  const rolesFromMetadata = parseUniverseRolesMetadata(
+    payload.privateMetadata ?? payload.private_metadata,
+  );
+
+  if (!rolesFromMetadata) {
+    return account;
+  }
+
+  return replaceAccountRolesByClerkUserId({
+    clerkUserId: payload.id,
+    roles: rolesFromMetadata,
+  });
 }
 
 /**

@@ -3,8 +3,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { MAIN_GENRES, type MainGenre } from "@/lib/beat-metadata";
 import { listPublishedBeatsPayload } from "@/server/beats/beat.service";
-import { BeatUploadTester } from "./beat-upload-tester";
 
 type BeatsPageProps = {
   searchParams: Promise<{
@@ -44,9 +44,11 @@ function formatPriceHT(priceAmount: number | null, currency: string, isFree: boo
  */
 export default async function BeatsPage({ searchParams }: BeatsPageProps) {
   const params = await searchParams;
+  const genreParam = params.genre?.trim().toUpperCase() as MainGenre | undefined;
+  const genre = genreParam && MAIN_GENRES.includes(genreParam) ? genreParam : undefined;
   const beats = await listPublishedBeatsPayload({
     search: params.search,
-    genre: params.genre,
+    genre,
     sellerSlug: params.sellerSlug,
     sort: "newest",
     limit: 48,
@@ -67,12 +69,16 @@ export default async function BeatsPage({ searchParams }: BeatsPageProps) {
             publication, profil vendeur et assets.
           </p>
         </div>
-        <Button asChild size="lg">
-          <Link href="/account-test">Tester mon compte</Link>
-        </Button>
+        <div className="flex flex-wrap gap-3">
+          <Button asChild size="lg">
+            <Link href="/beats/upload">Uploader un beat</Link>
+          </Button>
+          <Button asChild size="lg" variant="outline">
+            <Link href="/account-test">Tester mon compte</Link>
+          </Button>
+        </div>
       </div>
 
-      <BeatUploadTester />
 
       <form className="mt-6 grid gap-3 md:grid-cols-[1fr_180px_auto]" action="/beats">
         <Input

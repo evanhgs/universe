@@ -1,6 +1,7 @@
 import "server-only";
 
 import { syncCurrentAccountFromClerk } from "@/server/account/account.sync";
+import { actorFromAccount, assertCan } from "@/server/security/permissions";
 import { getPublicAssetUrl } from "@/server/storage/s3";
 
 import type { AssetType } from "../../../generated/prisma/enums";
@@ -90,9 +91,13 @@ export async function serializeBeat(beat: BeatRecord): Promise<BeatApiPayload> {
     durationSec: beat.durationSec,
     priceAmount: decimalToNumber(beat.basePriceAmount),
     currency: beat.currency,
-    primaryGenre: beat.primaryGenre,
-    primaryMood: beat.primaryMood,
+    primaryGenre: beat.mainGenres[0] ?? null,
+    primaryMood: beat.moods[0] ?? null,
+    mainGenres: beat.mainGenres,
+    secondGenres: beat.secondGenres,
+    moods: beat.moods,
     tags: beat.tags,
+    usageTags: beat.usageTags,
     status: beat.status,
     visibility: beat.visibility,
     isFree: beat.isFree,
@@ -153,17 +158,13 @@ async function assertSellerAccount(clerkUserId: string) {
     throw new Error("account_not_found");
   }
 
-  const roles = account.roles.map(({ role }) => role);
-
-  if (!roles.includes("SELLER")) {
-    throw new Error("seller_role_required");
-  }
+  assertCan(actorFromAccount(account), "beat:create");
 
   return account;
 }
 
 /**
- * Cree un beat pour le vendeur authentifie.
+ * Cree un beat. A la place un simple check pour voir si le compte n'est pas restreint par la modération
  * @param clerkUserId Identifiant Clerk de la session.
  * @param input Donnees de creation validees.
  */
@@ -174,6 +175,7 @@ export async function createBeatForCurrentSeller(clerkUserId: string, input: Cre
 }
 
 /**
+ * TODO: ajouter la pagination dans le marketplace 20 / 35 / 50
  * Liste les beats publics sous forme de payloads API.
  * @param query Filtres catalogue valides.
  */

@@ -21,6 +21,7 @@ vi.mock("@/server/marketplace/marketplace.repository", () => ({
   findActiveEntitlementForOffering: vi.fn(),
   findBuyerOrder: vi.fn(),
   findDownloadEntitlement: findDownloadEntitlementMock,
+  findLatestKycVerificationForUser: vi.fn(),
   findLatestPendingStripePayment: vi.fn(),
   findPurchasableOffering: vi.fn(),
   findStripePaymentForConfirmation: vi.fn(),

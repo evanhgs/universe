@@ -1,10 +1,25 @@
 import "server-only";
 
-import type { BeatStatus, LicenseScope, Visibility } from "../../../generated/prisma/enums";
 import {
-  DEFAULT_BEAT_CURRENCY,
-  MAX_BEAT_TAGS,
-} from "./beat.constants";
+  MainGenres,
+  Moods,
+  SecondGenres,
+  Tags,
+  UsageTags,
+  type BeatStatus,
+  type LicenseScope,
+  type MainGenres as MainGenre,
+  type Moods as Mood,
+  type SecondGenres as SecondGenre,
+  type Tags as Tag,
+  type UsageTags as UsageTag,
+  type Visibility,
+} from "../../../generated/prisma/enums";
+import {
+  BEAT_METADATA_LIMITS,
+  secondGenresForMainGenres,
+} from "@/lib/beat-metadata";
+import { DEFAULT_BEAT_CURRENCY } from "./beat.constants";
 import type {
   BeatAssetInput,
   BeatFeedCursor,
@@ -30,6 +45,11 @@ const allowedSorts = new Set<BeatListQuery["sort"]>([
   "bpm_asc",
   "bpm_desc",
 ]);
+const allowedMainGenres = new Set<MainGenre>(Object.values(MainGenres));
+const allowedSecondGenres = new Set<SecondGenre>(Object.values(SecondGenres));
+const allowedMoods = new Set<Mood>(Object.values(Moods));
+const allowedTags = new Set<Tag>(Object.values(Tags));
+const allowedUsageTags = new Set<UsageTag>(Object.values(UsageTags));
 const MAX_LICENSE_OFFERINGS = 3;
 const DEFAULT_FEED_LIMIT = 10;
 const MAX_FEED_LIMIT = 20;
@@ -156,35 +176,92 @@ function normalizeLicenseTitleKey(value: string) {
 }
 
 /**
- * Valide et dedoublonne la liste de tags d'un beat.
- * @param value Tableau de tags du payload JSON.
+ * Valide et dedoublonne une liste d'enums depuis le payload JSON.
+ * @param value Tableau de valeurs brutes.
+ * @param field Nom du champ.
+ * @param allowedValues Valeurs enum autorisees.
+ * @param maxItems Taille maximale.
  */
-function parseTags(value: unknown) {
+function parseEnumList<T extends string>(
+  value: unknown,
+  field: string,
+  allowedValues: Set<T>,
+  maxItems: number,
+) {
   if (value === undefined || value === null) {
     return [];
   }
 
   if (!Array.isArray(value)) {
-    throw new Error("tags must be an array.");
+    throw new Error(`${field} must be an array.`);
   }
 
-  const tags = Array.from(
+  const items = Array.from(
     new Set(
-      value.map((tag) => {
-        if (typeof tag !== "string") {
-          throw new Error("tags must only contain strings.");
+      value.map((item) => {
+        if (typeof item !== "string") {
+          throw new Error(`${field} must only contain strings.`);
         }
 
-        return tag.trim().toLowerCase();
+        return item.trim().toUpperCase();
       }).filter(Boolean),
     ),
-  );
+  ) as T[];
 
-  if (tags.length > MAX_BEAT_TAGS) {
-    throw new Error(`tags cannot contain more than ${MAX_BEAT_TAGS} values.`);
+  const invalid = items.find((item) => !allowedValues.has(item));
+
+  if (invalid) {
+    throw new Error(`${field} contains an invalid value.`);
   }
 
-  return tags;
+  if (items.length > maxItems) {
+    throw new Error(`${field} cannot contain more than ${maxItems} values.`);
+  }
+
+  return items;
+}
+
+function parseMainGenres(value: unknown) {
+  return parseEnumList(
+    value,
+    "mainGenres",
+    allowedMainGenres,
+    BEAT_METADATA_LIMITS.mainGenres,
+  );
+}
+
+function parseSecondGenres(value: unknown, mainGenres: MainGenre[]) {
+  const secondGenres = parseEnumList(
+    value,
+    "secondGenres",
+    allowedSecondGenres,
+    BEAT_METADATA_LIMITS.secondGenres,
+  );
+  const allowedForMainGenres = new Set(secondGenresForMainGenres(mainGenres));
+  const invalid = secondGenres.find((genre) => !allowedForMainGenres.has(genre));
+
+  if (invalid) {
+    throw new Error("secondGenres contains a value incompatible with mainGenres.");
+  }
+
+  return secondGenres;
+}
+
+function parseMoods(value: unknown) {
+  return parseEnumList(value, "moods", allowedMoods, BEAT_METADATA_LIMITS.moods);
+}
+
+function parseTags(value: unknown) {
+  return parseEnumList(value, "tags", allowedTags, BEAT_METADATA_LIMITS.tags);
+}
+
+function parseUsageTags(value: unknown) {
+  return parseEnumList(
+    value,
+    "usageTags",
+    allowedUsageTags,
+    BEAT_METADATA_LIMITS.usageTags,
+  );
 }
 
 /**
@@ -200,12 +277,12 @@ function parseTagListParam(value: string | null) {
     new Set(
       value
         .split(",")
-        .map((tag) => tag.trim().toLowerCase())
+        .map((tag) => tag.trim().toUpperCase() as Tag)
         .filter(Boolean),
     ),
-  );
+  ).filter((tag) => allowedTags.has(tag));
 
-  return tags.length > 0 ? tags.slice(0, MAX_BEAT_TAGS) : undefined;
+  return tags.length > 0 ? tags.slice(0, BEAT_METADATA_LIMITS.tags) : undefined;
 }
 
 /**
@@ -258,6 +335,24 @@ function parseLicenseType(value: string | null) {
   }
 
   return licenseType;
+}
+
+function parseOptionalEnumParam<T extends string>(
+  value: string | null,
+  field: string,
+  allowedValues: Set<T>,
+) {
+  const normalized = normalizeOptionalString(value)?.toUpperCase() as T | undefined;
+
+  if (normalized === undefined) {
+    return undefined;
+  }
+
+  if (!allowedValues.has(normalized)) {
+    throw new Error(`${field} is invalid.`);
+  }
+
+  return normalized;
 }
 
 /**
@@ -513,6 +608,7 @@ export function parseCreateBeatInput(payload: unknown): CreateBeatInput {
   const title = requireString(body.title, "title");
   const priceAmount = parsePrice(body.priceAmount);
   const isFree = parseBoolean(body.isFree, priceAmount === 0);
+  const publish = parseBoolean(body.publish, false);
 
   if (title.length > 140) {
     throw new Error("title is too long.");
@@ -524,6 +620,11 @@ export function parseCreateBeatInput(payload: unknown): CreateBeatInput {
 
   const currency = parseCurrency(body.currency);
   const audioAsset = parseAsset(body.audioAsset, "audioAsset");
+  const mainGenres = parseMainGenres(body.mainGenres);
+  const secondGenres = parseSecondGenres(body.secondGenres, mainGenres);
+  const moods = parseMoods(body.moods);
+  const tags = parseTags(body.tags);
+  const usageTags = parseUsageTags(body.usageTags);
   const licenseOfferings = parseLicenseOfferings(body.licenseOfferings, {
     priceAmount: isFree ? 0 : priceAmount,
     currency,
@@ -542,25 +643,33 @@ export function parseCreateBeatInput(payload: unknown): CreateBeatInput {
     throw new Error("audioAsset must be attached to the default license offering.");
   }
 
+  const thumbnailAsset =
+    body.thumbnailAsset === undefined || body.thumbnailAsset === null
+      ? null
+      : parseAsset(body.thumbnailAsset, "thumbnailAsset");
+
+  if (publish && !thumbnailAsset) {
+    throw new Error("thumbnailAsset is required to publish.");
+  }
+
   return {
     title,
     description: normalizeOptionalString(body.description),
     priceAmount: isFree ? 0 : priceAmount,
     currency,
-    primaryGenre: normalizeOptionalString(body.primaryGenre),
-    primaryMood: normalizeOptionalString(body.primaryMood),
-    tags: parseTags(body.tags),
+    mainGenres,
+    secondGenres,
+    moods,
+    tags,
+    usageTags,
     bpm: parseOptionalInteger(body.bpm, "bpm", 20, 300),
     musicalKey: normalizeOptionalString(body.musicalKey),
     visibility: parseVisibility(body.visibility),
-    publish: parseBoolean(body.publish, false),
+    publish,
     isFree,
     brandingRequired: parseBoolean(body.brandingRequired, isFree),
     audioAsset,
-    thumbnailAsset:
-      body.thumbnailAsset === undefined || body.thumbnailAsset === null
-        ? null
-        : parseAsset(body.thumbnailAsset, "thumbnailAsset"),
+    thumbnailAsset,
     licenseOfferings,
   };
 }
@@ -589,15 +698,25 @@ export function parseUpdateBeatInput(payload: unknown): UpdateBeatInput {
   if (body.previewAsset !== undefined) {
     throw new Error("previewAsset is generated automatically.");
   }
+  const mainGenres =
+    body.mainGenres !== undefined ? parseMainGenres(body.mainGenres) : undefined;
+
+  if (body.secondGenres !== undefined && mainGenres === undefined) {
+    throw new Error("mainGenres is required when updating secondGenres.");
+  }
 
   return {
     ...(title !== undefined ? { title } : {}),
     ...(body.description !== undefined ? { description: normalizeOptionalString(body.description) } : {}),
     ...(body.priceAmount !== undefined ? { priceAmount: parsePrice(body.priceAmount) } : {}),
     ...(body.currency !== undefined ? { currency: parseCurrency(body.currency) } : {}),
-    ...(body.primaryGenre !== undefined ? { primaryGenre: normalizeOptionalString(body.primaryGenre) } : {}),
-    ...(body.primaryMood !== undefined ? { primaryMood: normalizeOptionalString(body.primaryMood) } : {}),
+    ...(mainGenres !== undefined ? { mainGenres } : {}),
+    ...(body.secondGenres !== undefined
+      ? { secondGenres: parseSecondGenres(body.secondGenres, mainGenres ?? []) }
+      : {}),
+    ...(body.moods !== undefined ? { moods: parseMoods(body.moods) } : {}),
     ...(body.tags !== undefined ? { tags: parseTags(body.tags) } : {}),
+    ...(body.usageTags !== undefined ? { usageTags: parseUsageTags(body.usageTags) } : {}),
     ...(body.bpm !== undefined ? { bpm: parseOptionalInteger(body.bpm, "bpm", 20, 300) } : {}),
     ...(body.musicalKey !== undefined ? { musicalKey: normalizeOptionalString(body.musicalKey) } : {}),
     ...(body.visibility !== undefined ? { visibility: parseVisibility(body.visibility) } : {}),
@@ -628,8 +747,8 @@ export function parseBeatListQuery(url: URL): BeatListQuery {
 
   return {
     search: normalizeOptionalString(url.searchParams.get("search")) ?? undefined,
-    genre: normalizeOptionalString(url.searchParams.get("genre")) ?? undefined,
-    mood: normalizeOptionalString(url.searchParams.get("mood")) ?? undefined,
+    genre: parseOptionalEnumParam(url.searchParams.get("genre"), "genre", allowedMainGenres),
+    mood: parseOptionalEnumParam(url.searchParams.get("mood"), "mood", allowedMoods),
     bpm: bpm ?? undefined,
     bpmMin: bpmMin ?? undefined,
     bpmMax: bpmMax ?? undefined,

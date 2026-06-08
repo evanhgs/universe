@@ -2,6 +2,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
 import { Prisma, PrismaClient } from "../generated/prisma/client";
+import type { MainGenres, Moods, Tags, UsageTags } from "../generated/prisma/enums";
 
 const DEFAULT_SEED = {
   clerkUserId: process.env.SEED_CLERK_USER_ID ?? "user_seed_demo_v1",
@@ -19,57 +20,59 @@ const DEFAULT_SEED = {
 } as const;
 
 const SEED_BEAT_COUNT = 30;
-const seedGenres = ["Trap", "Drill", "R&B", "Afro", "Pop", "Boom bap"] as const;
-const seedMoods = ["Dark", "Melodic", "Club", "Sad", "Energetic", "Dreamy"] as const;
+const seedGenres = ["TRAP", "DRILL", "R_AND_B", "AFRO", "POP", "BOOM_BAP"] as const satisfies MainGenres[];
+const seedMoods = ["DARK", "MELOANCHOLIC", "CLUB", "SAD", "ENERGETIC", "DREAMY"] as const satisfies Moods[];
 const seedKeys = ["Am", "Cm", "Dm", "Em", "F#m", "Gm"] as const;
 const benchmarkGenres = [
-  "Trap",
-  "Drill",
-  "R&B",
-  "Afro",
-  "Pop",
-  "Boom bap",
-  "Jersey",
-  "Dancehall",
-  "Amapiano",
-  "Pluggnb",
-  "Reggaeton",
-  "House",
-] as const;
+  "TRAP",
+  "DRILL",
+  "R_AND_B",
+  "AFRO",
+  "POP",
+  "BOOM_BAP",
+  "JERSEY_CLUB",
+  "DANCEHALL",
+  "AMAPIANO",
+  "HIP_HOP",
+  "REGGAETON",
+  "HOUSE",
+] as const satisfies MainGenres[];
 const benchmarkMoods = [
-  "Dark",
-  "Melodic",
-  "Club",
-  "Sad",
-  "Energetic",
-  "Dreamy",
-  "Aggressive",
-  "Chill",
-  "Romantic",
-  "Cinematic",
-] as const;
+  "DARK",
+  "MELOANCHOLIC",
+  "CLUB",
+  "SAD",
+  "ENERGETIC",
+  "DREAMY",
+  "AGGRESSIVE",
+  "CHILL",
+  "ROMANTIC",
+  "CINEMATIC",
+] as const satisfies Moods[];
 const benchmarkTags = [
-  "808",
-  "piano",
-  "guitar",
-  "sample",
-  "freestyle",
-  "hard",
-  "smooth",
-  "summer",
-  "night",
-  "street",
-  "bounce",
-  "synth",
-  "choir",
-  "bass",
-  "latin",
-  "soul",
-  "sad",
-  "dark",
-  "melodic",
-  "club",
-] as const;
+  "INSTRUMENTS_808",
+  "PIANO",
+  "GUITAR",
+  "SAMPLE",
+  "PUNCHY",
+  "SOFT",
+  "BOUNCY",
+  "SYNTH",
+  "CHOIR",
+  "BASS",
+  "WARM",
+  "ANALOG",
+  "CLEAN",
+  "WIDE",
+] as const satisfies Tags[];
+const benchmarkUsageTags = [
+  "TYPE_BEAT",
+  "FREESTYLE",
+  "CLUB",
+  "RADIO",
+  "YOUTUBE",
+  "TIKTOK",
+] as const satisfies UsageTags[];
 
 const SEED_MODE = process.env.SEED_MODE ?? "demo";
 const BENCHMARK_SESSION_PREFIX = "seed-benchmark";
@@ -263,6 +266,8 @@ async function seedFeedBeats(ownerId: string) {
     const slug = seedBeatSlug(index);
     const genre = pickSeedValue(seedGenres, index);
     const mood = pickSeedValue(seedMoods, index + 1);
+    const tag = pickSeedValue(benchmarkTags, index);
+    const usageTag = pickSeedValue(benchmarkUsageTags, index);
     const publishedAt = new Date(Date.now() - index * 60 * 60 * 1000);
     const priceAmount = index % 7 === 0 ? 0 : 19 + (index % 6) * 10;
 
@@ -276,9 +281,11 @@ async function seedFeedBeats(ownerId: string) {
         durationSec: 110 + ((index * 11) % 80),
         basePriceAmount: priceAmount,
         currency: "EUR",
-        primaryGenre: genre,
-        primaryMood: mood,
-        tags: [genre.toLowerCase(), mood.toLowerCase(), `seed-${(index % 5) + 1}`],
+        mainGenres: [genre],
+        secondGenres: [],
+        moods: [mood],
+        tags: [tag],
+        usageTags: [usageTag],
         status: "PUBLISHED",
         visibility: "PUBLIC",
         moderationStatus: "CLEAN",
@@ -297,9 +304,11 @@ async function seedFeedBeats(ownerId: string) {
         durationSec: 110 + ((index * 11) % 80),
         basePriceAmount: priceAmount,
         currency: "EUR",
-        primaryGenre: genre,
-        primaryMood: mood,
-        tags: [genre.toLowerCase(), mood.toLowerCase(), `seed-${(index % 5) + 1}`],
+        mainGenres: [genre],
+        secondGenres: [],
+        moods: [mood],
+        tags: [tag],
+        usageTags: [usageTag],
         status: "PUBLISHED",
         visibility: "PUBLIC",
         moderationStatus: "CLEAN",
@@ -562,14 +571,15 @@ async function seedBenchmarkBuyers() {
   return buyers;
 }
 
-function benchmarkBeatTags(random: () => number, genre: string, mood: string, index: number) {
-  const tags = new Set<string>([genre.toLowerCase(), mood.toLowerCase()]);
+function benchmarkBeatTags(random: () => number) {
+  const tags = new Set<Tags>([
+    pickRandomValue(random, benchmarkTags),
+    pickRandomValue(random, benchmarkTags),
+  ]);
 
   while (tags.size < 7) {
     tags.add(pickRandomValue(random, benchmarkTags));
   }
-
-  tags.add(`benchmark-${(index % 12) + 1}`);
 
   return [...tags];
 }
@@ -643,7 +653,8 @@ async function seedBenchmarkBeats(random: () => number, sellers: Array<{ id: str
     const seller = sellers[index % sellers.length];
     const genre = pickRandomValue(random, benchmarkGenres);
     const mood = pickRandomValue(random, benchmarkMoods);
-    const tags = benchmarkBeatTags(random, genre, mood, index);
+    const tags = benchmarkBeatTags(random);
+    const usageTags = [pickRandomValue(random, benchmarkUsageTags)];
     const publishedAt = new Date(Date.now() - randomInt(random, 0, 180) * 24 * 60 * 60 * 1000);
     const priceAmount = index % 19 === 0 ? 0 : 19 + (index % 8) * 10;
     const slug = benchmarkBeatSlug(index);
@@ -658,9 +669,11 @@ async function seedBenchmarkBeats(random: () => number, sellers: Array<{ id: str
         durationSec: randomInt(random, 82, 190),
         basePriceAmount: priceAmount,
         currency: "EUR",
-        primaryGenre: genre,
-        primaryMood: mood,
+        mainGenres: [genre],
+        secondGenres: [],
+        moods: [mood],
         tags,
+        usageTags,
         status: "PUBLISHED",
         visibility: "PUBLIC",
         moderationStatus: "CLEAN",
@@ -679,9 +692,11 @@ async function seedBenchmarkBeats(random: () => number, sellers: Array<{ id: str
         durationSec: randomInt(random, 82, 190),
         basePriceAmount: priceAmount,
         currency: "EUR",
-        primaryGenre: genre,
-        primaryMood: mood,
+        mainGenres: [genre],
+        secondGenres: [],
+        moods: [mood],
         tags,
+        usageTags,
         status: "PUBLISHED",
         visibility: "PUBLIC",
         moderationStatus: "CLEAN",
@@ -694,8 +709,8 @@ async function seedBenchmarkBeats(random: () => number, sellers: Array<{ id: str
         id: true,
         ownerId: true,
         basePriceAmount: true,
-        primaryGenre: true,
-        primaryMood: true,
+        mainGenres: true,
+        moods: true,
         tags: true,
         bpm: true,
         publishedAt: true,
@@ -778,8 +793,8 @@ function tasteAffinity(
   const genres = buyer.taste.genres as unknown as Record<string, number>;
   const moods = buyer.taste.moods as unknown as Record<string, number>;
   const tags = buyer.taste.tags as unknown as Record<string, number>;
-  const genreScore = Number(genres[beat.primaryGenre?.toLowerCase() ?? ""] ?? 0);
-  const moodScore = Number(moods[beat.primaryMood?.toLowerCase() ?? ""] ?? 0);
+  const genreScore = Number(genres[beat.mainGenres[0]?.toLowerCase() ?? ""] ?? 0);
+  const moodScore = Number(moods[beat.moods[0]?.toLowerCase() ?? ""] ?? 0);
   const tagScore = beat.tags.reduce(
     (score, tag) => score + Number(tags[tag.toLowerCase()] ?? 0),
     0,

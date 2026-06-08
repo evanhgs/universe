@@ -18,9 +18,13 @@ function beat(overrides: Partial<BeatScoringInput> = {}): BeatScoringInput {
     sellerId: "seller_1",
     title: "Dark Piano Drill",
     description: null,
-    tags: ["drill", "piano", "dark"],
+    tags: ["PIANO", "SYNTH", "DRILL_BOUNCE"],
+    usageTags: ["TYPE_BEAT"],
     genre: "drill",
+    genres: ["DRILL", "TRAP"],
+    secondGenres: ["UK_DRILL"],
     mood: "dark",
+    moods: ["DARK", "ENERGETIC"],
     bpm: 142,
     musicalKey: "Am",
     priceAmount: 29,
@@ -86,7 +90,7 @@ describe("analytics service", () => {
     const profile: UserTasteProfileInput = {
       favoriteGenres: { drill: 0.8 },
       favoriteMoods: { dark: 0.9 },
-      favoriteTags: { piano: 0.7, drill: 0.6 },
+      favoriteTags: { piano: 0.7, type_beat: 0.6 },
       preferredBpmRange: [130, 150],
     };
 

@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 function beatErrorResponse(error: unknown) {
   const message = error instanceof Error ? error.message : "Unknown error.";
   const status =
-    message === "seller_role_required"
+    message === "account_not_active"
       ? 403
       : message === "beat_asset_duplicate"
         ? 409

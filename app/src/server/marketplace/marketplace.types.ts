@@ -2,6 +2,7 @@ import "server-only";
 
 import type {
   EntitlementStatus,
+  KycStatus,
   OrderStatus,
   PaymentStatus,
 } from "../../../generated/prisma/enums";
@@ -133,6 +134,12 @@ export type SellerDashboardPayload = {
     processingBeatCount: number;
     hiddenBeatCount: number;
     revenueByCurrency: SellerRevenueCurrencyPayload[];
+    payoutEligibility: {
+      canReceivePayouts: boolean;
+      kycStatus: KycStatus | null;
+      payoutAccountReady: boolean;
+      reason: string | null;
+    };
   };
   beats: SellerBeatPayload[];
 };

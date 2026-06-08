@@ -45,6 +45,10 @@ describe("account validation", () => {
 
   it("deduplicates and validates self-service roles", () => {
     expect(parseSelfServiceRoles({ roles: [" buyer ", "buyer"] })).toEqual(["BUYER"]);
+    expect(parseSelfServiceRoles({ roles: ["BUYER", "SELLER"] })).toEqual([
+      "BUYER",
+      "SELLER",
+    ]);
   });
 
   it("rejects roles outside self-service scope", () => {
@@ -52,8 +56,8 @@ describe("account validation", () => {
     expect(() => parseSelfServiceRoles({ roles: ["ADMIN"] })).toThrow(
       'Role "ADMIN" cannot be self-assigned.',
     );
-    expect(() => parseSelfServiceRoles({ roles: ["SELLER"] })).toThrow(
-      'Role "SELLER" cannot be self-assigned.',
+    expect(() => parseSelfServiceRoles({ roles: ["MODERATOR"] })).toThrow(
+      'Role "MODERATOR" cannot be self-assigned.',
     );
     expect(() => parseSelfServiceRoles({ roles: ["BUYER", 1] })).toThrow(
       "roles must only contain strings.",
