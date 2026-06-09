@@ -27,6 +27,8 @@ const initialPage = {
   count: 1,
   page: 1,
   limit: 20,
+  totalItems: 1,
+  totalPages: 1,
   hasPreviousPage: false,
   hasNextPage: false,
 };
@@ -45,6 +47,8 @@ describe("BeatsCatalogClient", () => {
           count: 1,
           page: 1,
           limit: 20,
+          totalItems: 1,
+          totalPages: 1,
           hasPreviousPage: false,
           hasNextPage: false,
         }),
@@ -90,6 +94,8 @@ describe("BeatsCatalogClient", () => {
           count: 1,
           page: 1,
           limit: 20,
+          totalItems: 1,
+          totalPages: 1,
           hasPreviousPage: false,
           hasNextPage: false,
         }),
@@ -121,5 +127,49 @@ describe("BeatsCatalogClient", () => {
       "/api/beats?search=header&limit=20",
       expect.objectContaining({ cache: "no-store" }),
     );
+  });
+
+  it("uses the resolved page returned by the API when a requested page is too high", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          items: [beat(4, "Last Valid Page Beat")],
+          count: 1,
+          page: 3,
+          limit: 20,
+          totalItems: 41,
+          totalPages: 3,
+          hasPreviousPage: true,
+          hasNextPage: false,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const pushStateSpy = vi.spyOn(window.history, "pushState");
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <BeatsCatalogClient
+        initialFilters={{
+          limit: 20,
+          page: 24,
+        }}
+        initialPage={{
+          ...initialPage,
+          page: 24,
+          totalItems: 41,
+          totalPages: 3,
+          hasPreviousPage: true,
+        }}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Precedent" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Last Valid Page Beat")).toBeInTheDocument();
+    });
+    expect(pushStateSpy).toHaveBeenCalledWith(null, "", "/beats?limit=20&page=3");
+    expect(screen.getByText("Page 3 / 3 - 20 resultats par page")).toBeInTheDocument();
   });
 });

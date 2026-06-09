@@ -44,6 +44,8 @@ type CatalogPage = {
   count?: number;
   page: number;
   limit: number;
+  totalItems: number;
+  totalPages: number;
   hasPreviousPage: boolean;
   hasNextPage: boolean;
 };
@@ -70,7 +72,7 @@ function formatPriceHT(priceAmount: number | null, currency: string, isFree: boo
     return "Prix a definir";
   }
 
-  return `${new Intl.NumberFormat("fr-FR", {
+  return `A partir de ${new Intl.NumberFormat("fr-FR", {
     style: "currency",
     currency,
   }).format(priceAmount)} HT`;
@@ -146,8 +148,14 @@ export function BeatsCatalogClient({
         }
 
         const nextPage = (await response.json()) as CatalogPage;
+        const resolvedParams = buildCatalogParams({
+          ...nextFilters,
+          page: nextPage.page,
+        });
+        const resolvedQuery = resolvedParams.toString();
+
         setPage(nextPage);
-        window.history.pushState(null, "", query ? `/beats?${query}` : "/beats");
+        window.history.pushState(null, "", resolvedQuery ? `/beats?${resolvedQuery}` : "/beats");
       } catch {
         setError("Impossible de charger le catalogue pour le moment.");
       } finally {
@@ -245,10 +253,9 @@ export function BeatsCatalogClient({
 
         {page.items.length === 0 ? (
           <div className="mt-10 rounded-lg border border-dashed border-border p-8">
-            <h2 className="text-xl font-semibold text-foreground">Aucune instrumentale publiee</h2>
+            <h2 className="text-xl font-semibold text-foreground">{"Aucune instru publiée"}</h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Cree une publication via l API <code>/api/beats</code>, avec
-              <code> publish: true</code>, pour alimenter ce catalogue.
+              {"C'est le désert musical ici..."}
             </p>
           </div>
         ) : (
@@ -273,7 +280,7 @@ export function BeatsCatalogClient({
                       <div className="flex items-start justify-between gap-3">
                         <h2 className="text-lg font-semibold text-foreground">{beat.title}</h2>
                         <p className="shrink-0 text-sm font-semibold text-foreground">
-                          A partir de {formatPriceHT(beat.priceAmount, beat.currency, beat.isFree)}
+                          {formatPriceHT(beat.priceAmount, beat.currency, beat.isFree)}
                         </p>
                       </div>
                       <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
@@ -296,7 +303,10 @@ export function BeatsCatalogClient({
 
         <nav className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5">
           <p className="text-sm text-muted-foreground">
-            Page {page.page} - {page.limit} resultats par page
+            Page {page.page} / {page.totalPages}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {page.totalItems} résultats trouvés
           </p>
           <div className="flex gap-2">
             <Button
@@ -305,7 +315,7 @@ export function BeatsCatalogClient({
               type="button"
               variant="outline"
             >
-              Precedent
+              {"Précédent"}
             </Button>
             <Button
               disabled={!page.hasNextPage || isLoading}
@@ -313,7 +323,7 @@ export function BeatsCatalogClient({
               type="button"
               variant="outline"
             >
-              Suivant
+              {"Suivant"}
             </Button>
           </div>
         </nav>

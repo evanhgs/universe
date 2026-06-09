@@ -474,12 +474,7 @@ export async function createBeat(ownerId: string, input: CreateBeatInput) {
   return beat;
 }
 
-/**
- * Liste les beats publics en appliquant les filtres de catalogue.
- * @param query Filtres et tri deja valides par parseBeatListQuery.
- * @returns Beats publics visibles et propres moderation, avec un element supplementaire pour detecter la suite.
- */
-export async function findPublishedBeats(query: BeatListQuery) {
+function buildPublishedBeatWhere(query: BeatListQuery): Prisma.BeatWhereInput {
   const ownerProfileFilters: Prisma.UserProfileWhereInput[] = [];
 
   if (query.producer) {
@@ -497,16 +492,6 @@ export async function findPublishedBeats(query: BeatListQuery) {
     });
   }
 
-  const orderBy =
-    query.sort === "price_asc"
-      ? [{ basePriceAmount: "asc" as const }, { publishedAt: "desc" as const }]
-      : query.sort === "price_desc"
-        ? [{ basePriceAmount: "desc" as const }, { publishedAt: "desc" as const }]
-        : query.sort === "bpm_asc"
-          ? [{ bpm: "asc" as const }, { publishedAt: "desc" as const }]
-          : query.sort === "bpm_desc"
-            ? [{ bpm: "desc" as const }, { publishedAt: "desc" as const }]
-            : [{ publishedAt: "desc" as const }, { createdAt: "desc" as const }];
   const normalizedSearch = query.search?.trim().toUpperCase();
   const searchGenre = normalizedSearch && searchableMainGenres.has(normalizedSearch)
     ? (normalizedSearch as MainGenre)
@@ -518,68 +503,94 @@ export async function findPublishedBeats(query: BeatListQuery) {
     ? (normalizedSearch as Tag)
     : null;
 
-  return getPrisma().beat.findMany({
-    where: {
-      status: "PUBLISHED",
-      visibility: "PUBLIC",
-      moderationStatus: "CLEAN",
-      ...(query.search
-        ? {
-            OR: [
-              { title: { contains: query.search, mode: "insensitive" } },
-              { description: { contains: query.search, mode: "insensitive" } },
-              ...(searchGenre ? [{ mainGenres: { has: searchGenre } }] : []),
-              ...(searchMood ? [{ moods: { has: searchMood } }] : []),
-              ...(searchTag ? [{ tags: { has: searchTag } }] : []),
-            ],
-          }
-        : {}),
-      ...(query.genre
-        ? { mainGenres: { has: query.genre } }
-        : {}),
-      ...(query.mood
-        ? { moods: { has: query.mood } }
-        : {}),
-      ...(query.bpm ? { bpm: query.bpm } : {}),
-      ...(query.bpmMin !== undefined || query.bpmMax !== undefined
-        ? {
-            bpm: {
-              ...(query.bpmMin !== undefined ? { gte: query.bpmMin } : {}),
-              ...(query.bpmMax !== undefined ? { lte: query.bpmMax } : {}),
+  return {
+    status: "PUBLISHED",
+    visibility: "PUBLIC",
+    moderationStatus: "CLEAN",
+    ...(query.search
+      ? {
+          OR: [
+            { title: { contains: query.search, mode: "insensitive" } },
+            { description: { contains: query.search, mode: "insensitive" } },
+            ...(searchGenre ? [{ mainGenres: { has: searchGenre } }] : []),
+            ...(searchMood ? [{ moods: { has: searchMood } }] : []),
+            ...(searchTag ? [{ tags: { has: searchTag } }] : []),
+          ],
+        }
+      : {}),
+    ...(query.genre
+      ? { mainGenres: { has: query.genre } }
+      : {}),
+    ...(query.mood
+      ? { moods: { has: query.mood } }
+      : {}),
+    ...(query.bpm ? { bpm: query.bpm } : {}),
+    ...(query.bpmMin !== undefined || query.bpmMax !== undefined
+      ? {
+          bpm: {
+            ...(query.bpmMin !== undefined ? { gte: query.bpmMin } : {}),
+            ...(query.bpmMax !== undefined ? { lte: query.bpmMax } : {}),
+          },
+        }
+      : {}),
+    ...(query.key
+      ? { musicalKey: { contains: query.key, mode: "insensitive" } }
+      : {}),
+    ...(query.priceMin !== undefined || query.priceMax !== undefined
+      ? {
+          basePriceAmount: {
+            ...(query.priceMin !== undefined ? { gte: query.priceMin } : {}),
+            ...(query.priceMax !== undefined ? { lte: query.priceMax } : {}),
+          },
+        }
+      : {}),
+    ...(query.tags ? { tags: { hasEvery: query.tags } } : {}),
+    ...(ownerProfileFilters.length > 0
+      ? { owner: { profile: { AND: ownerProfileFilters } } }
+      : {}),
+    ...(query.licenseType
+      ? {
+          licenseOfferings: {
+            some: {
+              isActive: true,
+              licenseTemplate: { scope: query.licenseType, isActive: true },
             },
-          }
-        : {}),
-      ...(query.key
-        ? { musicalKey: { contains: query.key, mode: "insensitive" } }
-        : {}),
-      ...(query.priceMin !== undefined || query.priceMax !== undefined
-        ? {
-            basePriceAmount: {
-              ...(query.priceMin !== undefined ? { gte: query.priceMin } : {}),
-              ...(query.priceMax !== undefined ? { lte: query.priceMax } : {}),
-            },
-          }
-        : {}),
-      ...(query.tags ? { tags: { hasEvery: query.tags } } : {}),
-      ...(ownerProfileFilters.length > 0
-        ? { owner: { profile: { AND: ownerProfileFilters } } }
-        : {}),
-      ...(query.licenseType
-        ? {
-            licenseOfferings: {
-              some: {
-                isActive: true,
-                licenseTemplate: { scope: query.licenseType, isActive: true },
-              },
-            },
-          }
-        : {}),
-    },
-    orderBy,
-    skip: (query.page - 1) * query.limit,
-    take: query.limit + 1,
-    include: beatInclude,
-  });
+          },
+        }
+      : {}),
+  };
+}
+
+/**
+ * Liste les beats publics en appliquant les filtres de catalogue.
+ * @param query Filtres et tri deja valides par parseBeatListQuery.
+ * @returns Beats publics visibles et nombre total de resultats.
+ */
+export async function findPublishedBeats(query: BeatListQuery) {
+  const prisma = getPrisma();
+  const where = buildPublishedBeatWhere(query);
+  const orderBy =
+    query.sort === "price_asc"
+      ? [{ basePriceAmount: "asc" as const }, { publishedAt: "desc" as const }]
+      : query.sort === "price_desc"
+        ? [{ basePriceAmount: "desc" as const }, { publishedAt: "desc" as const }]
+        : query.sort === "bpm_asc"
+          ? [{ bpm: "asc" as const }, { publishedAt: "desc" as const }]
+          : query.sort === "bpm_desc"
+            ? [{ bpm: "desc" as const }, { publishedAt: "desc" as const }]
+            : [{ publishedAt: "desc" as const }, { createdAt: "desc" as const }];
+  const [items, totalItems] = await prisma.$transaction([
+    prisma.beat.findMany({
+      where,
+      orderBy,
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
+      include: beatInclude,
+    }),
+    prisma.beat.count({ where }),
+  ]);
+
+  return { items, totalItems };
 }
 
 /**

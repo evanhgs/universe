@@ -55,6 +55,8 @@ export async function GET(request: Request) {
       count: page.items.length,
       page: page.page,
       limit: page.limit,
+      totalItems: page.totalItems,
+      totalPages: page.totalPages,
       hasPreviousPage: page.hasPreviousPage,
       hasNextPage: page.hasNextPage,
     },

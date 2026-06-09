@@ -180,16 +180,24 @@ export async function createBeatForCurrentSeller(clerkUserId: string, input: Cre
  * @param query Filtres catalogue valides.
  */
 export async function listPublishedBeatsPayload(query: BeatListQuery): Promise<BeatListPagePayload> {
-  const beats = await findPublishedBeats(query);
-  const hasNextPage = beats.length > query.limit;
-  const pageItems = hasNextPage ? beats.slice(0, query.limit) : beats;
+  const result = await findPublishedBeats(query);
+  const totalPages = Math.max(Math.ceil(result.totalItems / query.limit), 1);
+  const currentPage = Math.min(query.page, totalPages);
+  const pageResult = currentPage === query.page
+    ? result
+    : await findPublishedBeats({
+        ...query,
+        page: currentPage,
+      });
 
   return {
-    items: await Promise.all(pageItems.map(serializeBeat)),
-    page: query.page,
+    items: await Promise.all(pageResult.items.map(serializeBeat)),
+    page: currentPage,
     limit: query.limit,
-    hasPreviousPage: query.page > 1,
-    hasNextPage,
+    totalItems: result.totalItems,
+    totalPages,
+    hasPreviousPage: currentPage > 1,
+    hasNextPage: currentPage < totalPages,
   };
 }
 
@@ -334,12 +342,12 @@ export async function retryBeatPreviewForCurrentSeller(
  * @param profileSlug Slug du profil vendeur.
  */
 export async function listProfileBeatPayloads(profileSlug: string) {
-  const beats = await findPublishedBeats({
+  const result = await findPublishedBeats({
     sellerSlug: profileSlug,
     sort: "newest",
     limit: 8,
     page: 1,
   });
 
-  return Promise.all(beats.slice(0, 8).map(serializeBeat));
+  return Promise.all(result.items.map(serializeBeat));
 }
