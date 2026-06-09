@@ -16,6 +16,7 @@ vi.mock("next-themes", () => ({
 describe("ThemeSelect", () => {
   beforeEach(() => {
     setThemeMock.mockReset();
+    document.cookie = "universe.theme=; path=/; max-age=0";
     Element.prototype.hasPointerCapture = vi.fn(() => false);
     Element.prototype.setPointerCapture = vi.fn();
     Element.prototype.releasePointerCapture = vi.fn();
@@ -33,5 +34,6 @@ describe("ThemeSelect", () => {
     await userEvent.click(screen.getByRole("option", { name: /Sombre/ }));
 
     expect(setThemeMock).toHaveBeenCalledWith("dark");
+    expect(document.cookie).toContain("universe.theme=dark");
   });
 });
