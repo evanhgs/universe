@@ -34,7 +34,7 @@ import {
   markWebhookEventProcessed,
   recordWebhookEventStart,
 } from "./marketplace.repository";
-import { createStripeCheckoutSession, retrieveStripeCheckoutSession } from "./stripe.client";
+import { createStripeCheckoutSession, retrieveStripeCheckoutSession } from "@/lib/stripe.client";
 import type {
   CreateDirectPurchaseOrderInput,
   MarketplaceAssetPayload,
