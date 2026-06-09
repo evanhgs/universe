@@ -151,7 +151,7 @@ describe("beat validation", () => {
     expect(
       parseBeatListQuery(
         new URL(
-          "https://example.com/beats?tags=Piano,Synth&sort=price_desc&limit=100&sellerSlug=prod&licenseType=basic",
+          "https://example.com/beats?tags=Piano,Synth&sort=price_desc&limit=35&page=2&sellerSlug=prod&licenseType=basic",
         ),
       ),
     ).toEqual({
@@ -169,7 +169,8 @@ describe("beat validation", () => {
       tags: ["PIANO", "SYNTH"],
       licenseType: "BASIC",
       sort: "price_desc",
-      limit: 50,
+      limit: 35,
+      page: 2,
     });
 
     expect(parseUpdateBeatInput({ priceAmount: "12.345", status: "hidden" })).toEqual({

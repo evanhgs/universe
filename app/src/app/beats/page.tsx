@@ -11,10 +11,13 @@ type BeatsPageProps = {
     search?: string;
     genre?: string;
     sellerSlug?: string;
+    limit?: string;
+    page?: string;
   }>;
 };
 
 export const dynamic = "force-dynamic";
+const MARKETPLACE_LIMIT_OPTIONS = [20, 35, 50] as const;
 
 /**
  * Formate le prix hors taxe affiche sur les cartes catalogue.
@@ -37,6 +40,40 @@ function formatPriceHT(priceAmount: number | null, currency: string, isFree: boo
   }).format(priceAmount)} HT`;
 }
 
+function parseMarketplaceLimit(value: string | undefined) {
+  const limit = Number(value ?? MARKETPLACE_LIMIT_OPTIONS[0]);
+
+  return MARKETPLACE_LIMIT_OPTIONS.find((option) => option === limit) ?? MARKETPLACE_LIMIT_OPTIONS[0];
+}
+
+function parsePage(value: string | undefined) {
+  const page = Number(value ?? 1);
+
+  return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function paginationHref(
+  params: Awaited<BeatsPageProps["searchParams"]>,
+  updates: { page?: number; limit?: number },
+) {
+  const nextParams = new URLSearchParams();
+  const search = params.search?.trim();
+  const genre = params.genre?.trim();
+  const sellerSlug = params.sellerSlug?.trim();
+  const limit = updates.limit ?? parseMarketplaceLimit(params.limit);
+  const page = updates.page ?? parsePage(params.page);
+
+  if (search) nextParams.set("search", search);
+  if (genre) nextParams.set("genre", genre);
+  if (sellerSlug) nextParams.set("sellerSlug", sellerSlug);
+  nextParams.set("limit", String(limit));
+  if (page > 1) nextParams.set("page", String(page));
+
+  const query = nextParams.toString();
+
+  return query ? `/beats?${query}` : "/beats";
+}
+
 /**
  * Page catalogue serveur affichant les beats publics et le formulaire d'upload test.
  * @param props.searchParams Filtres search, genre et sellerSlug fournis par Next.js.
@@ -46,13 +83,17 @@ export default async function BeatsPage({ searchParams }: BeatsPageProps) {
   const params = await searchParams;
   const genreParam = params.genre?.trim().toUpperCase() as MainGenre | undefined;
   const genre = genreParam && MAIN_GENRES.includes(genreParam) ? genreParam : undefined;
-  const beats = await listPublishedBeatsPayload({
+  const limit = parseMarketplaceLimit(params.limit);
+  const page = parsePage(params.page);
+  const beatPage = await listPublishedBeatsPayload({
     search: params.search,
     genre,
     sellerSlug: params.sellerSlug,
     sort: "newest",
-    limit: 48,
+    limit,
+    page,
   });
+  const beats = beatPage.items;
 
   return (
     <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-6xl px-6 py-10">
@@ -80,7 +121,10 @@ export default async function BeatsPage({ searchParams }: BeatsPageProps) {
       </div>
 
 
-      <form className="mt-6 grid gap-3 md:grid-cols-[1fr_180px_auto]" action="/beats">
+      <form className="mt-6 grid gap-3 md:grid-cols-[1fr_180px_140px_auto]" action="/beats">
+        {params.sellerSlug ? (
+          <input name="sellerSlug" type="hidden" value={params.sellerSlug} />
+        ) : null}
         <Input
           defaultValue={params.search ?? ""}
           name="search"
@@ -91,6 +135,17 @@ export default async function BeatsPage({ searchParams }: BeatsPageProps) {
           name="genre"
           placeholder="Style"
         />
+        <select
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          defaultValue={limit}
+          name="limit"
+        >
+          {MARKETPLACE_LIMIT_OPTIONS.map((option) => (
+            <option key={option} value={option}>
+              {option} / page
+            </option>
+          ))}
+        </select>
         <Button size="lg" type="submit">
           Filtrer
         </Button>
@@ -146,6 +201,35 @@ export default async function BeatsPage({ searchParams }: BeatsPageProps) {
           })}
         </div>
       )}
+      <nav className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5">
+        <p className="text-sm text-muted-foreground">
+          Page {beatPage.page} - {beatPage.limit} resultats par page
+        </p>
+        <div className="flex gap-2">
+          {beatPage.hasPreviousPage ? (
+            <Button asChild variant="outline">
+              <Link href={paginationHref(params, { page: beatPage.page - 1 })}>
+                Precedent
+              </Link>
+            </Button>
+          ) : (
+            <Button disabled variant="outline">
+              Precedent
+            </Button>
+          )}
+          {beatPage.hasNextPage ? (
+            <Button asChild variant="outline">
+              <Link href={paginationHref(params, { page: beatPage.page + 1 })}>
+                Suivant
+              </Link>
+            </Button>
+          ) : (
+            <Button disabled variant="outline">
+              Suivant
+            </Button>
+          )}
+        </div>
+      </nav>
     </main>
   );
 }

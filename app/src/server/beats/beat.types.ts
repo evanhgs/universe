@@ -136,6 +136,15 @@ export type BeatListQuery = {
   licenseType?: LicenseScope;
   sort: "newest" | "price_asc" | "price_desc" | "bpm_asc" | "bpm_desc";
   limit: number;
+  page: number;
+};
+
+export type BeatListPagePayload = {
+  items: BeatApiPayload[];
+  page: number;
+  limit: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
 };
 
 export type BeatFeedCursor = {

@@ -20,6 +20,7 @@ import type {
   BeatApiPayload,
   BeatFeedPagePayload,
   BeatFeedQuery,
+  BeatListPagePayload,
   BeatListQuery,
   CreateBeatInput,
   UpdateBeatInput,
@@ -175,14 +176,21 @@ export async function createBeatForCurrentSeller(clerkUserId: string, input: Cre
 }
 
 /**
- * TODO: ajouter la pagination dans le marketplace 20 / 35 / 50
- * Liste les beats publics sous forme de payloads API.
+ * Liste une page de beats publics sous forme de payloads API.
  * @param query Filtres catalogue valides.
  */
-export async function listPublishedBeatsPayload(query: BeatListQuery) {
+export async function listPublishedBeatsPayload(query: BeatListQuery): Promise<BeatListPagePayload> {
   const beats = await findPublishedBeats(query);
+  const hasNextPage = beats.length > query.limit;
+  const pageItems = hasNextPage ? beats.slice(0, query.limit) : beats;
 
-  return Promise.all(beats.map(serializeBeat));
+  return {
+    items: await Promise.all(pageItems.map(serializeBeat)),
+    page: query.page,
+    limit: query.limit,
+    hasPreviousPage: query.page > 1,
+    hasNextPage,
+  };
 }
 
 /**
@@ -330,7 +338,8 @@ export async function listProfileBeatPayloads(profileSlug: string) {
     sellerSlug: profileSlug,
     sort: "newest",
     limit: 8,
+    page: 1,
   });
 
-  return Promise.all(beats.map(serializeBeat));
+  return Promise.all(beats.slice(0, 8).map(serializeBeat));
 }

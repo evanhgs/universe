@@ -477,7 +477,7 @@ export async function createBeat(ownerId: string, input: CreateBeatInput) {
 /**
  * Liste les beats publics en appliquant les filtres de catalogue.
  * @param query Filtres et tri deja valides par parseBeatListQuery.
- * @returns Beats publics visibles et propres moderation.
+ * @returns Beats publics visibles et propres moderation, avec un element supplementaire pour detecter la suite.
  */
 export async function findPublishedBeats(query: BeatListQuery) {
   const ownerProfileFilters: Prisma.UserProfileWhereInput[] = [];
@@ -576,7 +576,8 @@ export async function findPublishedBeats(query: BeatListQuery) {
         : {}),
     },
     orderBy,
-    take: query.limit,
+    skip: (query.page - 1) * query.limit,
+    take: query.limit + 1,
     include: beatInclude,
   });
 }

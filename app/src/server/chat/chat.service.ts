@@ -1,6 +1,7 @@
 import "server-only";
 
 import { syncCurrentAccountFromClerk } from "@/server/account/account.sync";
+import { getPublicAssetUrl } from "@/server/storage/s3";
 
 import type { ConversationType } from "../../../generated/prisma/enums";
 import {
@@ -48,17 +49,27 @@ async function assertCurrentAccount(clerkUserId: string): Promise<Account> {
  * Convertit un utilisateur Prisma en payload chat public minimal.
  * @param user Utilisateur charge avec son profil.
  */
-function serializeUser(user: {
+async function serializeUser(user: {
   id: string;
   profile: {
     displayName: string;
     slug: string;
+    avatarAsset: {
+      bucket: string;
+      objectKey: string;
+      isPublic: boolean;
+    } | null;
   } | null;
-}): ChatUserPayload {
+}): Promise<ChatUserPayload> {
+  const avatarUrl = user.profile?.avatarAsset
+    ? await getPublicAssetUrl(user.profile.avatarAsset)
+    : null;
+
   return {
     id: user.id,
     displayName: user.profile?.displayName ?? null,
     slug: user.profile?.slug ?? null,
+    avatarUrl,
   };
 }
 
@@ -66,11 +77,11 @@ function serializeUser(user: {
  * Convertit un message Prisma en payload API.
  * @param message Message charge avec sender.
  */
-function serializeMessage(message: MessageRecord): MessagePayload {
+async function serializeMessage(message: MessageRecord): Promise<MessagePayload> {
   return {
     id: message.id,
     conversationId: message.conversationId,
-    sender: message.sender ? serializeUser(message.sender) : null,
+    sender: message.sender ? await serializeUser(message.sender) : null,
     type: message.type,
     body: message.body,
     createdAt: message.createdAt.toISOString(),
@@ -131,14 +142,16 @@ async function serializeConversations(args: {
               title: beat.title,
             }
           : (null satisfies ChatBeatPayload),
-        participants: conversation.participants.map((participant) =>
-          serializeUser(participant.user),
+        participants: await Promise.all(
+          conversation.participants.map((participant) => serializeUser(participant.user)),
         ),
-        otherParticipants: conversation.participants
-          .filter((participant) => participant.userId !== args.userId)
-          .map((participant) => serializeUser(participant.user)),
+        otherParticipants: await Promise.all(
+          conversation.participants
+            .filter((participant) => participant.userId !== args.userId)
+            .map((participant) => serializeUser(participant.user)),
+        ),
         lastMessage: conversation.messages[0]
-          ? serializeMessage(conversation.messages[0])
+          ? await serializeMessage(conversation.messages[0])
           : null,
         lastMessageAt: conversation.lastMessageAt?.toISOString() ?? null,
         unreadCount,
@@ -247,7 +260,7 @@ export async function listCurrentUserMessages(
 
   const messages = await listConversationMessages(conversationId, page);
 
-  return messages.reverse().map(serializeMessage);
+  return Promise.all(messages.reverse().map(serializeMessage));
 }
 
 /**
@@ -271,7 +284,7 @@ export async function sendCurrentUserMessage(
     throw new Error("conversation_forbidden");
   }
 
-  return serializeMessage(
+  return await serializeMessage(
     await createTextMessage({
       conversationId,
       senderId: account.id,

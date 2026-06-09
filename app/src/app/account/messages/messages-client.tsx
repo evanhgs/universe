@@ -13,6 +13,7 @@ import {
 } from "react";
 
 import { Alert } from "@/components/ui/alert";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -94,6 +95,20 @@ function conversationTitle(conversation: ConversationSummary) {
       .join(" / ") ||
     "Utilisateur"
   );
+}
+
+function conversationAvatarParticipant(conversation: ConversationSummary) {
+  return conversation.otherParticipants[0] ?? conversation.participants[0] ?? null;
+}
+
+function userInitials(user: { displayName: string | null; slug: string | null } | null) {
+  const label = user?.displayName ?? user?.slug ?? "U";
+  const words = label.trim().split(/\s+/).filter(Boolean);
+  const initials = words.length > 1
+    ? `${words[0][0]}${words[1][0]}`
+    : label.slice(0, 2);
+
+  return initials.toUpperCase();
 }
 
 /**
@@ -329,31 +344,42 @@ export function MessagesClient() {
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {conversations.map((conversation) => (
-                <button
-                  className={`grid w-full gap-2 p-4 text-left hover:bg-muted ${
-                    selectedConversation?.id === conversation.id ? "bg-muted" : ""
-                  }`}
-                  key={conversation.id}
-                  onClick={() => selectConversation(conversation.id)}
-                  type="button"
-                >
-                  <span className="flex items-center justify-between gap-3">
-                    <span className="truncate text-sm font-semibold text-foreground">
-                      {conversationTitle(conversation)}
+              {conversations.map((conversation) => {
+                const avatarParticipant = conversationAvatarParticipant(conversation);
+
+                return (
+                  <button
+                    className={`flex w-full gap-3 p-4 text-left hover:bg-muted ${
+                      selectedConversation?.id === conversation.id ? "bg-muted" : ""
+                    }`}
+                    key={conversation.id}
+                    onClick={() => selectConversation(conversation.id)}
+                    type="button"
+                  >
+                    <Avatar className="size-10">
+                      {avatarParticipant?.avatarUrl ? (
+                        <AvatarImage alt="" src={avatarParticipant.avatarUrl} />
+                      ) : null}
+                      <AvatarFallback>{userInitials(avatarParticipant)}</AvatarFallback>
+                    </Avatar>
+                    <span className="grid min-w-0 flex-1 gap-2">
+                      <span className="flex items-center justify-between gap-3">
+                        <span className="truncate text-sm font-semibold text-foreground">
+                          {conversationTitle(conversation)}
+                        </span>
+                        {conversation.unreadCount > 0 ? (
+                          <Badge className="min-w-6 justify-center px-2 py-0" variant="primary">
+                            {conversation.unreadCount}
+                          </Badge>
+                        ) : null}
+                      </span>
+                      <span className="line-clamp-2 text-sm leading-5 text-muted-foreground">
+                        {conversation.lastMessage?.body ?? "Conversation ouverte."}
+                      </span>
                     </span>
-                    {conversation.unreadCount > 0 ? (
-                      <Badge className="min-w-6 justify-center px-2 py-0" variant="primary">
-                        {conversation.unreadCount}
-                      </Badge>
-                    ) : null}
-                  </span>
-                  {/*TODO: ajouter la photo de profil à coté du pseudo*/}
-                  <span className="line-clamp-2 text-sm leading-5 text-muted-foreground">
-                    {conversation.lastMessage?.body ?? "Conversation ouverte."}
-                  </span>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           )}
         </aside>
