@@ -164,12 +164,13 @@ describe("BeatsCatalogClient", () => {
       />,
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Precedent" }));
+    await userEvent.click(screen.getByRole("button", { name: "Précédent" }));
 
     await waitFor(() => {
       expect(screen.getByText("Last Valid Page Beat")).toBeInTheDocument();
     });
     expect(pushStateSpy).toHaveBeenCalledWith(null, "", "/beats?limit=20&page=3");
-    expect(screen.getByText("Page 3 / 3 - 20 resultats par page")).toBeInTheDocument();
+    expect(screen.getByText("Page 3 / 3")).toBeInTheDocument();
+    expect(screen.getByText("41 résultats trouvés")).toBeInTheDocument();
   });
 });
