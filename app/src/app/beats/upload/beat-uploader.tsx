@@ -11,7 +11,7 @@ import {
   UploadCloud,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import {SubmitEventHandler, SyntheticEvent, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -542,7 +542,7 @@ export function BeatUpload() {
     setSecondGenres((current) => current.filter((genre) => allowedSecondGenres.includes(genre)));
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const normalizedTitle = title.trim();
