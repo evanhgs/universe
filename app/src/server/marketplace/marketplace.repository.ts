@@ -105,11 +105,19 @@ export async function findPurchasableOffering(input: CreateDirectPurchaseOrderIn
       ...(input.licenseOfferingId ? { id: input.licenseOfferingId } : {}),
       ...(input.beatSlug ? { beat: { slug: input.beatSlug } } : {}),
       isActive: true,
+      stripePriceId: {
+        not: null,
+      },
+      stripePriceActive: true,
       beat: {
         ...(input.beatSlug ? { slug: input.beatSlug } : {}),
         status: "PUBLISHED",
         visibility: "PUBLIC",
         moderationStatus: "CLEAN",
+        stripeProductId: {
+          not: null,
+        },
+        stripeSyncStatus: "SYNCED",
       },
       licenseTemplate: {
         isActive: true,
@@ -189,6 +197,7 @@ export async function createOrderForOffering(args: {
           unitAmount: priceAmount,
           quantity: 1,
           lineTotalAmount: priceAmount,
+          stripePriceIdSnapshot: args.offering.stripePriceId,
           rightsSnapshotJson: rightsSnapshot,
         },
       },

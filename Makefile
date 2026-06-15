@@ -38,12 +38,12 @@ endif
 	dev dev-down dev-logs dev-ps \
 	dev-next-sh dev-prisma-generate dev-prisma-migrate dev-prisma-migrate-container \
 	dev-prisma-push dev-prisma-push-container dev-prisma-studio dev-prisma-studio-container \
-	dev-db-seed-benchmark \
+	dev-db-seed-benchmark dev-stripe-clear-catalog dev-stripe-sync-catalog \
 	dev-test dev-test-next dev-test-rust dev-test-python \
 	runtime runtime-down runtime-logs runtime-ps runtime-prisma-migrate runtime-prisma-push \
 	staging staging-down staging-logs staging-ps staging-prisma-migrate staging-prisma-push \
 	prod prod-down prod-logs prod-ps \
-	db-seed-benchmark next-sh prisma-generate prisma-migrate prisma-push prisma-studio test
+	db-seed-benchmark next-sh prisma-generate prisma-migrate prisma-push prisma-studio stripe-clear-catalog stripe-sync-catalog test
 
 define require_env_file
 	@test -f $(1) || (echo "Missing $(1). Copy $(1).example to $(1) before running this target." >&2; exit 1)
@@ -123,6 +123,14 @@ dev-db-seed-benchmark:
 	$(call require_env_file,$(DEV_ENV_FILE))
 	$(DEV_COMPOSE) exec -T $(SEED_ENV_ARGS) nextjs npm run db:seed:benchmark
 
+dev-stripe-clear-catalog:
+	$(call require_env_file,$(DEV_ENV_FILE))
+	$(call run_dev_prisma_host,npm run stripe:clear-catalog -- $(ARGS))
+
+dev-stripe-sync-catalog:
+	$(call require_env_file,$(DEV_ENV_FILE))
+	$(call run_dev_prisma_host,npm run stripe:sync-catalog -- $(ARGS))
+
 # -----------------------------------------------------------------------------
 # Dev tests (run inside the dev compose containers — `make dev` must be up).
 # Each granular target executes the canonical test runner of its stack ; the
@@ -152,6 +160,8 @@ prisma-migrate: dev-prisma-migrate
 prisma-push: dev-prisma-push
 prisma-studio: dev-prisma-studio
 db-seed-benchmark: dev-db-seed-benchmark
+stripe-clear-catalog: dev-stripe-clear-catalog
+stripe-sync-catalog: dev-stripe-sync-catalog
 test: dev-test
 
 # -----------------------------------------------------------------------------

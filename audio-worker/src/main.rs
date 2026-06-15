@@ -720,9 +720,9 @@ async fn mark_job_ready(
         r#"
         UPDATE "Beat"
         SET "durationSec" = $2,
-            status = CASE WHEN $3 AND status = 'PROCESSING' THEN 'PUBLISHED' ELSE status END,
-            "publishedAt" = CASE WHEN $3 AND status = 'PROCESSING' THEN NOW() ELSE "publishedAt" END,
-            "firstPublishedAt" = CASE WHEN $3 AND "firstPublishedAt" IS NULL THEN NOW() ELSE "firstPublishedAt" END,
+            status = CASE WHEN $3 AND status = 'PROCESSING' AND "stripeSyncStatus" = 'SYNCED'::"StripeCatalogSyncStatus" THEN 'PUBLISHED' ELSE status END,
+            "publishedAt" = CASE WHEN $3 AND status = 'PROCESSING' AND "stripeSyncStatus" = 'SYNCED'::"StripeCatalogSyncStatus" THEN NOW() ELSE "publishedAt" END,
+            "firstPublishedAt" = CASE WHEN $3 AND "firstPublishedAt" IS NULL AND "stripeSyncStatus" = 'SYNCED'::"StripeCatalogSyncStatus" THEN NOW() ELSE "firstPublishedAt" END,
             "updatedAt" = NOW()
         WHERE id = $1
         "#,

@@ -11,7 +11,7 @@ import {
   UploadCloud,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import {SubmitEventHandler, SyntheticEvent, useMemo, useState } from "react";
+import { SyntheticEvent, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

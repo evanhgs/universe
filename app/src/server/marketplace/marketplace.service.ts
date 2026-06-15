@@ -289,6 +289,12 @@ export async function createStripeCheckoutForCurrentBuyer(
   }
 
   const totalAmount = decimalToNumber(order.totalAmount) ?? 0;
+  const stripePriceIdSnapshots = order.items.map((item) => item.stripePriceIdSnapshot);
+
+  if (stripePriceIdSnapshots.length === 0 || stripePriceIdSnapshots.some((priceId) => !priceId)) {
+    throw new Error("stripe_price_missing");
+  }
+
   const reusablePayment = await findLatestPendingStripePayment({
     orderId: order.id,
     buyerId: account.id,
@@ -317,13 +323,12 @@ export async function createStripeCheckoutForCurrentBuyer(
     currency: order.currency,
   });
   const defaults = buildDefaultCheckoutUrls(order.id, requestUrl);
+
   const session = await createStripeCheckoutSession({
     orderId: order.id,
     paymentId: payment.id,
     buyerId: account.id,
-    amountCents: toCents(totalAmount),
-    currency: order.currency,
-    title: order.items.map((item) => item.titleSnapshot).join(", "),
+    stripePriceIdSnapshots: stripePriceIdSnapshots as string[],
     successUrl: input.successUrl ?? defaults.successUrl,
     cancelUrl: input.cancelUrl ?? defaults.cancelUrl,
   });

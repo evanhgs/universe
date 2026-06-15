@@ -67,9 +67,7 @@ export async function createStripeCheckoutSession(args: {
   orderId: string;
   paymentId: string;
   buyerId: string;
-  amountCents: number;
-  currency: string;
-  title: string;
+  stripePriceIdSnapshots: string[];
   successUrl: string;
   cancelUrl: string;
 }) {
@@ -88,19 +86,10 @@ export async function createStripeCheckoutSession(args: {
     automatic_tax: {
       enabled: getStripeAutomaticTaxEnabled(),
     },
-    line_items: [
-      {
-        quantity: 1,
-        price_data: {
-          currency: args.currency.toLowerCase(),
-          unit_amount: args.amountCents,
-          tax_behavior: "exclusive",
-          product_data: {
-            name: args.title,
-          },
-        },
-      },
-    ],
+    line_items: args.stripePriceIdSnapshots.map((price) => ({
+      price,
+      quantity: 1,
+    })),
     metadata,
     payment_intent_data: {
       metadata,

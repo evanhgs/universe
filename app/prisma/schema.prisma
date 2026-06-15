@@ -35,6 +35,13 @@ enum BeatStatus {
   DELETED
 }
 
+enum StripeCatalogSyncStatus {
+  NOT_SYNCED
+  SYNCING
+  SYNCED
+  FAILED
+}
+
 enum Visibility {
   PUBLIC
   UNLISTED
@@ -633,6 +640,10 @@ model Beat {
   moderationStatus     ModerationStatus @default(CLEAN)
   isFree               Boolean   @default(false)
   brandingRequired     Boolean   @default(false)
+  stripeProductId      String?   @unique
+  stripeSyncStatus     StripeCatalogSyncStatus @default(NOT_SYNCED)
+  stripeSyncedAt       DateTime?
+  stripeSyncError      String?
   firstPublishedAt     DateTime?
   publishedAt          DateTime?
   archivedAt           DateTime?
@@ -720,6 +731,8 @@ model BeatLicenseOffering {
   title                    String?
   description              String?
   priceAmount              Decimal      @db.Decimal(10,2)
+  stripePriceId            String?      @unique
+  stripePriceActive        Boolean      @default(false)
   currency                 String       @default("EUR")
   isActive                 Boolean      @default(true)
   isDefault                Boolean      @default(false)
@@ -782,6 +795,7 @@ model OrderItem {
   unitAmount              Decimal         @db.Decimal(10,2)
   quantity                Int             @default(1)
   lineTotalAmount         Decimal         @db.Decimal(10,2)
+  stripePriceIdSnapshot   String?
   rightsSnapshotJson      Json?
   createdAt               DateTime        @default(now())
 
