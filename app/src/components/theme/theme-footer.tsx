@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { ThemeSelect } from "./theme-select";
 
-const appVersion = "v2.2.1-dev";
+const appVersion = "v2.3.0-dev";
 
 export function ThemeFooter() {
   return (
