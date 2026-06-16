@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   checkoutSessionsCreate: vi.fn(),
   portalSessionsCreate: vi.fn(),
+  taxRatesCreate: vi.fn(),
+  taxRatesList: vi.fn(),
   stripeConstructor: vi.fn(),
 }));
 
@@ -18,6 +20,10 @@ vi.mock("stripe", () => ({
         create: mocks.portalSessionsCreate,
       },
     };
+    taxRates = {
+      create: mocks.taxRatesCreate,
+      list: mocks.taxRatesList,
+    };
 
     constructor(...args: unknown[]) {
       mocks.stripeConstructor(...args);
@@ -32,6 +38,18 @@ describe("stripe client", () => {
     vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_123");
     mocks.checkoutSessionsCreate.mockResolvedValue({ id: "cs_123" });
     mocks.portalSessionsCreate.mockResolvedValue({ url: "https://stripe.test/portal" });
+    mocks.taxRatesList.mockResolvedValue({
+      data: [
+        {
+          id: "txr_fr_vat",
+          country: "FR",
+          inclusive: false,
+          percentage: 20,
+          tax_type: "vat",
+        },
+      ],
+    });
+    mocks.taxRatesCreate.mockResolvedValue({ id: "txr_created" });
   });
 
   it("creates Checkout Sessions with catalog Price ids", async () => {
@@ -52,8 +70,13 @@ describe("stripe client", () => {
           {
             price: "price_123",
             quantity: 1,
+            tax_rates: ["txr_fr_vat"],
           },
         ],
+        billing_address_collection: "required",
+        automatic_tax: {
+          enabled: false,
+        },
       }),
     );
     expect(mocks.checkoutSessionsCreate.mock.calls[0][0].line_items[0]).not.toHaveProperty(

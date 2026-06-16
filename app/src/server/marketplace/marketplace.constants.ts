@@ -3,3 +3,4 @@ import "server-only";
 export const DEFAULT_PLATFORM_COMMISSION_RATE_BP = 3000;
 export const PREMIUM_PLATFORM_COMMISSION_RATE_BP = 900;
 export const DEFAULT_DOWNLOAD_LIMIT = 5;
+export const FRANCE_DEFAULT_VAT_RATE_PERCENT = 20;

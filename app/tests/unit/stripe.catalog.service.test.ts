@@ -39,6 +39,12 @@ const catalogBeat = {
   slug: "first-beat",
   title: "First Beat",
   description: "Dark trap beat",
+  bpm: 140,
+  musicalKey: "C Minor",
+  durationSec: 145,
+  mainGenres: ["RAP", "TRAP"],
+  moods: ["DARK"],
+  tags: ["HEAVY_DRUMS"],
   status: "DRAFT",
   stripeProductId: null,
   licenseOfferings: [
@@ -83,10 +89,15 @@ describe("stripe catalog service", () => {
     expect(mocks.stripe.products.create).toHaveBeenCalledWith(
       expect.objectContaining({
         name: "First Beat",
+        description: expect.stringContaining("BPM: 140"),
         metadata: {
           beatId: "beat_1",
           ownerId: "seller_1",
           slug: "first-beat",
+          title: "First Beat",
+          bpm: "140",
+          musicalKey: "C Minor",
+          durationSec: "145",
         },
         tax_code: "txcd_10000000",
       }),
@@ -98,6 +109,7 @@ describe("stripe catalog service", () => {
         unit_amount: 1299,
         currency: "eur",
         tax_behavior: "exclusive",
+        nickname: "MP3",
       }),
     );
     expect(mocks.prisma.beatLicenseOffering.update).toHaveBeenCalledWith({
