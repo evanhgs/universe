@@ -5,6 +5,8 @@ import {
   renderPurchaseConfirmedEmail,
   renderSaleConfirmedEmail,
   renderSellerAccessGrantedEmail,
+  renderSubscriptionEndedEmail,
+  renderSubscriptionStartedEmail,
 } from "@/server/email/email.templates";
 import type { OrderEmailContext } from "@/server/email/email.types";
 
@@ -154,5 +156,38 @@ describe("email templates", () => {
       latestUnreadMessageId: "msg_123",
       latestUnreadAt: "2026-01-02T11:00:00.000Z",
     });
+  });
+
+  it("renders subscription lifecycle emails", () => {
+    const subscription = {
+      id: "sub_local_123",
+      providerSubscriptionId: "sub_stripe_123",
+      status: "ACTIVE",
+      currentPeriodEnd: new Date("2026-07-16T00:00:00.000Z"),
+      user: {
+        id: "user_123",
+        email: "creator@example.com",
+        displayName: "Creator <Name>",
+      },
+      plan: {
+        name: "Universe",
+        reducedCommissionRateBp: 900,
+      },
+    };
+
+    const started = renderSubscriptionStartedEmail(subscription);
+    const ended = renderSubscriptionEndedEmail({
+      ...subscription,
+      status: "CANCELED",
+    });
+
+    expect(started.subject).toBe("Ton abonnement Universe est actif");
+    expect(started.template).toBe("SUBSCRIPTION_STARTED");
+    expect(started.dedupeKey).toBe("subscription.started:sub_stripe_123");
+    expect(started.textBody).toContain("Commission marketplace: 9%");
+    expect(started.htmlBody).toContain("Creator &lt;Name&gt;");
+    expect(ended.subject).toBe("Ton abonnement Universe n'est plus actif");
+    expect(ended.template).toBe("SUBSCRIPTION_ENDED");
+    expect(ended.dedupeKey).toBe("subscription.ended:sub_stripe_123:CANCELED");
   });
 });

@@ -23,6 +23,9 @@ describe("PricingPage", () => {
       isAuthenticated: false,
       isPremium: false,
       commissionRateBp: 3000,
+      status: "INACTIVE",
+      currentPeriodEnd: null,
+      canManageSubscription: false,
     });
   });
 
@@ -36,5 +39,13 @@ describe("PricingPage", () => {
     expect(screen.getAllByText(/30%/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/9%/).length).toBeGreaterThan(0);
     expect(screen.getByText(/Traitement audio et support plus prioritaires/)).toBeInTheDocument();
+  });
+
+  it("shows a success notification after subscription Checkout redirect", async () => {
+    const { default: PricingPage } = await import("@/app/pricing/page");
+
+    render(await PricingPage({ searchParams: Promise.resolve({ subscription: "success" }) }));
+
+    expect(screen.getByText(/abonnement Universe a bien ete pris en compte/)).toBeInTheDocument();
   });
 });

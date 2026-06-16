@@ -5,6 +5,7 @@ const findChatUnreadReminderCandidatesMock = vi.fn();
 const findEmailAccountByClerkUserIdMock = vi.fn();
 const findEmailEventByDedupeKeyMock = vi.fn();
 const findOrderEmailContextMock = vi.fn();
+const findSubscriptionEmailContextMock = vi.fn();
 const updateEmailEventStatusMock = vi.fn();
 
 vi.mock("@/server/email/email.repository", () => ({
@@ -13,6 +14,7 @@ vi.mock("@/server/email/email.repository", () => ({
   findEmailAccountByClerkUserId: findEmailAccountByClerkUserIdMock,
   findEmailEventByDedupeKey: findEmailEventByDedupeKeyMock,
   findOrderEmailContext: findOrderEmailContextMock,
+  findSubscriptionEmailContext: findSubscriptionEmailContextMock,
   updateEmailEventStatus: updateEmailEventStatusMock,
 }));
 
@@ -31,6 +33,7 @@ describe("EmailService", () => {
     findEmailAccountByClerkUserIdMock.mockReset();
     findEmailEventByDedupeKeyMock.mockReset().mockResolvedValue(null);
     findOrderEmailContextMock.mockReset();
+    findSubscriptionEmailContextMock.mockReset();
     updateEmailEventStatusMock.mockReset().mockImplementation((args) => Promise.resolve(args));
   });
 
@@ -198,6 +201,42 @@ describe("EmailService", () => {
       expect.objectContaining({
         template: "CHAT_UNREAD_REMINDER",
         dedupeKey: "chat.unread.reminder:conv_123:recipient_123:msg_123",
+      }),
+    );
+  });
+
+  it("sends subscription started emails from subscription context", async () => {
+    const provider = {
+      send: vi.fn().mockResolvedValue({
+        provider: "RESEND",
+        providerMessageId: "resend_123",
+      }),
+    };
+    findSubscriptionEmailContextMock.mockResolvedValue({
+      id: "sub_local_123",
+      providerSubscriptionId: "sub_stripe_123",
+      status: "ACTIVE",
+      currentPeriodEnd: new Date("2026-07-16T00:00:00.000Z"),
+      user: {
+        id: "user_123",
+        email: "creator@example.com",
+        displayName: "Creator",
+      },
+      plan: {
+        name: "Universe",
+        reducedCommissionRateBp: 900,
+      },
+    });
+    const { EmailService } = await import("@/server/email/email.service");
+    const service = new EmailService(provider);
+
+    await service.sendSubscriptionStarted("sub_stripe_123");
+
+    expect(findSubscriptionEmailContextMock).toHaveBeenCalledWith("sub_stripe_123");
+    expect(createEmailEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        template: "SUBSCRIPTION_STARTED",
+        dedupeKey: "subscription.started:sub_stripe_123",
       }),
     );
   });

@@ -16,9 +16,10 @@ import {
   DEFAULT_PLATFORM_COMMISSION_RATE_BP,
   PREMIUM_PLATFORM_COMMISSION_RATE_BP,
 } from "@/server/marketplace/marketplace.constants";
+import { emailService } from "@/server/email/email.service";
 
 const UNIVERSE_MONTHLY_PLAN_CODE = "universe_monthly";
-const UNIVERSE_MONTHLY_PRICE_AMOUNT = process.env.UNIVERSE_PRICING_MONTHLY_LABEL ?? "";
+const DEFAULT_UNIVERSE_MONTHLY_PRICE_AMOUNT = 8.99;
 const UNIVERSE_MONTHLY_CURRENCY = "EUR";
 
 type SubscriptionLike = Stripe.Subscription & {
@@ -38,6 +39,18 @@ function getUniverseMonthlyPriceId() {
   }
 
   return priceId;
+}
+
+function getUniverseMonthlyPriceAmount() {
+  const rawAmount = process.env.UNIVERSE_PRICING_MONTHLY_LABEL?.trim();
+
+  if (!rawAmount) {
+    return DEFAULT_UNIVERSE_MONTHLY_PRICE_AMOUNT;
+  }
+
+  const amount = Number.parseFloat(rawAmount.replace(",", "."));
+
+  return Number.isFinite(amount) && amount > 0 ? amount : DEFAULT_UNIVERSE_MONTHLY_PRICE_AMOUNT;
 }
 
 function buildUrl(origin: string, path: string) {
@@ -105,12 +118,14 @@ function isPremiumStatus(status: SubscriptionStatus, currentPeriodEnd: Date | nu
 }
 
 async function ensureUniverseMonthlyPlan() {
+  const priceAmount = getUniverseMonthlyPriceAmount();
+
   return getPrisma().subscriptionPlan.upsert({
     where: { code: UNIVERSE_MONTHLY_PLAN_CODE },
     update: {
       name: "Universe",
       interval: "MONTHLY",
-      priceAmount: UNIVERSE_MONTHLY_PRICE_AMOUNT,
+      priceAmount,
       currency: UNIVERSE_MONTHLY_CURRENCY,
       reducedCommissionRateBp: PREMIUM_PLATFORM_COMMISSION_RATE_BP,
       stripePriceId: getUniverseMonthlyPriceId(),
@@ -120,7 +135,7 @@ async function ensureUniverseMonthlyPlan() {
       code: UNIVERSE_MONTHLY_PLAN_CODE,
       name: "Universe",
       interval: "MONTHLY",
-      priceAmount: UNIVERSE_MONTHLY_PRICE_AMOUNT,
+      priceAmount,
       currency: UNIVERSE_MONTHLY_CURRENCY,
       reducedCommissionRateBp: PREMIUM_PLATFORM_COMMISSION_RATE_BP,
       stripePriceId: getUniverseMonthlyPriceId(),
@@ -129,14 +144,10 @@ async function ensureUniverseMonthlyPlan() {
   });
 }
 
-async function findActiveSubscription(userId: string, now = new Date()) {
+async function findLatestUniverseSubscription(userId: string) {
   return getPrisma().userSubscription.findFirst({
     where: {
       userId,
-      status: {
-        in: ["ACTIVE", "TRIALING"],
-      },
-      OR: [{ currentPeriodEnd: null }, { currentPeriodEnd: { gt: now } }],
       plan: {
         code: UNIVERSE_MONTHLY_PLAN_CODE,
         isActive: true,
@@ -146,7 +157,7 @@ async function findActiveSubscription(userId: string, now = new Date()) {
       plan: true,
     },
     orderBy: {
-      currentPeriodEnd: "desc",
+      updatedAt: "desc",
     },
   });
 }
@@ -189,13 +200,34 @@ export async function getSubscriptionSummaryForClerkUser(clerkUserId: string | n
     throw new Error("account_not_found");
   }
 
-  const subscription = await findActiveSubscription(account.id);
+  const summary = await getSubscriptionSummaryForUserId(account.id);
 
   return {
     isAuthenticated: true,
-    isPremium: Boolean(subscription),
-    commissionRateBp:
-      subscription?.plan.reducedCommissionRateBp ?? DEFAULT_PLATFORM_COMMISSION_RATE_BP,
+    ...summary,
+  };
+}
+
+export async function getSubscriptionSummaryForUserId(userId: string) {
+  const [subscription, user] = await Promise.all([
+    findLatestUniverseSubscription(userId),
+    getPrisma().user.findUnique({
+      where: { id: userId },
+      select: { stripeCustomerId: true },
+    }),
+  ]);
+  const isPremium = subscription
+    ? isPremiumStatus(subscription.status, subscription.currentPeriodEnd)
+    : false;
+
+  return {
+    isPremium,
+    commissionRateBp: isPremium
+      ? subscription?.plan.reducedCommissionRateBp ?? PREMIUM_PLATFORM_COMMISSION_RATE_BP
+      : DEFAULT_PLATFORM_COMMISSION_RATE_BP,
+    status: subscription?.status ?? "INACTIVE",
+    currentPeriodEnd: subscription?.currentPeriodEnd?.toISOString() ?? null,
+    canManageSubscription: Boolean(user?.stripeCustomerId),
   };
 }
 
@@ -257,7 +289,6 @@ export async function createUniverseSubscriptionPortalForCurrentUser(
     customerId: account.stripeCustomerId,
     returnUrl: buildUrl(origin, "/pricing"),
   });
-
   if (!session.url) {
     throw new Error("stripe_portal_url_missing");
   }
@@ -304,7 +335,7 @@ export async function syncStripeSubscription(subscription: SubscriptionLike) {
     });
   }
 
-  return prisma.userSubscription.upsert({
+  const savedSubscription = await prisma.userSubscription.upsert({
     where: { providerSubscriptionId: subscription.id },
     update: {
       userId: user.id,
@@ -328,6 +359,14 @@ export async function syncStripeSubscription(subscription: SubscriptionLike) {
       canceledAt: canceledAt ?? (status === "CANCELED" ? new Date() : null),
     },
   });
+
+  if (isPremiumStatus(status, currentPeriodEnd)) {
+    await emailService.sendSubscriptionStarted(subscription.id);
+  } else {
+    await emailService.sendSubscriptionEnded(subscription.id);
+  }
+
+  return savedSubscription;
 }
 
 /**

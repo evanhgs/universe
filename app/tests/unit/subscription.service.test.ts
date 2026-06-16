@@ -31,6 +31,10 @@ const mocks = vi.hoisted(() => ({
     createPortalSession: vi.fn(),
     retrieveSubscription: vi.fn(),
   },
+  email: {
+    sendSubscriptionStarted: vi.fn(),
+    sendSubscriptionEnded: vi.fn(),
+  },
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -48,11 +52,16 @@ vi.mock("@/lib/stripe.client", () => ({
   retrieveStripeSubscription: mocks.stripe.retrieveSubscription,
 }));
 
+vi.mock("@/server/email/email.service", () => ({
+  emailService: mocks.email,
+}));
+
 describe("subscription service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("APP_URL", "");
     vi.stubEnv("STRIPE_UNIVERSE_MONTHLY_PRICE_ID", "price_monthly");
+    vi.stubEnv("UNIVERSE_PRICING_MONTHLY_LABEL", "4,99 €/mois");
     mocks.account.stripeCustomerId = null;
     mocks.prisma.subscriptionPlan.upsert.mockResolvedValue({
       id: "plan_1",
@@ -100,6 +109,16 @@ describe("subscription service", () => {
         userId: "user_1",
         planCode: "universe_monthly",
         priceId: "price_monthly",
+      }),
+    );
+    expect(mocks.prisma.subscriptionPlan.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          priceAmount: 4.99,
+        }),
+        update: expect.objectContaining({
+          priceAmount: 4.99,
+        }),
       }),
     );
   });
@@ -156,5 +175,7 @@ describe("subscription service", () => {
         }),
       }),
     );
+    expect(mocks.email.sendSubscriptionStarted).toHaveBeenCalledWith("sub_1");
+    expect(mocks.email.sendSubscriptionEnded).not.toHaveBeenCalled();
   });
 });

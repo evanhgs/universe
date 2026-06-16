@@ -79,3 +79,19 @@ export type ChatUnreadReminderContext = {
     displayName: string | null;
   } | null;
 };
+
+export type SubscriptionEmailContext = {
+  id: string;
+  providerSubscriptionId: string | null;
+  status: string;
+  currentPeriodEnd: Date | null;
+  user: {
+    id: string;
+    email: string;
+    displayName: string | null;
+  };
+  plan: {
+    name: string;
+    reducedCommissionRateBp: number;
+  };
+};

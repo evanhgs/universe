@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import type { Metadata } from "next";
 import { Check, Clock3, Headphones, LineChart, ShieldCheck, Sparkles } from "lucide-react";
 
+import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { getSubscriptionSummaryForClerkUser } from "@/server/subscriptions/subscription.service";
@@ -15,7 +16,36 @@ export const metadata: Metadata = {
   description: "Abonnement Universe pour reduire la commission marketplace et debloquer les outils createurs.",
 };
 
-const monthlyLabel = process.env.UNIVERSE_PRICING_MONTHLY_LABEL ?? "";
+type PricingPageProps = {
+  searchParams?: Promise<{
+    subscription?: string;
+  }>;
+};
+
+function getMonthlyLabel() {
+  const rawLabel = process.env.UNIVERSE_PRICING_MONTHLY_LABEL?.trim();
+
+  if (!rawLabel) {
+    return "8,99 €/mois";
+  }
+
+  if (/[^\d\s,.]/.test(rawLabel)) {
+    return rawLabel;
+  }
+
+  const amount = Number.parseFloat(rawLabel.replace(",", "."));
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return "8,99 €/mois";
+  }
+
+  return `${new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: "EUR",
+  }).format(amount)}/mois`;
+}
+
+const monthlyLabel = getMonthlyLabel();
 
 const freeBenefits = [
   "Publication et vente de beats sur la marketplace",
@@ -34,8 +64,9 @@ const premiumBenefits = [
 /**
  * Page publique de pricing Universe.
  */
-export default async function PricingPage() {
+export default async function PricingPage({ searchParams }: PricingPageProps = {}) {
   const { userId } = await auth();
+  const params = await searchParams;
   const subscription = await getSubscriptionSummaryForClerkUser(userId);
 
   return (
@@ -82,6 +113,17 @@ export default async function PricingPage() {
       </section>
 
       <section className="mx-auto w-full max-w-6xl px-6 py-12">
+        {params?.subscription === "success" ? (
+          <Alert className="mb-6" variant="success">
+            Ton abonnement Universe a bien ete pris en compte. Le statut premium se met a jour
+            automatiquement des que Stripe confirme le paiement.
+          </Alert>
+        ) : null}
+        {params?.subscription === "cancelled" ? (
+          <Alert className="mb-6" variant="warning">
+            {"Le paiement de l'abonnement a ete annule. Aucun changement n'a ete applique."}
+          </Alert>
+        ) : null}
         <div className="grid gap-5 lg:grid-cols-2">
           <Card>
             <CardContent className="p-6">
@@ -118,7 +160,7 @@ export default async function PricingPage() {
                 </div>
                 <Sparkles className="h-8 w-8 text-brand" aria-hidden />
               </div>
-              <p className="mt-5 text-4xl font-semibold text-foreground">{monthlyLabel + " €/mois"}</p>
+              <p className="mt-5 text-4xl font-semibold text-foreground">{monthlyLabel}</p>
               <p className="mt-2 text-sm text-muted-foreground">{"9% de commission par vente éligible"}.</p>
               <ul className="mt-6 space-y-3">
                 {premiumBenefits.map((benefit) => (

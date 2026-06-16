@@ -12,6 +12,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getCurrentAccountSnapshot } from "@/server/account/account.service";
+import { getSubscriptionSummaryForUserId } from "@/server/subscriptions/subscription.service";
+
+import { SubscriptionPortalButton } from "./subscription-portal-button";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +42,7 @@ export default async function AccountPage() {
   }
 
   const account = await getCurrentAccountSnapshot();
+  const subscription = await getSubscriptionSummaryForUserId(account.user.id);
   const isSeller = account.roles.includes("SELLER");
   const fullName = [account.user.firstName, account.user.lastName].filter(Boolean).join(" ");
 
@@ -53,6 +57,11 @@ export default async function AccountPage() {
             <h1 className="text-4xl font-semibold tracking-tight text-foreground">
               {account.profile.displayName}
             </h1>
+            {subscription.isPremium ? (
+              <Badge className="mt-3 bg-brand-muted text-brand-dark dark:text-brand-light">
+                Universe actif
+              </Badge>
+            ) : null}
             <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
               {account.profile.bio ??
                 "Ajoute une bio pour presenter ton univers, ton catalogue ou tes besoins d'achat."}
@@ -138,6 +147,37 @@ export default async function AccountPage() {
           </CardContent>
         </Card>
       </section>
+
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle>Abonnement Universe</CardTitle>
+          <CardDescription>
+            {"Gere la facturation Stripe, la pause si elle est activee dans Stripe, les moyens de paiement et l'annulation depuis le portail securise."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              {subscription.isPremium ? "Universe actif" : "Universe non actif"}
+            </p>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              Commission actuelle: {subscription.commissionRateBp / 100}%.
+              {subscription.currentPeriodEnd
+                ? ` Prochaine echeance: ${new Intl.DateTimeFormat("fr-FR", {
+                    dateStyle: "long",
+                  }).format(new Date(subscription.currentPeriodEnd))}.`
+                : ""}
+            </p>
+          </div>
+          {subscription.canManageSubscription ? (
+            <SubscriptionPortalButton />
+          ) : (
+            <Button asChild>
+              <Link href="/pricing">Passer à Universe</Link>
+            </Button>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="mt-8">
         <CardHeader>

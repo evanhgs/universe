@@ -13,6 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
+import { SubscriptionPortalButton } from "../subscription-portal-button";
+
 type AccountSnapshot = {
   user: {
     email: string;
@@ -33,6 +35,12 @@ type AccountSnapshot = {
 
 type ProfileFormProps = {
   initialAccount: AccountSnapshot;
+  subscription: {
+    isPremium: boolean;
+    commissionRateBp: number;
+    currentPeriodEnd: string | null;
+    canManageSubscription: boolean;
+  };
 };
 
 type JsonBody = {
@@ -68,7 +76,7 @@ async function readJsonResponse<T>(response: Response): Promise<T> {
  * Formulaire client pour modifier les champs de profil autorises par l'API account.
  * @param props.initialAccount Snapshot charge cote serveur pour eviter un etat vide.
  */
-export function ProfileForm({ initialAccount }: ProfileFormProps) {
+export function ProfileForm({ initialAccount, subscription }: ProfileFormProps) {
   const { getToken } = useAuth();
   const { openUserProfile } = useClerk();
   const router = useRouter();
@@ -286,6 +294,27 @@ export function ProfileForm({ initialAccount }: ProfileFormProps) {
             <Button asChild size="lg" variant="outline">
               <Link href="/account">Retour au compte</Link>
             </Button>
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <h2 className="text-lg font-semibold text-foreground">Abonnement Universe</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            {subscription.isPremium
+              ? `Universe est actif avec ${subscription.commissionRateBp / 100}% de commission.`
+              : `Universe n'est pas actif. La commission actuelle est de ${subscription.commissionRateBp / 100}%.`}
+          </p>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            {"Le portail Stripe permet de gerer le moyen de paiement, la pause si elle est activee dans Stripe, la desactivation et l'annulation."}
+          </p>
+          <div className="mt-5">
+            {subscription.canManageSubscription ? (
+              <SubscriptionPortalButton />
+            ) : (
+              <Button asChild variant="outline">
+                <Link href="/pricing">{"Voir l'abonnement"}</Link>
+              </Button>
+            )}
           </div>
         </Card>
 

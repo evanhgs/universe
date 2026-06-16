@@ -7,6 +7,7 @@ import {
   findEmailAccountByClerkUserId,
   findEmailEventByDedupeKey,
   findOrderEmailContext,
+  findSubscriptionEmailContext,
   updateEmailEventStatus,
 } from "./email.repository";
 import {
@@ -14,6 +15,8 @@ import {
   renderPurchaseConfirmedEmail,
   renderSaleConfirmedEmail,
   renderSellerAccessGrantedEmail,
+  renderSubscriptionEndedEmail,
+  renderSubscriptionStartedEmail,
 } from "./email.templates";
 import { ResendEmailProvider } from "./resend.provider";
 
@@ -123,6 +126,7 @@ export class EmailService {
   }
 
   /**
+   * @deprecated
    * Envoie la confirmation d'acces vendeur.
    * @param clerkUserId Identifiant Clerk du compte.
    */
@@ -188,6 +192,26 @@ export class EmailService {
       processed: candidates.length,
       sentOrRecorded,
     };
+  }
+
+  async sendSubscriptionStarted(providerSubscriptionId: string) {
+    const subscription = await findSubscriptionEmailContext(providerSubscriptionId);
+
+    if (!subscription) {
+      return null;
+    }
+
+    return this.send(renderSubscriptionStartedEmail(subscription));
+  }
+
+  async sendSubscriptionEnded(providerSubscriptionId: string) {
+    const subscription = await findSubscriptionEmailContext(providerSubscriptionId);
+
+    if (!subscription) {
+      return null;
+    }
+
+    return this.send(renderSubscriptionEndedEmail(subscription));
   }
 }
 

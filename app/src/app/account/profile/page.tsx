@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 
 import { getCurrentAccountSnapshot } from "@/server/account/account.service";
+import { getSubscriptionSummaryForUserId } from "@/server/subscriptions/subscription.service";
 
 import { ProfileForm } from "./profile-form";
 
@@ -25,6 +26,7 @@ export default async function AccountProfilePage() {
   }
 
   const account = await getCurrentAccountSnapshot();
+  const subscription = await getSubscriptionSummaryForUserId(account.user.id);
 
-  return <ProfileForm initialAccount={account} />;
+  return <ProfileForm initialAccount={account} subscription={subscription} />;
 }

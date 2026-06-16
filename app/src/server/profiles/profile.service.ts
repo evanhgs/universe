@@ -6,6 +6,7 @@ import type {
 } from "./profile.types";
 import { findAllProfiles, findProfileBySlug } from "./profile.repository";
 import { listProfileBeatPayloads } from "../beats/beat.service";
+import { getSubscriptionSummaryForUserId } from "../subscriptions/subscription.service";
 
 const profileSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -41,7 +42,10 @@ export async function getProfilePayloadBySlug(
     return null;
   }
 
-  const beats = await listProfileBeatPayloads(profile.slug);
+  const [beats, subscription] = await Promise.all([
+    listProfileBeatPayloads(profile.slug),
+    getSubscriptionSummaryForUserId(profile.user.id),
+  ]);
 
   return {
     id: profile.id,
@@ -60,6 +64,9 @@ export async function getProfilePayloadBySlug(
       sellerRatingCount: profile.sellerRatingCount,
     },
     roles: profile.user.roles.map(({ role }) => role),
+    subscription: {
+      isPremium: subscription.isPremium,
+    },
     visibility: {
       isPublic: profile.isPublic,
       viewerCanEdit,
