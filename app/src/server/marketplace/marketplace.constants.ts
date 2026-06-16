@@ -1,4 +1,5 @@
 import "server-only";
 
-export const PLATFORM_COMMISSION_RATE = 0.3;
+export const DEFAULT_PLATFORM_COMMISSION_RATE_BP = 3000;
+export const PREMIUM_PLATFORM_COMMISSION_RATE_BP = 900;
 export const DEFAULT_DOWNLOAD_LIMIT = 5;

@@ -10,6 +10,10 @@ const findLatestPendingStripePaymentMock = vi.fn();
 const attachStripeSessionToPaymentMock = vi.fn();
 const createStripeCheckoutSessionMock = vi.fn();
 const retrieveStripeCheckoutSessionMock = vi.fn();
+const recordWebhookEventStartMock = vi.fn();
+const markWebhookEventProcessedMock = vi.fn();
+const handleSubscriptionCheckoutMock = vi.fn();
+const isSubscriptionCheckoutMock = vi.fn();
 
 vi.mock("@/server/account/account.sync", () => ({
   syncCurrentAccountFromClerk: syncCurrentAccountFromClerkMock,
@@ -39,8 +43,8 @@ vi.mock("@/server/marketplace/marketplace.repository", () => ({
   markOrderPaidFromStripe: vi.fn(),
   markStripePaymentFailedBySession: vi.fn(),
   markWebhookEventFailed: vi.fn(),
-  markWebhookEventProcessed: vi.fn(),
-  recordWebhookEventStart: vi.fn(),
+  markWebhookEventProcessed: markWebhookEventProcessedMock,
+  recordWebhookEventStart: recordWebhookEventStartMock,
 }));
 
 vi.mock("@/lib/stripe.client", () => ({
@@ -52,6 +56,13 @@ vi.mock("@/server/email/email.service", () => ({
   emailService: {
     sendOrderConfirmedEmails: vi.fn(),
   },
+}));
+
+vi.mock("@/server/subscriptions/subscription.service", () => ({
+  handleStripeSubscriptionCheckoutCompleted: handleSubscriptionCheckoutMock,
+  handleStripeSubscriptionInvoicePaymentFailed: vi.fn(),
+  isStripeSubscriptionCheckoutSession: isSubscriptionCheckoutMock,
+  syncStripeSubscription: vi.fn(),
 }));
 
 describe("marketplace service", () => {
@@ -69,6 +80,10 @@ describe("marketplace service", () => {
     attachStripeSessionToPaymentMock.mockReset();
     createStripeCheckoutSessionMock.mockReset();
     retrieveStripeCheckoutSessionMock.mockReset();
+    recordWebhookEventStartMock.mockReset().mockResolvedValue({ alreadyProcessed: false });
+    markWebhookEventProcessedMock.mockReset().mockResolvedValue({});
+    handleSubscriptionCheckoutMock.mockReset().mockResolvedValue({ id: "sub_local_1" });
+    isSubscriptionCheckoutMock.mockReset().mockReturnValue(false);
   });
 
   it("rejects a download entitlement whose buyerId does not match the current account", async () => {
@@ -166,5 +181,29 @@ describe("marketplace service", () => {
       ),
     ).rejects.toThrow("stripe_price_missing");
     expect(createStripeCheckoutSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("routes subscription Checkout webhooks to the subscription handler", async () => {
+    isSubscriptionCheckoutMock.mockReturnValue(true);
+    const session = {
+      id: "cs_sub_123",
+      mode: "subscription",
+      metadata: { purpose: "universe_subscription" },
+    };
+    const { handleStripeCheckoutWebhookEvent } = await import(
+      "@/server/marketplace/marketplace.service"
+    );
+
+    await handleStripeCheckoutWebhookEvent({
+      id: "evt_1",
+      type: "checkout.session.completed",
+      data: { object: session },
+    } as never);
+
+    expect(handleSubscriptionCheckoutMock).toHaveBeenCalledWith(session);
+    expect(markWebhookEventProcessedMock).toHaveBeenCalledWith({
+      provider: "STRIPE",
+      eventId: "evt_1",
+    });
   });
 });

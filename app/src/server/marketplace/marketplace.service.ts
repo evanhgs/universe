@@ -8,6 +8,12 @@ import {
   getPayoutEligibility,
 } from "@/server/security/permissions";
 import { createProtectedAssetUrl } from "@/server/storage/s3";
+import {
+  handleStripeSubscriptionCheckoutCompleted,
+  handleStripeSubscriptionInvoicePaymentFailed,
+  isStripeSubscriptionCheckoutSession,
+  syncStripeSubscription,
+} from "@/server/subscriptions/subscription.service";
 import type Stripe from "stripe";
 
 import { Prisma } from "../../../generated/prisma/client";
@@ -472,6 +478,10 @@ async function dispatchStripeCheckoutWebhookEvent(event: Stripe.Event) {
     case "checkout.session.async_payment_succeeded": {
       const session = event.data.object as Stripe.Checkout.Session;
 
+      if (isStripeSubscriptionCheckoutSession(session)) {
+        return handleStripeSubscriptionCheckoutCompleted(session);
+      }
+
       return fulfillStripeCheckoutSession(session.id);
     }
     case "checkout.session.async_payment_failed":
@@ -487,6 +497,18 @@ async function dispatchStripeCheckoutWebhookEvent(event: Stripe.Event) {
       });
 
       return null;
+    }
+    case "customer.subscription.created":
+    case "customer.subscription.updated":
+    case "customer.subscription.deleted": {
+      const subscription = event.data.object as Stripe.Subscription;
+
+      return syncStripeSubscription(subscription);
+    }
+    case "invoice.payment_failed": {
+      const invoice = event.data.object as Stripe.Invoice;
+
+      return handleStripeSubscriptionInvoicePaymentFailed(invoice);
     }
     default:
       return null;

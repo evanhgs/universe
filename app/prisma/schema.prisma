@@ -486,6 +486,7 @@ model User {
   id                 String              @id @default(cuid())
   clerkUserId        String?             @unique
   email              String              @unique
+  stripeCustomerId   String?             @unique
   username           String?             @unique
   passwordHash       String?
   phoneE164          String?
@@ -796,6 +797,7 @@ model OrderItem {
   quantity                Int             @default(1)
   lineTotalAmount         Decimal         @db.Decimal(10,2)
   stripePriceIdSnapshot   String?
+  commissionRateBpSnapshot Int            @default(3000)
   rightsSnapshotJson      Json?
   createdAt               DateTime        @default(now())
 
@@ -1062,6 +1064,7 @@ model SubscriptionPlan {
   priceAmount             Decimal              @db.Decimal(10,2)
   currency                String               @default("EUR")
   reducedCommissionRateBp Int
+  stripePriceId           String?              @unique
   isActive                Boolean              @default(true)
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt

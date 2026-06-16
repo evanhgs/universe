@@ -37,7 +37,7 @@ function stripeErrorMessage(error: unknown) {
 }
 
 function shouldActivateProduct(beat: Pick<CatalogBeat, "status">) {
-  return beat.status === "PUBLISHED";
+  return beat.status === "PUBLISHED" || beat.status === "PROCESSING" || beat.status === "DRAFT";
 }
 
 function productMetadata(beat: Pick<CatalogBeat, "id" | "ownerId" | "slug">) {

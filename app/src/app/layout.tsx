@@ -51,6 +51,12 @@ export default async function RootLayout({
                   >
                     Universe
                   </Link>
+                  <Link
+                    className="shrink-0 text-sm font-medium text-muted-foreground transition hover:text-foreground"
+                    href="/pricing"
+                  >
+                    Pricing
+                  </Link>
                   <div className="order-3 w-full sm:order-0 sm:min-w-0 sm:flex-1">
                     <SearchBar />
                   </div>

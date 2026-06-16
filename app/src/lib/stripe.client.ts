@@ -98,14 +98,89 @@ export async function createStripeCheckoutSession(args: {
 }
 
 /**
+ * Cree un customer Stripe rattache a un utilisateur local.
+ */
+export async function createStripeCustomer(args: {
+  userId: string;
+  clerkUserId: string | null;
+  email: string;
+  name?: string | null;
+}) {
+  return getStripeClient().customers.create({
+    email: args.email,
+    name: args.name ?? undefined,
+    metadata: {
+      userId: args.userId,
+      clerkUserId: args.clerkUserId ?? "",
+    },
+  });
+}
+
+/**
+ * Cree une session Checkout Stripe Billing pour l'abonnement Universe.
+ */
+export async function createStripeSubscriptionCheckoutSession(args: {
+  customerId: string;
+  userId: string;
+  planCode: string;
+  priceId: string;
+  successUrl: string;
+  cancelUrl: string;
+}) {
+  const metadata = {
+    purpose: "universe_subscription",
+    userId: args.userId,
+    planCode: args.planCode,
+  };
+
+  return getStripeClient().checkout.sessions.create({
+    mode: "subscription",
+    customer: args.customerId,
+    client_reference_id: args.userId,
+    success_url: args.successUrl,
+    cancel_url: args.cancelUrl,
+    line_items: [
+      {
+        price: args.priceId,
+        quantity: 1,
+      },
+    ],
+    metadata,
+    subscription_data: {
+      metadata,
+    },
+  });
+}
+
+/**
+ * Cree une session Stripe Customer Portal pour gerer un abonnement.
+ */
+export async function createStripeBillingPortalSession(args: {
+  customerId: string;
+  returnUrl: string;
+}) {
+  return getStripeClient().billingPortal.sessions.create({
+    customer: args.customerId,
+    return_url: args.returnUrl,
+  });
+}
+
+/**
  * Recupere une session Stripe Checkout existante.
  * @param sessionId Identifiant Stripe Checkout Session.
  * @returns Session Stripe avec line_items expand.
  */
 export async function retrieveStripeCheckoutSession(sessionId: string) {
   return getStripeClient().checkout.sessions.retrieve(sessionId, {
-    expand: ["line_items"],
+    expand: ["line_items", "subscription"],
   });
+}
+
+/**
+ * Recupere un abonnement Stripe Billing.
+ */
+export async function retrieveStripeSubscription(subscriptionId: string) {
+  return getStripeClient().subscriptions.retrieve(subscriptionId);
 }
 
 /**

@@ -116,8 +116,7 @@ Objectif : améliorer **engagement, monétisation et expérience utilisateur**
 
 * Abonnement mensuel / annuel  
 * Réduction commission (30% → \~9%)  
-* Gestion statut premium  
-* Impact abonnement sur visibilité
+* Gestion statut premium
 
 ---
 
@@ -272,4 +271,3 @@ Selon chatgpt je précise.
 3. **Monétisation avancée (V2)** → revenus  
 4. **Contrats & juridique (V3)** → crédibilité  
 5. **IA / Content ID (V4)** → différenciation
-
