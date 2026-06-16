@@ -4,7 +4,6 @@ import type { EmailProviderClient, OrderEmailContext, TransactionalEmail } from 
 import {
   createEmailEvent,
   findChatUnreadReminderCandidates,
-  findEmailAccountByClerkUserId,
   findEmailEventByDedupeKey,
   findOrderEmailContext,
   findSubscriptionEmailContext,
@@ -14,7 +13,6 @@ import {
   renderChatUnreadReminderEmail,
   renderPurchaseConfirmedEmail,
   renderSaleConfirmedEmail,
-  renderSellerAccessGrantedEmail,
   renderSubscriptionEndedEmail,
   renderSubscriptionStartedEmail,
 } from "./email.templates";
@@ -123,21 +121,6 @@ export class EmailService {
         return this.send(email);
       }),
     );
-  }
-
-  /**
-   * @deprecated
-   * Envoie la confirmation d'acces vendeur.
-   * @param clerkUserId Identifiant Clerk du compte.
-   */
-  async sendSellerAccessGranted(clerkUserId: string) {
-    const account = await findEmailAccountByClerkUserId(clerkUserId);
-
-    if (!account) {
-      return null;
-    }
-
-    return this.send(renderSellerAccessGrantedEmail(account, clerkUserId));
   }
 
   /**

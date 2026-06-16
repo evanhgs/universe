@@ -4,7 +4,6 @@ import {
   renderChatUnreadReminderEmail,
   renderPurchaseConfirmedEmail,
   renderSaleConfirmedEmail,
-  renderSellerAccessGrantedEmail,
   renderSubscriptionEndedEmail,
   renderSubscriptionStartedEmail,
 } from "@/server/email/email.templates";
@@ -55,16 +54,16 @@ describe("email templates", () => {
   it("renders a purchase confirmation with escaped HTML and order metadata", () => {
     const email = renderPurchaseConfirmedEmail(orderContext());
 
-    expect(email.subject).toBe("Achat confirme sur Universe");
+    expect(email.subject).toBe("Achat confirmé sur Universe");
     expect(email.template).toBe("PURCHASE_CONFIRMED");
     expect(email.dedupeKey).toBe("purchase.confirmed:order_<123>");
     expect(email.recipientUserId).toBe("buyer_123");
     expect(email.metadata).toEqual({
       orderId: "order_<123>",
     });
-    expect(email.textBody).toContain("Ton achat Universe est confirme.");
+    expect(email.textBody).toContain("Votre achat a été confirmé.");
     expect(email.textBody).toContain("- Night <Ride>");
-    expect(email.textBody).toMatch(/Total paye: 100,00/);
+    expect(email.textBody).toMatch(/Total payé: 100,00/);
     expect(email.htmlBody).toContain("Universe");
     expect(email.htmlBody).toContain("Buyer &lt;Admin&gt;");
     expect(email.htmlBody).toContain("Night &lt;Ride&gt;");
@@ -97,31 +96,6 @@ describe("email templates", () => {
     expect(email?.htmlBody).toContain("Night &lt;Ride&gt;");
   });
 
-  it("renders seller access granted with the account target", () => {
-    const email = renderSellerAccessGrantedEmail(
-      {
-        id: "seller_123",
-        email: "seller@example.com",
-        profile: {
-          displayName: null,
-        },
-      },
-      "clerk_123",
-    );
-
-    expect(email.to).toEqual({
-      email: "seller@example.com",
-      name: null,
-    });
-    expect(email.subject).toBe("Ton acces vendeur Universe est active");
-    expect(email.template).toBe("SELLER_ACCESS_GRANTED");
-    expect(email.dedupeKey).toBe("seller.access.granted:seller_123");
-    expect(email.textBody).toContain("Bonjour,");
-    expect(email.metadata).toEqual({
-      clerkUserId: "clerk_123",
-    });
-  });
-
   it("renders unread chat reminders with escaped sender and stable metadata", () => {
     const createdAt = new Date("2026-01-02T11:00:00.000Z");
     const email = renderChatUnreadReminderEmail(
@@ -149,8 +123,8 @@ describe("email templates", () => {
     expect(email.subject).toBe("Message non lu sur Universe");
     expect(email.template).toBe("CHAT_UNREAD_REMINDER");
     expect(email.dedupeKey).toBe("chat.unread.reminder:conv_123:recipient_123:msg_123");
-    expect(email.textBody).toContain("Sender <Name> t'a envoye un message");
-    expect(email.htmlBody).toContain("Sender &lt;Name&gt; t&#39;a envoye un message");
+    expect(email.textBody).toContain("Sender <Name> vous a envoyé un message");
+    expect(email.htmlBody).toContain("Sender &lt;Name&gt; vous a envoyé un message");
     expect(email.metadata).toEqual({
       conversationId: "conv_123",
       latestUnreadMessageId: "msg_123",
@@ -181,12 +155,12 @@ describe("email templates", () => {
       status: "CANCELED",
     });
 
-    expect(started.subject).toBe("Ton abonnement Universe est actif");
+    expect(started.subject).toBe("Votre abonnement Universe est actif");
     expect(started.template).toBe("SUBSCRIPTION_STARTED");
     expect(started.dedupeKey).toBe("subscription.started:sub_stripe_123");
     expect(started.textBody).toContain("Commission marketplace: 9%");
     expect(started.htmlBody).toContain("Creator &lt;Name&gt;");
-    expect(ended.subject).toBe("Ton abonnement Universe n'est plus actif");
+    expect(ended.subject).toBe("Votre abonnement Universe n'est plus actif");
     expect(ended.template).toBe("SUBSCRIPTION_ENDED");
     expect(ended.dedupeKey).toBe("subscription.ended:sub_stripe_123:CANCELED");
   });

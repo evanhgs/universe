@@ -58,6 +58,7 @@ vi.mock("@/server/email/email.service", () => ({
 
 describe("subscription service", () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.clearAllMocks();
     vi.stubEnv("APP_URL", "");
     vi.stubEnv("STRIPE_UNIVERSE_MONTHLY_PRICE_ID", "price_monthly");

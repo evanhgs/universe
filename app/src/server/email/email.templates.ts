@@ -176,34 +176,34 @@ export function renderPurchaseConfirmedEmail(order: OrderEmailContext): Transact
   const total = formatMoney(order.totalAmount, order.currency);
   const textBody = `${greeting(order.buyer.displayName)}
 
-Ton achat Universe est confirme.
+Votre achat a été confirmé.
 
 Commande: ${order.id}
-Total paye: ${total}
+Total payé: ${total}
 
-Instrumentales:
+Beats:
 ${itemList}
 
-Tes fichiers sont disponibles depuis Mes achats.`;
+Vos fichiers sont disponibles depuis la page mes achats.`;
 
   return {
     to: {
       email: order.buyer.email,
       name: order.buyer.displayName,
     },
-    subject: "Achat confirme sur Universe",
+    subject: "Achat confirmé sur Universe",
     textBody,
     htmlBody: renderEmailLayout({
-      preheader: "Ton achat Universe est confirme.",
-      title: "Achat confirme",
-      intro: [greeting(order.buyer.displayName), "Ton achat Universe est confirme."],
+      preheader: "Votre achat Universe est confirmé.",
+      title: "Achat confirmé",
+      intro: [greeting(order.buyer.displayName), "Votre achat Universe est confirmé."],
       rows: [
         { label: "Commande", value: order.id },
-        { label: "Total paye", value: total },
+        { label: "Total payé", value: total },
       ],
-      listTitle: "Instrumentales",
+      listTitle: "Beats",
       listItems: order.items.map((item) => item.title),
-      outro: ["Tes fichiers sont disponibles depuis Mes achats."],
+      outro: ["Vos fichiers sont disponibles depuis la page mes achats."],
     }),
     template: "PURCHASE_CONFIRMED",
     dedupeKey: `purchase.confirmed:${order.id}`,
@@ -237,15 +237,15 @@ export function renderSaleConfirmedEmail(
   );
   const textBody = `${greeting(seller.displayName)}
 
-Tu as une nouvelle vente sur Universe.
+Vous avez une nouvelle vente sur Universe.
 
 Commande: ${order.id}
 Montant brut vendeur: ${total}
 
-Instrumentales:
+Beat:
 ${items.map((item) => `- ${item.title}`).join("\n")}
 
-Retrouve le detail dans ton dashboard vendeur.`;
+Retrouvez le détail dans votre dashboard vendeur.`;
 
   return {
     to: {
@@ -255,16 +255,16 @@ Retrouve le detail dans ton dashboard vendeur.`;
     subject: "Nouvelle vente sur Universe",
     textBody,
     htmlBody: renderEmailLayout({
-      preheader: "Tu as une nouvelle vente sur Universe.",
+      preheader: "Vous avez une nouvelle vente sur Universe.",
       title: "Nouvelle vente",
-      intro: [greeting(seller.displayName), "Tu as une nouvelle vente sur Universe."],
+      intro: [greeting(seller.displayName), "Vous avez une nouvelle vente sur Universe."],
       rows: [
         { label: "Commande", value: order.id },
         { label: "Montant brut vendeur", value: total },
       ],
-      listTitle: "Instrumentales",
+      listTitle: "Beats",
       listItems: items.map((item) => item.title),
-      outro: ["Retrouve le detail dans ton dashboard vendeur."],
+      outro: ["Retrouvez le detail dans votre dashboard vendeur."],
     }),
     template: "SALE_CONFIRMED",
     dedupeKey: `sale.confirmed:${order.id}:${sellerId}`,
@@ -273,47 +273,6 @@ Retrouve le detail dans ton dashboard vendeur.`;
       orderId: order.id,
       sellerId,
       orderItemIds: items.map((item) => item.id),
-    },
-  };
-}
-
-/**
- * Rend la confirmation d'acces vendeur.
- * @param account Compte vendeur.
- * @param clerkUserId Identifiant Clerk.
- */
-export function renderSellerAccessGrantedEmail(
-  account: SellerAccessGrantedAccount,
-  clerkUserId: string,
-): TransactionalEmail {
-  const displayName = account.profile?.displayName ?? null;
-  const textBody = `${greeting(displayName)}
-
-Ton acces vendeur Universe est active.
-
-Tu peux publier tes instrumentales, suivre tes ventes et gerer ton catalogue depuis ton compte.`;
-
-  return {
-    to: {
-      email: account.email,
-      name: displayName,
-    },
-    subject: "Ton acces vendeur Universe est active",
-    textBody,
-    htmlBody: renderEmailLayout({
-      preheader: "Ton acces vendeur Universe est active.",
-      title: "Acces vendeur active",
-      intro: [
-        greeting(displayName),
-        "Ton acces vendeur Universe est active.",
-        "Tu peux publier tes instrumentales, suivre tes ventes et gerer ton catalogue depuis ton compte.",
-      ],
-    }),
-    template: "SELLER_ACCESS_GRANTED",
-    dedupeKey: `seller.access.granted:${account.id}`,
-    recipientUserId: account.id,
-    metadata: {
-      clerkUserId,
     },
   };
 }
@@ -331,9 +290,9 @@ export function renderChatUnreadReminderEmail(
   const displayName = candidate.user.profile?.displayName ?? null;
   const textBody = `${greeting(displayName)}
 
-${senderName} t'a envoye un message sur Universe il y a plus de 24h.
+${senderName} vous a envoyé un message sur Universe il y a plus de 24h.
 
-Ouvre ta messagerie pour repondre.`;
+Ouvrez votre messagerie pour répondre.`;
 
   return {
     to: {
@@ -343,12 +302,12 @@ Ouvre ta messagerie pour repondre.`;
     subject: "Message non lu sur Universe",
     textBody,
     htmlBody: renderEmailLayout({
-      preheader: "Tu as un message non lu sur Universe.",
+      preheader: "Vous avez un message non lu sur Universe.",
       title: "Message non lu",
       intro: [
         greeting(displayName),
-        `${senderName} t'a envoye un message sur Universe il y a plus de 24h.`,
-        "Ouvre ta messagerie pour repondre.",
+        `${senderName} vous a envoyé un message sur Universe il y a plus de 24h.`,
+        "Ouvrez votre messagerie pour répondre.",
       ],
     }),
     template: "CHAT_UNREAD_REMINDER",
@@ -376,35 +335,35 @@ export function renderSubscriptionStartedEmail(subscription: SubscriptionEmailCo
   const commissionRate = `${subscription.plan.reducedCommissionRateBp / 100}%`;
   const textBody = `${greeting(subscription.user.displayName)}
 
-Ton abonnement Universe est actif.
+Votre abonnement Universe est actif.
 
 Plan: ${subscription.plan.name}
 Commission marketplace: ${commissionRate}
-Prochaine echeance: ${formatDate(subscription.currentPeriodEnd)}
+Prochaine échéance: ${formatDate(subscription.currentPeriodEnd)}
 
-Tu peux gerer ton abonnement depuis ton profil Universe.`;
+Vous pouvez gérer votre abonnement depuis votre profil Universe.`;
 
   return {
     to: {
       email: subscription.user.email,
       name: subscription.user.displayName,
     },
-    subject: "Ton abonnement Universe est actif",
+    subject: "Votre abonnement Universe est actif",
     textBody,
     htmlBody: renderEmailLayout({
-      preheader: "Ton abonnement Universe est actif.",
+      preheader: "Votre abonnement Universe est actif.",
       title: "Abonnement Universe actif",
       intro: [
         greeting(subscription.user.displayName),
-        "Ton abonnement Universe est actif.",
-        `Ta commission marketplace passe a ${commissionRate} sur les ventes eligibles.`,
+        "Votre abonnement Universe est actif.",
+        `Votre commission marketplace passe à ${commissionRate} sur toutes les ventes.`,
       ],
       rows: [
         { label: "Plan", value: subscription.plan.name },
         { label: "Commission", value: commissionRate },
-        { label: "Prochaine echeance", value: formatDate(subscription.currentPeriodEnd) },
+        { label: "Prochaine échéance", value: formatDate(subscription.currentPeriodEnd) },
       ],
-      outro: ["Tu peux gerer ton abonnement depuis ton profil Universe."],
+      outro: ["Vous pouvez gérer votre abonnement depuis votre profil Universe."],
     }),
     template: "SUBSCRIPTION_STARTED",
     dedupeKey: `subscription.started:${subscription.providerSubscriptionId ?? subscription.id}`,
@@ -419,27 +378,27 @@ Tu peux gerer ton abonnement depuis ton profil Universe.`;
 export function renderSubscriptionEndedEmail(subscription: SubscriptionEmailContext): TransactionalEmail {
   const textBody = `${greeting(subscription.user.displayName)}
 
-Ton abonnement Universe n'est plus actif.
+Votre abonnement Universe n'est plus actif.
 
 Plan: ${subscription.plan.name}
 Statut: ${subscription.status}
 
-Ta commission marketplace repasse au taux standard sur les prochaines ventes.`;
+Votre commission marketplace repasse au taux standard sur les prochaines ventes.`;
 
   return {
     to: {
       email: subscription.user.email,
       name: subscription.user.displayName,
     },
-    subject: "Ton abonnement Universe n'est plus actif",
+    subject: "Votre abonnement Universe n'est plus actif",
     textBody,
     htmlBody: renderEmailLayout({
-      preheader: "Ton abonnement Universe n'est plus actif.",
+      preheader: "Votre abonnement Universe n'est plus actif.",
       title: "Abonnement Universe inactif",
       intro: [
         greeting(subscription.user.displayName),
-        "Ton abonnement Universe n'est plus actif.",
-        "Ta commission marketplace repasse au taux standard sur les prochaines ventes.",
+        "Votre abonnement Universe n'est plus actif.",
+        "Votre commission marketplace repasse au taux standard sur les prochaines ventes.",
       ],
       rows: [
         { label: "Plan", value: subscription.plan.name },
