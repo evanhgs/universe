@@ -1,5 +1,7 @@
 "use client";
 
+import { Alert, type AlertProps } from "@/components/ui/alert";
+import { notify } from "@/components/ui/notification";
 import { useAuth } from "@clerk/nextjs";
 import { useState } from "react";
 
@@ -187,6 +189,53 @@ const preClass =
   "mt-3 overflow-x-auto rounded-lg border border-border bg-muted p-4 text-sm leading-6 text-foreground";
 const miniCardClass = "rounded-lg border border-border bg-muted px-4 py-3";
 
+const alertDemoClass =
+  "static left-auto top-auto z-auto w-full max-w-none translate-x-0 motion-safe:animate-none";
+
+const alertDemos = [
+  {
+    durationMs: 3200,
+    id: "alert-demo-default",
+    label: "Default",
+    message: "Notification neutre avec props HTML, className et contenu enfant.",
+    variant: "default",
+  },
+  {
+    durationMs: 3600,
+    id: "alert-demo-success",
+    label: "Success",
+    message: "Ton abonnement Universe a bien ete pris en compte.",
+    variant: "success",
+  },
+  {
+    durationMs: 4200,
+    id: "alert-demo-warning",
+    label: "Warning",
+    message: "Le paiement a ete annule. Aucun changement n'a ete applique.",
+    variant: "warning",
+  },
+  {
+    durationMs: 5000,
+    id: "alert-demo-destructive",
+    label: "Destructive",
+    message: "Une erreur est survenue pendant l'appel API de test.",
+    variant: "destructive",
+  },
+  {
+    durationMs: 6500,
+    id: "alert-demo-muted",
+    label: "Muted",
+    message: "Etat informatif discret pour les retours secondaires.",
+    variant: "muted",
+  },
+] satisfies Array<{
+  durationMs: number;
+  id: string;
+  label: string;
+  message: string;
+  variant: NonNullable<AlertProps["variant"]>;
+}>;
+
 /**
  * Appelle une route API locale avec headers JSON par defaut.
  * @param path Chemin API relatif.
@@ -298,6 +347,57 @@ function BreakdownBars({
   );
 }
 
+function NotificationShowcase() {
+  return (
+    <section className={sectionClass}>
+      <div>
+        <h2 className="text-lg font-semibold">Notification showcase</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+          Test visuel de <code>Alert</code> et declenchement imperatif via <code>notify(...)</code>,
+          utilisable depuis un fichier client non TSX.
+        </p>
+      </div>
+
+      <div className="mt-5 grid gap-3">
+        {alertDemos.map((demo) => (
+          <Alert
+            aria-live={demo.variant === "destructive" ? "assertive" : "polite"}
+            className={alertDemoClass}
+            data-testid={`account-test-${demo.id}`}
+            id={demo.id}
+            key={demo.id}
+            role={demo.variant === "destructive" ? "alert" : "status"}
+            title={`${demo.label} Alert`}
+            variant={demo.variant}
+          >
+            <span className="font-semibold">{demo.label}:</span> {demo.message}
+          </Alert>
+        ))}
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        {alertDemos.map((demo) => (
+          <button
+            className={demo.variant === "default" ? secondaryButtonClass : buttonClass}
+            key={`notify-${demo.id}`}
+            onClick={() => {
+              void notify({
+                durationMs: demo.durationMs,
+                message: demo.message,
+                title: `${demo.label}:`,
+                variant: demo.variant,
+              });
+            }}
+            type="button"
+          >
+            Notify {demo.label}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 /**
  * Page outil pour tester les endpoints account depuis le navigateur.
  * @returns Interface de diagnostic Clerk/account.
@@ -384,14 +484,31 @@ export default function AccountTestPage() {
       if (!token) {
         setSessionToken("");
         setTokenStatus("Aucun token disponible. Connecte-toi d'abord avec Clerk.");
+        notify({
+          message: "Connecte-toi d'abord avec Clerk pour charger un token.",
+          title: "Token indisponible:",
+          variant: "warning",
+        });
         return;
       }
 
       setSessionToken(token);
       setTokenStatus("Session token charge. Tu peux le copier dans Bruno.");
+      notify({
+        message: "Tu peux maintenant le copier dans Bruno.",
+        title: "Session token charge:",
+        variant: "success",
+      });
     } catch (err) {
       setSessionToken("");
-      setError(err instanceof Error ? err.message : "Unknown error");
+      const message = err instanceof Error ? err.message : "Unknown error";
+
+      setError(message);
+      notify({
+        message,
+        title: "Erreur Clerk:",
+        variant: "destructive",
+      });
     }
   }
 
@@ -401,11 +518,21 @@ export default function AccountTestPage() {
   async function copySessionToken() {
     if (!sessionToken) {
       setTokenStatus("Charge d'abord un session token.");
+      notify({
+        message: "Charge d'abord un session token.",
+        title: "Copie impossible:",
+        variant: "warning",
+      });
       return;
     }
 
     await navigator.clipboard.writeText(sessionToken);
     setTokenStatus("Session token copie dans le presse-papiers.");
+    notify({
+      message: "Session token copie dans le presse-papiers.",
+      title: "Copie terminee:",
+      variant: "success",
+    });
   }
 
   function summarizeSaturation(samples: SaturationSample[], total: number, startedAt: number): SaturationRun {
@@ -604,6 +731,8 @@ export default function AccountTestPage() {
             </div>
           </div>
         </section>
+
+        <NotificationShowcase />
 
         {error ? (
           <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 dark:border-rose-900/70 dark:bg-rose-950/60 dark:text-rose-300">

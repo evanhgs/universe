@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 
 import { ThemeFooter } from "@/components/theme/theme-footer";
 import { ThemeProvider } from "@/components/theme/theme-provider";
+import { NotificationViewport } from "@/components/ui/notification";
 
 import { AuthActions } from "./auth-buttons";
 import { SearchBar } from "./search-bar";
@@ -66,6 +67,7 @@ export default async function RootLayout({
                 </div>
               </header>
               <div className="min-h-[calc(100vh-146px)]">{children}</div>
+              <NotificationViewport />
               <ThemeFooter />
             </div>
           </ClerkProvider>
