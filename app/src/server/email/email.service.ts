@@ -4,16 +4,17 @@ import type { EmailProviderClient, OrderEmailContext, TransactionalEmail } from 
 import {
   createEmailEvent,
   findChatUnreadReminderCandidates,
-  findEmailAccountByClerkUserId,
   findEmailEventByDedupeKey,
   findOrderEmailContext,
+  findSubscriptionEmailContext,
   updateEmailEventStatus,
 } from "./email.repository";
 import {
   renderChatUnreadReminderEmail,
   renderPurchaseConfirmedEmail,
   renderSaleConfirmedEmail,
-  renderSellerAccessGrantedEmail,
+  renderSubscriptionEndedEmail,
+  renderSubscriptionStartedEmail,
 } from "./email.templates";
 import { ResendEmailProvider } from "./resend.provider";
 
@@ -123,20 +124,6 @@ export class EmailService {
   }
 
   /**
-   * Envoie la confirmation d'acces vendeur.
-   * @param clerkUserId Identifiant Clerk du compte.
-   */
-  async sendSellerAccessGranted(clerkUserId: string) {
-    const account = await findEmailAccountByClerkUserId(clerkUserId);
-
-    if (!account) {
-      return null;
-    }
-
-    return this.send(renderSellerAccessGrantedEmail(account, clerkUserId));
-  }
-
-  /**
    * Envoie les emails achat et vente apres paiement confirme.
    * @param orderId Identifiant commande payee.
    */
@@ -188,6 +175,26 @@ export class EmailService {
       processed: candidates.length,
       sentOrRecorded,
     };
+  }
+
+  async sendSubscriptionStarted(providerSubscriptionId: string) {
+    const subscription = await findSubscriptionEmailContext(providerSubscriptionId);
+
+    if (!subscription) {
+      return null;
+    }
+
+    return this.send(renderSubscriptionStartedEmail(subscription));
+  }
+
+  async sendSubscriptionEnded(providerSubscriptionId: string) {
+    const subscription = await findSubscriptionEmailContext(providerSubscriptionId);
+
+    if (!subscription) {
+      return null;
+    }
+
+    return this.send(renderSubscriptionEndedEmail(subscription));
   }
 }
 

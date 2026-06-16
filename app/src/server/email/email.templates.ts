@@ -1,7 +1,7 @@
 import "server-only";
 
 import { Prisma } from "../../../generated/prisma/client";
-import type { OrderEmailContext, TransactionalEmail } from "./email.types";
+import type { OrderEmailContext, SubscriptionEmailContext, TransactionalEmail } from "./email.types";
 
 export type SellerAccessGrantedAccount = {
   id: string;
@@ -84,7 +84,7 @@ function renderParagraphs(values: string[]) {
   return values
     .map(
       (value) =>
-        `<p style="margin:0 0 16px;color:#333333;font-size:16px;line-height:1.6;">${escapeHtml(
+        `<p style="margin:0 0 14px;color:#3f3f46;font-size:15px;line-height:1.65;font-weight:400;">${escapeHtml(
           value,
         )}</p>`,
     )
@@ -96,14 +96,14 @@ function renderRows(rows: LayoutRow[] | undefined) {
     return "";
   }
 
-  return `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:8px 0 24px;border-collapse:collapse;border:1px solid #e6e2dc;">
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:10px 0 26px;border-collapse:separate;border-spacing:0;border:1px solid #e5e5ea;border-radius:16px;overflow:hidden;background:#ffffff;">
 ${rows
   .map(
-    (row) => `<tr>
-  <td style="padding:12px 14px;background:#f8f6f2;border-bottom:1px solid #e6e2dc;color:#6f6a62;font-size:13px;font-weight:700;text-transform:uppercase;">${escapeHtml(
+    (row, index) => `<tr>
+  <td style="padding:14px 16px;background:#fbfbfd;border-bottom:${index === rows.length - 1 ? "0" : "1px solid #e5e5ea"};color:#6e6e73;font-size:12px;font-weight:600;letter-spacing:0.01em;">${escapeHtml(
     row.label,
   )}</td>
-  <td style="padding:12px 14px;border-bottom:1px solid #e6e2dc;color:#111111;font-size:15px;text-align:right;">${escapeHtml(
+  <td style="padding:14px 16px;border-bottom:${index === rows.length - 1 ? "0" : "1px solid #e5e5ea"};color:#1d1d1f;font-size:14px;font-weight:500;text-align:right;">${escapeHtml(
     row.value,
   )}</td>
 </tr>`,
@@ -117,11 +117,11 @@ function renderList(title: string | undefined, items: string[] | undefined) {
     return "";
   }
 
-  return `<div style="margin:0 0 24px;">
-  <p style="margin:0 0 10px;color:#111111;font-size:15px;font-weight:700;">${escapeHtml(
+  return `<div style="margin:2px 0 26px;">
+  <p style="margin:0 0 12px;color:#1d1d1f;font-size:14px;font-weight:700;">${escapeHtml(
     title,
   )}</p>
-  <ul style="margin:0;padding:0 0 0 20px;color:#333333;font-size:15px;line-height:1.6;">
+  <ul style="margin:0;padding:0 0 0 19px;color:#3f3f46;font-size:14px;line-height:1.65;">
 ${items.map((item) => `    <li>${escapeHtml(item)}</li>`).join("\n")}
   </ul>
 </div>`;
@@ -130,22 +130,22 @@ ${items.map((item) => `    <li>${escapeHtml(item)}</li>`).join("\n")}
 function renderEmailLayout(input: EmailLayoutInput) {
   return `<!doctype html>
 <html>
-  <body style="margin:0;padding:0;background:#f3f0ea;font-family:Arial,Helvetica,sans-serif;">
+  <body style="margin:0;padding:0;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escapeHtml(
       input.preheader,
     )}</div>
-    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;background:#f3f0ea;padding:28px 12px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;background:#f5f5f7;padding:32px 12px;">
       <tr>
         <td align="center">
-          <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#ffffff;border:1px solid #e2ddd4;border-collapse:collapse;">
+          <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;max-width:620px;border-collapse:separate;border-spacing:0;">
             <tr>
-              <td style="padding:24px 28px 18px;border-bottom:1px solid #e2ddd4;">
-                <div style="color:#111111;font-size:18px;font-weight:800;letter-spacing:0;">Universe</div>
+              <td style="padding:0 8px 18px;text-align:center;">
+                <div style="color:#1d1d1f;font-size:20px;font-weight:700;letter-spacing:-0.01em;">Universe</div>
               </td>
             </tr>
             <tr>
-              <td style="padding:28px;">
-                <h1 style="margin:0 0 18px;color:#111111;font-size:24px;line-height:1.25;font-weight:800;">${escapeHtml(
+              <td style="padding:34px 34px 30px;background:#ffffff;border:1px solid #e5e5ea;border-radius:28px;box-shadow:0 18px 48px rgba(0,0,0,0.06);">
+                <h1 style="margin:0 0 18px;color:#1d1d1f;font-size:28px;line-height:1.18;font-weight:700;letter-spacing:-0.02em;">${escapeHtml(
                   input.title,
                 )}</h1>
                 ${renderParagraphs(input.intro)}
@@ -155,7 +155,7 @@ function renderEmailLayout(input: EmailLayoutInput) {
               </td>
             </tr>
             <tr>
-              <td style="padding:18px 28px;background:#111111;color:#f7f3ec;font-size:12px;line-height:1.5;">
+              <td style="padding:18px 26px 0;text-align:center;color:#86868b;font-size:12px;line-height:1.55;">
                 Email transactionnel Universe. Tu le recois car une action liee a ton compte vient d'etre effectuee.
               </td>
             </tr>
@@ -176,34 +176,34 @@ export function renderPurchaseConfirmedEmail(order: OrderEmailContext): Transact
   const total = formatMoney(order.totalAmount, order.currency);
   const textBody = `${greeting(order.buyer.displayName)}
 
-Ton achat Universe est confirme.
+Votre achat a été confirmé.
 
 Commande: ${order.id}
-Total paye: ${total}
+Total payé: ${total}
 
-Instrumentales:
+Beats:
 ${itemList}
 
-Tes fichiers sont disponibles depuis Mes achats.`;
+Vos fichiers sont disponibles depuis la page mes achats.`;
 
   return {
     to: {
       email: order.buyer.email,
       name: order.buyer.displayName,
     },
-    subject: "Achat confirme sur Universe",
+    subject: "Achat confirmé sur Universe",
     textBody,
     htmlBody: renderEmailLayout({
-      preheader: "Ton achat Universe est confirme.",
-      title: "Achat confirme",
-      intro: [greeting(order.buyer.displayName), "Ton achat Universe est confirme."],
+      preheader: "Votre achat Universe est confirmé.",
+      title: "Achat confirmé",
+      intro: [greeting(order.buyer.displayName), "Votre achat Universe est confirmé."],
       rows: [
         { label: "Commande", value: order.id },
-        { label: "Total paye", value: total },
+        { label: "Total payé", value: total },
       ],
-      listTitle: "Instrumentales",
+      listTitle: "Beats",
       listItems: order.items.map((item) => item.title),
-      outro: ["Tes fichiers sont disponibles depuis Mes achats."],
+      outro: ["Vos fichiers sont disponibles depuis la page mes achats."],
     }),
     template: "PURCHASE_CONFIRMED",
     dedupeKey: `purchase.confirmed:${order.id}`,
@@ -237,15 +237,15 @@ export function renderSaleConfirmedEmail(
   );
   const textBody = `${greeting(seller.displayName)}
 
-Tu as une nouvelle vente sur Universe.
+Vous avez une nouvelle vente sur Universe.
 
 Commande: ${order.id}
 Montant brut vendeur: ${total}
 
-Instrumentales:
+Beat:
 ${items.map((item) => `- ${item.title}`).join("\n")}
 
-Retrouve le detail dans ton dashboard vendeur.`;
+Retrouvez le détail dans votre dashboard vendeur.`;
 
   return {
     to: {
@@ -255,16 +255,16 @@ Retrouve le detail dans ton dashboard vendeur.`;
     subject: "Nouvelle vente sur Universe",
     textBody,
     htmlBody: renderEmailLayout({
-      preheader: "Tu as une nouvelle vente sur Universe.",
+      preheader: "Vous avez une nouvelle vente sur Universe.",
       title: "Nouvelle vente",
-      intro: [greeting(seller.displayName), "Tu as une nouvelle vente sur Universe."],
+      intro: [greeting(seller.displayName), "Vous avez une nouvelle vente sur Universe."],
       rows: [
         { label: "Commande", value: order.id },
         { label: "Montant brut vendeur", value: total },
       ],
-      listTitle: "Instrumentales",
+      listTitle: "Beats",
       listItems: items.map((item) => item.title),
-      outro: ["Retrouve le detail dans ton dashboard vendeur."],
+      outro: ["Retrouvez le detail dans votre dashboard vendeur."],
     }),
     template: "SALE_CONFIRMED",
     dedupeKey: `sale.confirmed:${order.id}:${sellerId}`,
@@ -273,47 +273,6 @@ Retrouve le detail dans ton dashboard vendeur.`;
       orderId: order.id,
       sellerId,
       orderItemIds: items.map((item) => item.id),
-    },
-  };
-}
-
-/**
- * Rend la confirmation d'acces vendeur.
- * @param account Compte vendeur.
- * @param clerkUserId Identifiant Clerk.
- */
-export function renderSellerAccessGrantedEmail(
-  account: SellerAccessGrantedAccount,
-  clerkUserId: string,
-): TransactionalEmail {
-  const displayName = account.profile?.displayName ?? null;
-  const textBody = `${greeting(displayName)}
-
-Ton acces vendeur Universe est active.
-
-Tu peux publier tes instrumentales, suivre tes ventes et gerer ton catalogue depuis ton compte.`;
-
-  return {
-    to: {
-      email: account.email,
-      name: displayName,
-    },
-    subject: "Ton acces vendeur Universe est active",
-    textBody,
-    htmlBody: renderEmailLayout({
-      preheader: "Ton acces vendeur Universe est active.",
-      title: "Acces vendeur active",
-      intro: [
-        greeting(displayName),
-        "Ton acces vendeur Universe est active.",
-        "Tu peux publier tes instrumentales, suivre tes ventes et gerer ton catalogue depuis ton compte.",
-      ],
-    }),
-    template: "SELLER_ACCESS_GRANTED",
-    dedupeKey: `seller.access.granted:${account.id}`,
-    recipientUserId: account.id,
-    metadata: {
-      clerkUserId,
     },
   };
 }
@@ -331,9 +290,9 @@ export function renderChatUnreadReminderEmail(
   const displayName = candidate.user.profile?.displayName ?? null;
   const textBody = `${greeting(displayName)}
 
-${senderName} t'a envoye un message sur Universe il y a plus de 24h.
+${senderName} vous a envoyé un message sur Universe il y a plus de 24h.
 
-Ouvre ta messagerie pour repondre.`;
+Ouvrez votre messagerie pour répondre.`;
 
   return {
     to: {
@@ -343,12 +302,12 @@ Ouvre ta messagerie pour repondre.`;
     subject: "Message non lu sur Universe",
     textBody,
     htmlBody: renderEmailLayout({
-      preheader: "Tu as un message non lu sur Universe.",
+      preheader: "Vous avez un message non lu sur Universe.",
       title: "Message non lu",
       intro: [
         greeting(displayName),
-        `${senderName} t'a envoye un message sur Universe il y a plus de 24h.`,
-        "Ouvre ta messagerie pour repondre.",
+        `${senderName} vous a envoyé un message sur Universe il y a plus de 24h.`,
+        "Ouvrez votre messagerie pour répondre.",
       ],
     }),
     template: "CHAT_UNREAD_REMINDER",
@@ -358,6 +317,101 @@ Ouvre ta messagerie pour repondre.`;
       conversationId: candidate.conversationId,
       latestUnreadMessageId: latestUnread.id,
       latestUnreadAt: latestUnread.createdAt.toISOString(),
+    } satisfies Prisma.InputJsonObject,
+  };
+}
+
+function formatDate(value: Date | null) {
+  if (!value) {
+    return "Non renseignee";
+  }
+
+  return new Intl.DateTimeFormat("fr-FR", {
+    dateStyle: "long",
+  }).format(value);
+}
+
+export function renderSubscriptionStartedEmail(subscription: SubscriptionEmailContext): TransactionalEmail {
+  const commissionRate = `${subscription.plan.reducedCommissionRateBp / 100}%`;
+  const textBody = `${greeting(subscription.user.displayName)}
+
+Votre abonnement Universe est actif.
+
+Plan: ${subscription.plan.name}
+Commission marketplace: ${commissionRate}
+Prochaine échéance: ${formatDate(subscription.currentPeriodEnd)}
+
+Vous pouvez gérer votre abonnement depuis votre profil Universe.`;
+
+  return {
+    to: {
+      email: subscription.user.email,
+      name: subscription.user.displayName,
+    },
+    subject: "Votre abonnement Universe est actif",
+    textBody,
+    htmlBody: renderEmailLayout({
+      preheader: "Votre abonnement Universe est actif.",
+      title: "Abonnement Universe actif",
+      intro: [
+        greeting(subscription.user.displayName),
+        "Votre abonnement Universe est actif.",
+        `Votre commission marketplace passe à ${commissionRate} sur toutes les ventes.`,
+      ],
+      rows: [
+        { label: "Plan", value: subscription.plan.name },
+        { label: "Commission", value: commissionRate },
+        { label: "Prochaine échéance", value: formatDate(subscription.currentPeriodEnd) },
+      ],
+      outro: ["Vous pouvez gérer votre abonnement depuis votre profil Universe."],
+    }),
+    template: "SUBSCRIPTION_STARTED",
+    dedupeKey: `subscription.started:${subscription.providerSubscriptionId ?? subscription.id}`,
+    recipientUserId: subscription.user.id,
+    metadata: {
+      subscriptionId: subscription.id,
+      providerSubscriptionId: subscription.providerSubscriptionId,
+    } satisfies Prisma.InputJsonObject,
+  };
+}
+
+export function renderSubscriptionEndedEmail(subscription: SubscriptionEmailContext): TransactionalEmail {
+  const textBody = `${greeting(subscription.user.displayName)}
+
+Votre abonnement Universe n'est plus actif.
+
+Plan: ${subscription.plan.name}
+Statut: ${subscription.status}
+
+Votre commission marketplace repasse au taux standard sur les prochaines ventes.`;
+
+  return {
+    to: {
+      email: subscription.user.email,
+      name: subscription.user.displayName,
+    },
+    subject: "Votre abonnement Universe n'est plus actif",
+    textBody,
+    htmlBody: renderEmailLayout({
+      preheader: "Votre abonnement Universe n'est plus actif.",
+      title: "Abonnement Universe inactif",
+      intro: [
+        greeting(subscription.user.displayName),
+        "Votre abonnement Universe n'est plus actif.",
+        "Votre commission marketplace repasse au taux standard sur les prochaines ventes.",
+      ],
+      rows: [
+        { label: "Plan", value: subscription.plan.name },
+        { label: "Statut", value: subscription.status },
+      ],
+    }),
+    template: "SUBSCRIPTION_ENDED",
+    dedupeKey: `subscription.ended:${subscription.providerSubscriptionId ?? subscription.id}:${subscription.status}`,
+    recipientUserId: subscription.user.id,
+    metadata: {
+      subscriptionId: subscription.id,
+      providerSubscriptionId: subscription.providerSubscriptionId,
+      status: subscription.status,
     } satisfies Prisma.InputJsonObject,
   };
 }

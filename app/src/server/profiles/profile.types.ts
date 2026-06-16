@@ -20,6 +20,9 @@ export type ProfileApiPayload = {
     sellerRatingCount: number;
   };
   roles: RoleCode[];
+  subscription: {
+    isPremium: boolean;
+  };
   visibility: {
     isPublic: boolean;
     viewerCanEdit: boolean;
@@ -50,6 +53,7 @@ export type ProfileRecord = {
   sellerRatingAvg: number | null;
   sellerRatingCount: number;
   user: {
+    id: string;
     clerkUserId: string | null;
     roles: Array<{
       role: RoleCode;

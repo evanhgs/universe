@@ -111,6 +111,7 @@ The runtime files contain both regular config and secrets, including:
 - `CLERK_WEBHOOK_SIGNING_SECRET`
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
+- `STRIPE_UNIVERSE_MONTHLY_PRICE_ID`
 - `S3_ACCESS_KEY_ID`
 - `S3_SECRET_ACCESS_KEY`
 
@@ -160,7 +161,7 @@ The Next.js service now expects these runtime variables from `infra/env/stack.*.
 - `CLERK_SECRET_KEY`: Clerk server secret
 - `CLERK_WEBHOOK_SIGNING_SECRET`: Clerk webhook secret
 
-Stripe marketplace payments read `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_AUTOMATIC_TAX_ENABLED` from `infra/env/stack.*.env`.
+Stripe marketplace payments and Universe subscription billing read `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_UNIVERSE_MONTHLY_PRICE_ID`, `UNIVERSE_PRICING_MONTHLY_LABEL`, and `STRIPE_AUTOMATIC_TAX_ENABLED` from `infra/env/stack.*.env`.
 
 The Stripe webhook endpoint is `/api/webhooks/stripe`. In local development, use Stripe CLI forwarding and copy the printed `whsec_...` value into `STRIPE_WEBHOOK_SECRET`.
 

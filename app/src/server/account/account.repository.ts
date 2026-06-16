@@ -9,6 +9,7 @@ export const accountSelect = {
   id: true,
   clerkUserId: true,
   email: true,
+  stripeCustomerId: true,
   username: true,
   firstName: true,
   lastName: true,

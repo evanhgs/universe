@@ -11,6 +11,13 @@ const chatUserSelect = {
     select: {
       displayName: true,
       slug: true,
+      avatarAsset: {
+        select: {
+          bucket: true,
+          objectKey: true,
+          isPublic: true,
+        },
+      },
     },
   },
 } as const;

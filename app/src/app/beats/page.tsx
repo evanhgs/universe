@@ -1,41 +1,35 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { MAIN_GENRES, type MainGenre } from "@/lib/beat-metadata";
 import { listPublishedBeatsPayload } from "@/server/beats/beat.service";
+import { BeatsCatalogClient } from "./beats-catalog-client";
 
 type BeatsPageProps = {
   searchParams: Promise<{
     search?: string;
     genre?: string;
     sellerSlug?: string;
+    limit?: string;
+    page?: string;
   }>;
 };
 
 export const dynamic = "force-dynamic";
+const MARKETPLACE_LIMIT_OPTIONS = [20, 35, 50] as const;
 
-/**
- * Formate le prix hors taxe affiche sur les cartes catalogue.
- * @param priceAmount Prix decimal nullable.
- * @param currency Code devise ISO.
- * @param isFree Indique si le beat est gratuit.
- */
-function formatPriceHT(priceAmount: number | null, currency: string, isFree: boolean) {
-  if (isFree || priceAmount === 0) {
-    return "Gratuit";
-  }
+function parseMarketplaceLimit(value: string | undefined) {
+  const limit = Number(value ?? MARKETPLACE_LIMIT_OPTIONS[0]);
 
-  if (priceAmount === null) {
-    return "Prix a definir";
-  }
-
-  return `${new Intl.NumberFormat("fr-FR", {
-    style: "currency",
-    currency,
-  }).format(priceAmount)} HT`;
+  return MARKETPLACE_LIMIT_OPTIONS.find((option) => option === limit) ?? MARKETPLACE_LIMIT_OPTIONS[0];
 }
+
+function parsePage(value: string | undefined) {
+  const page = Number(value ?? 1);
+
+  return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
 
 /**
  * Page catalogue serveur affichant les beats publics et le formulaire d'upload test.
@@ -46,12 +40,15 @@ export default async function BeatsPage({ searchParams }: BeatsPageProps) {
   const params = await searchParams;
   const genreParam = params.genre?.trim().toUpperCase() as MainGenre | undefined;
   const genre = genreParam && MAIN_GENRES.includes(genreParam) ? genreParam : undefined;
-  const beats = await listPublishedBeatsPayload({
+  const limit = parseMarketplaceLimit(params.limit);
+  const currentPage = parsePage(params.page);
+  const beatPage = await listPublishedBeatsPayload({
     search: params.search,
     genre,
     sellerSlug: params.sellerSlug,
     sort: "newest",
-    limit: 48,
+    limit,
+    page: currentPage,
   });
 
   return (
@@ -59,14 +56,13 @@ export default async function BeatsPage({ searchParams }: BeatsPageProps) {
       <div className="flex flex-col gap-6 border-b border-border pb-8 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-sm font-medium uppercase text-muted-foreground">
-            Catalogue V1
+            {"Catalogues"}
           </p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground">
-            Instrumentales publiees
+            {'Marketplace des beats publiés'}
           </h1>
           <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">
-            Les beats publics de la marketplace, branches aux premiers modeles
-            publication, profil vendeur et assets.
+            {"Utilisez la barre de recherche pour cibler vos résultats, ou allez scroller un coup dans le feed !"}
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -80,72 +76,16 @@ export default async function BeatsPage({ searchParams }: BeatsPageProps) {
       </div>
 
 
-      <form className="mt-6 grid gap-3 md:grid-cols-[1fr_180px_auto]" action="/beats">
-        <Input
-          defaultValue={params.search ?? ""}
-          name="search"
-          placeholder="Rechercher par titre, description ou tag"
-        />
-        <Input
-          defaultValue={params.genre ?? ""}
-          name="genre"
-          placeholder="Style"
-        />
-        <Button size="lg" type="submit">
-          Filtrer
-        </Button>
-      </form>
-
-      {beats.length === 0 ? (
-        <div className="mt-10 rounded-lg border border-dashed border-border p-8">
-          <h2 className="text-xl font-semibold text-foreground">Aucune instrumentale publiee</h2>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Cree une publication via l API <code>/api/beats</code>, avec
-            <code> publish: true</code>, pour alimenter ce catalogue.
-          </p>
-        </div>
-      ) : (
-        <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {beats.map((beat) => {
-            const thumbnail = beat.assets.find((asset) => asset.role === "IMAGE_THUMBNAIL");
-
-            return (
-              <Card className="overflow-hidden" key={beat.id}>
-                <Link href={`/beats/${beat.slug}`}>
-                  <div className="aspect-video bg-muted">
-                    {thumbnail?.url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        alt=""
-                        className="h-full w-full object-cover"
-                        src={thumbnail.url}
-                      />
-                    ) : null}
-                  </div>
-                  <CardContent className="space-y-3 p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <h2 className="text-lg font-semibold text-foreground">{beat.title}</h2>
-                      <p className="shrink-0 text-sm font-semibold text-foreground">
-                        A partir de {formatPriceHT(beat.priceAmount, beat.currency, beat.isFree)}
-                      </p>
-                    </div>
-                    <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
-                      {beat.description ?? "Sans description."}
-                    </p>
-                    <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                      {beat.primaryGenre ? <span>{beat.primaryGenre}</span> : null}
-                      {beat.seller.slug ? <span>par {beat.seller.displayName}</span> : null}
-                    </div>
-                    <span className="inline-flex h-10 items-center justify-center rounded-full border border-input px-4 text-sm font-medium text-foreground">
-                      Voir licences
-                    </span>
-                  </CardContent>
-                </Link>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+      <BeatsCatalogClient
+        initialFilters={{
+          search: params.search,
+          genre: params.genre,
+          sellerSlug: params.sellerSlug,
+          limit,
+          page: currentPage,
+        }}
+        initialPage={beatPage}
+      />
     </main>
   );
 }

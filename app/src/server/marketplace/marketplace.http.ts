@@ -24,6 +24,8 @@ export function marketplaceErrorResponse(error: unknown) {
         : code === "already_purchased" ||
             code === "cannot_buy_own_beat" ||
             code === "order_not_payable" ||
+            code === "stripe_catalog_not_ready" ||
+            code === "stripe_price_missing" ||
             code === "download_limit_reached" ||
             code === "entitlement_expired"
           ? 409

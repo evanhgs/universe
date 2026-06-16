@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ChatContactButton } from "@/app/chat-contact-button";
+import { Badge } from "@/components/ui/badge";
 import { getProfilePayloadBySlug } from "@/server/profiles/profile.service";
 
 type ProfilePageProps = {
@@ -34,9 +35,18 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
           {profile.roles.includes('SELLER') ? "profile vendeur" : "profile utilisateur"}
         </p>
         <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <h1 className="text-4xl font-semibold tracking-tight text-foreground">
-            {profile.displayName}
-          </h1>
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-4xl font-semibold tracking-tight text-foreground">
+                {profile.displayName}
+              </h1>
+              {profile.subscription.isPremium ? (
+                <Badge className="bg-brand-muted text-brand-dark dark:text-brand-light">
+                  Universe actif
+                </Badge>
+              ) : null}
+            </div>
+          </div>
           {!profile.visibility.viewerCanEdit ? (
             <ChatContactButton
               label="Contacter"

@@ -13,6 +13,8 @@
     "test": "vitest",
     "test:ci": "vitest run",
     "check": "npm run lint && npm run typecheck && npm run test:ci && npm run build",
+    "stripe:clear-catalog": "tsx scripts/stripe-clear-catalog.ts",
+    "stripe:sync-catalog": "tsx scripts/stripe-sync-catalog.ts",
     "db:seed": "prisma db seed",
     "db:seed:benchmark": "SEED_MODE=benchmark SEED_BEAT_COUNT=${SEED_BEAT_COUNT:-500} SEED_SELLER_COUNT=${SEED_SELLER_COUNT:-40} SEED_ANALYTICS_EVENTS=${SEED_ANALYTICS_EVENTS:-50000} prisma db seed"
   },

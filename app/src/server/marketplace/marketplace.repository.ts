@@ -3,7 +3,10 @@ import "server-only";
 import { getPrisma } from "@/lib/prisma";
 
 import { Prisma } from "../../../generated/prisma/client";
-import { DEFAULT_DOWNLOAD_LIMIT, PLATFORM_COMMISSION_RATE } from "./marketplace.constants";
+import {
+  DEFAULT_DOWNLOAD_LIMIT,
+  DEFAULT_PLATFORM_COMMISSION_RATE_BP,
+} from "./marketplace.constants";
 import type { CreateDirectPurchaseOrderInput } from "./marketplace.types";
 
 const orderInclude = {
@@ -50,6 +53,14 @@ const orderInclude = {
  */
 function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+function commissionFromBp(amount: number, commissionRateBp: number) {
+  return roundMoney(amount * (commissionRateBp / 10_000));
+}
+
+function commissionDescription(commissionRateBp: number) {
+  return `Platform commission ${commissionRateBp / 100}%`;
 }
 
 /**
@@ -105,11 +116,19 @@ export async function findPurchasableOffering(input: CreateDirectPurchaseOrderIn
       ...(input.licenseOfferingId ? { id: input.licenseOfferingId } : {}),
       ...(input.beatSlug ? { beat: { slug: input.beatSlug } } : {}),
       isActive: true,
+      stripePriceId: {
+        not: null,
+      },
+      stripePriceActive: true,
       beat: {
         ...(input.beatSlug ? { slug: input.beatSlug } : {}),
         status: "PUBLISHED",
         visibility: "PUBLIC",
         moderationStatus: "CLEAN",
+        stripeProductId: {
+          not: null,
+        },
+        stripeSyncStatus: "SYNCED",
       },
       licenseTemplate: {
         isActive: true,
@@ -166,7 +185,8 @@ export async function createOrderForOffering(args: {
   offering: NonNullable<Awaited<ReturnType<typeof findPurchasableOffering>>>;
 }) {
   const priceAmount = decimalToNumber(args.offering.priceAmount) ?? 0;
-  const commissionAmount = roundMoney(priceAmount * PLATFORM_COMMISSION_RATE);
+  const commissionRateBp = await findSellerCommissionRateBp(args.offering.sellerId);
+  const commissionAmount = commissionFromBp(priceAmount, commissionRateBp);
   const rightsSnapshot = buildRightsSnapshot(args.offering);
 
   return getPrisma().order.create({
@@ -189,12 +209,44 @@ export async function createOrderForOffering(args: {
           unitAmount: priceAmount,
           quantity: 1,
           lineTotalAmount: priceAmount,
+          stripePriceIdSnapshot: args.offering.stripePriceId,
+          commissionRateBpSnapshot: commissionRateBp,
           rightsSnapshotJson: rightsSnapshot,
         },
       },
     },
     include: orderInclude,
   });
+}
+
+/**
+ * Retourne le taux de commission vendeur courant, reduit si abonnement actif.
+ */
+export async function findSellerCommissionRateBp(sellerId: string, now = new Date()) {
+  const subscription = await getPrisma().userSubscription.findFirst({
+    where: {
+      userId: sellerId,
+      status: {
+        in: ["ACTIVE", "TRIALING"],
+      },
+      OR: [{ currentPeriodEnd: null }, { currentPeriodEnd: { gt: now } }],
+      plan: {
+        isActive: true,
+      },
+    },
+    select: {
+      plan: {
+        select: {
+          reducedCommissionRateBp: true,
+        },
+      },
+    },
+    orderBy: {
+      currentPeriodEnd: "desc",
+    },
+  });
+
+  return subscription?.plan.reducedCommissionRateBp ?? DEFAULT_PLATFORM_COMMISSION_RATE_BP;
 }
 
 /**
@@ -395,7 +447,8 @@ export async function markOrderPaidFromStripe(args: {
 
       if (item.sellerId) {
         const lineTotal = decimalToNumber(item.lineTotalAmount) ?? 0;
-        const commission = roundMoney(lineTotal * PLATFORM_COMMISSION_RATE); //! varier la commission en fonction de l'abonnement de l'utilisateur
+        const commissionRateBp = item.commissionRateBpSnapshot;
+        const commission = commissionFromBp(lineTotal, commissionRateBp);
         const sellerEarning = roundMoney(lineTotal - commission);
 
         await tx.payoutLedgerEntry.createMany({
@@ -418,7 +471,7 @@ export async function markOrderPaidFromStripe(args: {
               type: "PLATFORM_COMMISSION",
               amount: -commission,
               currency: existingOrder.currency,
-              description: "Platform commission 30%",
+              description: commissionDescription(commissionRateBp),
             },
             {
               orderId: existingOrder.id,

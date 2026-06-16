@@ -44,8 +44,10 @@ function mutationErrorResponse(error: unknown) {
       ? 403
       : code === "beat_forbidden"
         ? 403
-      : code === "beat_asset_duplicate"
+      : code === "beat_asset_duplicate" || code === "stripe_catalog_not_ready"
         ? 409
+        : code === "stripe_not_configured"
+          ? 503
         : 400;
   const message =
     code === "beat_forbidden"
@@ -54,6 +56,8 @@ function mutationErrorResponse(error: unknown) {
         ? "A seller account is required to modify beats."
       : code === "beat_asset_duplicate"
         ? "This beat asset is already attached to another beat."
+      : code === "stripe_catalog_not_ready"
+        ? "Stripe catalog is not ready for this beat."
       : code;
 
   return NextResponse.json(

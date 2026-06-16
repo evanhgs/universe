@@ -19,6 +19,7 @@ const themeLabels = {
   light: "Clair",
   system: "Ordinateur",
 } as const;
+const THEME_STORAGE_KEY = "universe.theme";
 
 type ThemeChoice = keyof typeof themeLabels;
 
@@ -38,6 +39,14 @@ export function ThemeSelect({ className, compact = false }: ThemeSelectProps) {
   const currentTheme =
     theme === "light" || theme === "dark" || theme === "system" ? theme : "system";
 
+  function persistTheme(value: string) {
+    setTheme(value);
+
+    if (value === "light" || value === "dark" || value === "system") {
+      document.cookie = `${THEME_STORAGE_KEY}=${encodeURIComponent(value)}; path=/; max-age=31536000; samesite=lax`;
+    }
+  }
+
   return (
     <div className={cn("grid gap-2", className)}>
       {compact ? null : (
@@ -50,7 +59,7 @@ export function ThemeSelect({ className, compact = false }: ThemeSelectProps) {
       )}
       <Select
         disabled={!isMounted}
-        onValueChange={(value) => setTheme(value)}
+        onValueChange={persistTheme}
         value={isMounted ? currentTheme : "system"}
       >
         <SelectTrigger

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import Link from "next/link";
+import { cookies } from "next/headers";
 
 import { ThemeFooter } from "@/components/theme/theme-footer";
 import { ThemeProvider } from "@/components/theme/theme-provider";
@@ -8,6 +9,8 @@ import { ThemeProvider } from "@/components/theme/theme-provider";
 import { AuthActions } from "./auth-buttons";
 import { SearchBar } from "./search-bar";
 import "./globals.css";
+
+const THEME_STORAGE_KEY = "universe.theme";
 
 export const metadata: Metadata = {
   title: "Universe",
@@ -19,19 +22,24 @@ export const metadata: Metadata = {
  * @param props.children Contenu de la route Next.js active.
  * @returns Structure HTML globale de l'application.
  */
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const themeCookie = (await cookies()).get(THEME_STORAGE_KEY)?.value;
+  const initialThemeClass =
+    themeCookie === "dark" || themeCookie === "light" ? themeCookie : undefined;
+
   return (
-    <html lang="fr" suppressHydrationWarning>
+    <html className={initialThemeClass} lang="fr" suppressHydrationWarning>
       <body>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
+          disableTransitionOnChange
           enableSystem
-          storageKey="universe.theme"
+          storageKey={THEME_STORAGE_KEY}
         >
           <ClerkProvider dynamic>
             <div className="min-h-screen bg-background text-foreground">
@@ -42,6 +50,12 @@ export default function RootLayout({
                     href="/"
                   >
                     Universe
+                  </Link>
+                  <Link
+                    className="shrink-0 text-sm font-medium text-muted-foreground transition hover:text-foreground"
+                    href="/pricing"
+                  >
+                    Pricing
                   </Link>
                   <div className="order-3 w-full sm:order-0 sm:min-w-0 sm:flex-1">
                     <SearchBar />

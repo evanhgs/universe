@@ -1,5 +1,5 @@
 import { handleStripeCheckoutWebhookEvent } from "@/server/marketplace/marketplace.service";
-import { constructStripeWebhookEvent } from "@/server/marketplace/stripe.client";
+import { constructStripeWebhookEvent } from "@/lib/stripe.client";
 
 export const dynamic = "force-dynamic";
 

@@ -6,16 +6,23 @@ import {
   renderChatUnreadReminderEmail,
   renderPurchaseConfirmedEmail,
   renderSaleConfirmedEmail,
-  renderSellerAccessGrantedEmail,
+  renderSubscriptionEndedEmail,
+  renderSubscriptionStartedEmail,
 } from "@/server/email/email.templates";
-import type { OrderEmailContext, TransactionalEmail } from "@/server/email/email.types";
+import type {
+  OrderEmailContext,
+  SubscriptionEmailContext,
+  TransactionalEmail,
+} from "@/server/email/email.types";
 import { PRIVATE_JSON_HEADERS } from "@/server/http/response-headers";
 
 type EmailTestTemplate =
   | "PURCHASE_CONFIRMED"
   | "SALE_CONFIRMED"
   | "SELLER_ACCESS_GRANTED"
-  | "CHAT_UNREAD_REMINDER";
+  | "CHAT_UNREAD_REMINDER"
+  | "SUBSCRIPTION_STARTED"
+  | "SUBSCRIPTION_ENDED";
 
 type EmailTestPayload = {
   toEmail?: unknown;
@@ -26,8 +33,9 @@ type EmailTestPayload = {
 const EMAIL_TEST_TEMPLATES = new Set<EmailTestTemplate>([
   "PURCHASE_CONFIRMED",
   "SALE_CONFIRMED",
-  "SELLER_ACCESS_GRANTED",
   "CHAT_UNREAD_REMINDER",
+  "SUBSCRIPTION_STARTED",
+  "SUBSCRIPTION_ENDED",
 ]);
 
 function emailTestEnabled() {
@@ -110,6 +118,28 @@ function sampleOrder(args: { toEmail: string; recipientName: string | null }): O
   };
 }
 
+function sampleSubscription(args: {
+  toEmail: string;
+  recipientName: string | null;
+  status: "ACTIVE" | "CANCELED";
+}): SubscriptionEmailContext {
+  return {
+    id: `email_test_subscription_${Date.now()}`,
+    providerSubscriptionId: `email_test_stripe_subscription_${Date.now()}`,
+    status: args.status,
+    currentPeriodEnd: args.status === "ACTIVE" ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null,
+    user: {
+      id: "email_test_subscriber",
+      email: args.toEmail,
+      displayName: args.recipientName,
+    },
+    plan: {
+      name: "Universe",
+      reducedCommissionRateBp: 900,
+    },
+  };
+}
+
 function renderTestEmail(args: {
   toEmail: string;
   recipientName: string | null;
@@ -140,19 +170,29 @@ function renderTestEmail(args: {
     });
   }
 
-  if (args.template === "SELLER_ACCESS_GRANTED") {
+  if (args.template === "SUBSCRIPTION_STARTED") {
     return testEmailEvent({
-      ...renderSellerAccessGrantedEmail(
-        {
-          id: "email_test_seller",
-          email: args.toEmail,
-          profile: {
-            displayName: args.recipientName,
-          },
-        },
-        "email_test_clerk_user",
+      ...renderSubscriptionStartedEmail(
+        sampleSubscription({
+          toEmail: args.toEmail,
+          recipientName: args.recipientName,
+          status: "ACTIVE",
+        }),
       ),
-      dedupeKey: `email.test.seller-access.${testId}`,
+      dedupeKey: `email.test.subscription-started.${testId}`,
+    });
+  }
+
+  if (args.template === "SUBSCRIPTION_ENDED") {
+    return testEmailEvent({
+      ...renderSubscriptionEndedEmail(
+        sampleSubscription({
+          toEmail: args.toEmail,
+          recipientName: args.recipientName,
+          status: "CANCELED",
+        }),
+      ),
+      dedupeKey: `email.test.subscription-ended.${testId}`,
     });
   }
 

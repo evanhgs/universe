@@ -35,6 +35,13 @@ enum BeatStatus {
   DELETED
 }
 
+enum StripeCatalogSyncStatus {
+  NOT_SYNCED
+  SYNCING
+  SYNCED
+  FAILED
+}
+
 enum Visibility {
   PUBLIC
   UNLISTED
@@ -196,6 +203,8 @@ enum EmailTemplate {
   SALE_CONFIRMED
   SELLER_ACCESS_GRANTED
   CHAT_UNREAD_REMINDER
+  SUBSCRIPTION_STARTED
+  SUBSCRIPTION_ENDED
 }
 
 enum EmailEventStatus {
@@ -479,6 +488,7 @@ model User {
   id                 String              @id @default(cuid())
   clerkUserId        String?             @unique
   email              String              @unique
+  stripeCustomerId   String?             @unique
   username           String?             @unique
   passwordHash       String?
   phoneE164          String?
@@ -633,6 +643,10 @@ model Beat {
   moderationStatus     ModerationStatus @default(CLEAN)
   isFree               Boolean   @default(false)
   brandingRequired     Boolean   @default(false)
+  stripeProductId      String?   @unique
+  stripeSyncStatus     StripeCatalogSyncStatus @default(NOT_SYNCED)
+  stripeSyncedAt       DateTime?
+  stripeSyncError      String?
   firstPublishedAt     DateTime?
   publishedAt          DateTime?
   archivedAt           DateTime?
@@ -720,6 +734,8 @@ model BeatLicenseOffering {
   title                    String?
   description              String?
   priceAmount              Decimal      @db.Decimal(10,2)
+  stripePriceId            String?      @unique
+  stripePriceActive        Boolean      @default(false)
   currency                 String       @default("EUR")
   isActive                 Boolean      @default(true)
   isDefault                Boolean      @default(false)
@@ -782,6 +798,8 @@ model OrderItem {
   unitAmount              Decimal         @db.Decimal(10,2)
   quantity                Int             @default(1)
   lineTotalAmount         Decimal         @db.Decimal(10,2)
+  stripePriceIdSnapshot   String?
+  commissionRateBpSnapshot Int            @default(3000)
   rightsSnapshotJson      Json?
   createdAt               DateTime        @default(now())
 
@@ -1048,6 +1066,7 @@ model SubscriptionPlan {
   priceAmount             Decimal              @db.Decimal(10,2)
   currency                String               @default("EUR")
   reducedCommissionRateBp Int
+  stripePriceId           String?              @unique
   isActive                Boolean              @default(true)
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt

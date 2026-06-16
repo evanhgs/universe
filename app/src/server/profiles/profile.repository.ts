@@ -29,6 +29,7 @@ export async function findProfileBySlug(slug: string): Promise<ProfileRecord | n
       sellerRatingCount: true,
       user: {
         select: {
+          id: true,
           clerkUserId: true,
           roles: {
             select: {

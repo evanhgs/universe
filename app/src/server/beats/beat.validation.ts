@@ -51,6 +51,8 @@ const allowedMoods = new Set<Mood>(Object.values(Moods));
 const allowedTags = new Set<Tag>(Object.values(Tags));
 const allowedUsageTags = new Set<UsageTag>(Object.values(UsageTags));
 const MAX_LICENSE_OFFERINGS = 3;
+const MARKETPLACE_LIMIT_OPTIONS = [20, 35, 50] as const;
+const DEFAULT_MARKETPLACE_LIMIT = 20;
 const DEFAULT_FEED_LIMIT = 10;
 const MAX_FEED_LIMIT = 20;
 const defaultLicenseTitles: Record<LicenseScope, string> = {
@@ -379,6 +381,26 @@ function parsePositiveLimit(value: string | null, fallback: number, max: number)
   const limit = Number(value ?? fallback);
 
   return Number.isInteger(limit) && limit > 0 ? Math.min(limit, max) : fallback;
+}
+
+/**
+ * Parse la taille de page marketplace parmi les options publiques autorisees.
+ * @param value Parametre URL limit.
+ */
+function parseMarketplaceLimit(value: string | null) {
+  const limit = Number(value ?? DEFAULT_MARKETPLACE_LIMIT);
+
+  return MARKETPLACE_LIMIT_OPTIONS.find((option) => option === limit) ?? DEFAULT_MARKETPLACE_LIMIT;
+}
+
+/**
+ * Parse le numero de page catalogue en entier strictement positif.
+ * @param value Parametre URL page.
+ */
+function parsePage(value: string | null) {
+  const page = Number(value ?? 1);
+
+  return Number.isInteger(page) && page > 0 ? page : 1;
 }
 
 /**
@@ -760,7 +782,8 @@ export function parseBeatListQuery(url: URL): BeatListQuery {
     sellerSlug: normalizeOptionalString(url.searchParams.get("sellerSlug")) ?? undefined,
     licenseType: parseLicenseType(url.searchParams.get("licenseType")),
     sort: parseSort(url.searchParams.get("sort")),
-    limit: parsePositiveLimit(url.searchParams.get("limit"), 24, 50),
+    limit: parseMarketplaceLimit(url.searchParams.get("limit")),
+    page: parsePage(url.searchParams.get("page")),
   };
 }
 

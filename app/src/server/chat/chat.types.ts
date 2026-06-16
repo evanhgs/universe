@@ -20,6 +20,7 @@ export type ChatUserPayload = {
   id: string;
   displayName: string | null;
   slug: string | null;
+  avatarUrl: string | null;
 };
 
 export type ChatBeatPayload = {

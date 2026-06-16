@@ -8,6 +8,12 @@ import {
   getPayoutEligibility,
 } from "@/server/security/permissions";
 import { createProtectedAssetUrl } from "@/server/storage/s3";
+import {
+  handleStripeSubscriptionCheckoutCompleted,
+  handleStripeSubscriptionInvoicePaymentFailed,
+  isStripeSubscriptionCheckoutSession,
+  syncStripeSubscription,
+} from "@/server/subscriptions/subscription.service";
 import type Stripe from "stripe";
 
 import { Prisma } from "../../../generated/prisma/client";
@@ -34,7 +40,7 @@ import {
   markWebhookEventProcessed,
   recordWebhookEventStart,
 } from "./marketplace.repository";
-import { createStripeCheckoutSession, retrieveStripeCheckoutSession } from "./stripe.client";
+import { createStripeCheckoutSession, retrieveStripeCheckoutSession } from "@/lib/stripe.client";
 import type {
   CreateDirectPurchaseOrderInput,
   MarketplaceAssetPayload,
@@ -289,6 +295,12 @@ export async function createStripeCheckoutForCurrentBuyer(
   }
 
   const totalAmount = decimalToNumber(order.totalAmount) ?? 0;
+  const stripePriceIdSnapshots = order.items.map((item) => item.stripePriceIdSnapshot);
+
+  if (stripePriceIdSnapshots.length === 0 || stripePriceIdSnapshots.some((priceId) => !priceId)) {
+    throw new Error("stripe_price_missing");
+  }
+
   const reusablePayment = await findLatestPendingStripePayment({
     orderId: order.id,
     buyerId: account.id,
@@ -317,13 +329,12 @@ export async function createStripeCheckoutForCurrentBuyer(
     currency: order.currency,
   });
   const defaults = buildDefaultCheckoutUrls(order.id, requestUrl);
+
   const session = await createStripeCheckoutSession({
     orderId: order.id,
     paymentId: payment.id,
     buyerId: account.id,
-    amountCents: toCents(totalAmount),
-    currency: order.currency,
-    title: order.items.map((item) => item.titleSnapshot).join(", "),
+    stripePriceIdSnapshots: stripePriceIdSnapshots as string[],
     successUrl: input.successUrl ?? defaults.successUrl,
     cancelUrl: input.cancelUrl ?? defaults.cancelUrl,
   });
@@ -467,6 +478,10 @@ async function dispatchStripeCheckoutWebhookEvent(event: Stripe.Event) {
     case "checkout.session.async_payment_succeeded": {
       const session = event.data.object as Stripe.Checkout.Session;
 
+      if (isStripeSubscriptionCheckoutSession(session)) {
+        return handleStripeSubscriptionCheckoutCompleted(session);
+      }
+
       return fulfillStripeCheckoutSession(session.id);
     }
     case "checkout.session.async_payment_failed":
@@ -482,6 +497,18 @@ async function dispatchStripeCheckoutWebhookEvent(event: Stripe.Event) {
       });
 
       return null;
+    }
+    case "customer.subscription.created":
+    case "customer.subscription.updated":
+    case "customer.subscription.deleted": {
+      const subscription = event.data.object as Stripe.Subscription;
+
+      return syncStripeSubscription(subscription);
+    }
+    case "invoice.payment_failed": {
+      const invoice = event.data.object as Stripe.Invoice;
+
+      return handleStripeSubscriptionInvoicePaymentFailed(invoice);
     }
     default:
       return null;

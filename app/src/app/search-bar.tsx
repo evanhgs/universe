@@ -2,6 +2,7 @@
 
 import { Search } from "lucide-react";
 import { useId } from "react";
+import { usePathname } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,7 @@ type SearchBarProps = {
  */
 export function SearchBar({ defaultQuery = "", scope = "all" }: SearchBarProps) {
   const inputId = useId();
+  const pathname = usePathname();
 
   return (
     <form
@@ -26,6 +28,21 @@ export function SearchBar({ defaultQuery = "", scope = "all" }: SearchBarProps) 
       aria-label="Recherche globale"
       className="relative w-full"
       method="get"
+      onSubmit={(event) => {
+        if (pathname !== "/beats") {
+          return;
+        }
+
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        const search = String(formData.get("search") ?? "");
+
+        window.dispatchEvent(
+          new CustomEvent("beats:catalog-search", {
+            detail: { search },
+          }),
+        );
+      }}
       role="search"
     >
       <label className="sr-only" htmlFor={inputId}>

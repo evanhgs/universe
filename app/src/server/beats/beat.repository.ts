@@ -19,6 +19,12 @@ import {
   BEAT_SLUG_PATTERN,
   DEFAULT_BASIC_LICENSE_CODE,
 } from "./beat.constants";
+import {
+  assertStripeCatalogReadyForPublication,
+  deactivateStripeCatalogForBeat,
+  replaceStripePriceForOffering,
+  syncStripeCatalogForBeat,
+} from "./stripe.catalog.service";
 import type {
   BeatAssetInput,
   BeatFeedQuery,
@@ -273,7 +279,8 @@ async function refreshSellerBeatCount(userId: string) {
 }
 
 /**
- * Cree un beat, ses assets, offres de licence et job de generation de preview dans une transaction.
+ * Cree un beat, ses assets, offres de licence et job de generation de preview.
+ * Synchronise ensuite le catalogue Stripe hors transaction locale.
  * @param ownerId Identifiant utilisateur interne du vendeur.
  * @param input Donnees de creation validees.
  * @returns Beat cree avec owner et assets charges.
@@ -469,17 +476,24 @@ export async function createBeat(ownerId: string, input: CreateBeatInput) {
     throw error;
   });
 
+  try {
+    await syncStripeCatalogForBeat(beat.id);
+  } catch {
+    return prisma.beat.findUniqueOrThrow({
+      where: { id: beat.id },
+      include: beatInclude,
+    });
+  }
+
   await refreshSellerBeatCount(ownerId);
 
-  return beat;
+  return prisma.beat.findUniqueOrThrow({
+    where: { id: beat.id },
+    include: beatInclude,
+  });
 }
 
-/**
- * Liste les beats publics en appliquant les filtres de catalogue.
- * @param query Filtres et tri deja valides par parseBeatListQuery.
- * @returns Beats publics visibles et propres moderation.
- */
-export async function findPublishedBeats(query: BeatListQuery) {
+function buildPublishedBeatWhere(query: BeatListQuery): Prisma.BeatWhereInput {
   const ownerProfileFilters: Prisma.UserProfileWhereInput[] = [];
 
   if (query.producer) {
@@ -497,16 +511,6 @@ export async function findPublishedBeats(query: BeatListQuery) {
     });
   }
 
-  const orderBy =
-    query.sort === "price_asc"
-      ? [{ basePriceAmount: "asc" as const }, { publishedAt: "desc" as const }]
-      : query.sort === "price_desc"
-        ? [{ basePriceAmount: "desc" as const }, { publishedAt: "desc" as const }]
-        : query.sort === "bpm_asc"
-          ? [{ bpm: "asc" as const }, { publishedAt: "desc" as const }]
-          : query.sort === "bpm_desc"
-            ? [{ bpm: "desc" as const }, { publishedAt: "desc" as const }]
-            : [{ publishedAt: "desc" as const }, { createdAt: "desc" as const }];
   const normalizedSearch = query.search?.trim().toUpperCase();
   const searchGenre = normalizedSearch && searchableMainGenres.has(normalizedSearch)
     ? (normalizedSearch as MainGenre)
@@ -518,67 +522,94 @@ export async function findPublishedBeats(query: BeatListQuery) {
     ? (normalizedSearch as Tag)
     : null;
 
-  return getPrisma().beat.findMany({
-    where: {
-      status: "PUBLISHED",
-      visibility: "PUBLIC",
-      moderationStatus: "CLEAN",
-      ...(query.search
-        ? {
-            OR: [
-              { title: { contains: query.search, mode: "insensitive" } },
-              { description: { contains: query.search, mode: "insensitive" } },
-              ...(searchGenre ? [{ mainGenres: { has: searchGenre } }] : []),
-              ...(searchMood ? [{ moods: { has: searchMood } }] : []),
-              ...(searchTag ? [{ tags: { has: searchTag } }] : []),
-            ],
-          }
-        : {}),
-      ...(query.genre
-        ? { mainGenres: { has: query.genre } }
-        : {}),
-      ...(query.mood
-        ? { moods: { has: query.mood } }
-        : {}),
-      ...(query.bpm ? { bpm: query.bpm } : {}),
-      ...(query.bpmMin !== undefined || query.bpmMax !== undefined
-        ? {
-            bpm: {
-              ...(query.bpmMin !== undefined ? { gte: query.bpmMin } : {}),
-              ...(query.bpmMax !== undefined ? { lte: query.bpmMax } : {}),
+  return {
+    status: "PUBLISHED",
+    visibility: "PUBLIC",
+    moderationStatus: "CLEAN",
+    ...(query.search
+      ? {
+          OR: [
+            { title: { contains: query.search, mode: "insensitive" } },
+            { description: { contains: query.search, mode: "insensitive" } },
+            ...(searchGenre ? [{ mainGenres: { has: searchGenre } }] : []),
+            ...(searchMood ? [{ moods: { has: searchMood } }] : []),
+            ...(searchTag ? [{ tags: { has: searchTag } }] : []),
+          ],
+        }
+      : {}),
+    ...(query.genre
+      ? { mainGenres: { has: query.genre } }
+      : {}),
+    ...(query.mood
+      ? { moods: { has: query.mood } }
+      : {}),
+    ...(query.bpm ? { bpm: query.bpm } : {}),
+    ...(query.bpmMin !== undefined || query.bpmMax !== undefined
+      ? {
+          bpm: {
+            ...(query.bpmMin !== undefined ? { gte: query.bpmMin } : {}),
+            ...(query.bpmMax !== undefined ? { lte: query.bpmMax } : {}),
+          },
+        }
+      : {}),
+    ...(query.key
+      ? { musicalKey: { contains: query.key, mode: "insensitive" } }
+      : {}),
+    ...(query.priceMin !== undefined || query.priceMax !== undefined
+      ? {
+          basePriceAmount: {
+            ...(query.priceMin !== undefined ? { gte: query.priceMin } : {}),
+            ...(query.priceMax !== undefined ? { lte: query.priceMax } : {}),
+          },
+        }
+      : {}),
+    ...(query.tags ? { tags: { hasEvery: query.tags } } : {}),
+    ...(ownerProfileFilters.length > 0
+      ? { owner: { profile: { AND: ownerProfileFilters } } }
+      : {}),
+    ...(query.licenseType
+      ? {
+          licenseOfferings: {
+            some: {
+              isActive: true,
+              licenseTemplate: { scope: query.licenseType, isActive: true },
             },
-          }
-        : {}),
-      ...(query.key
-        ? { musicalKey: { contains: query.key, mode: "insensitive" } }
-        : {}),
-      ...(query.priceMin !== undefined || query.priceMax !== undefined
-        ? {
-            basePriceAmount: {
-              ...(query.priceMin !== undefined ? { gte: query.priceMin } : {}),
-              ...(query.priceMax !== undefined ? { lte: query.priceMax } : {}),
-            },
-          }
-        : {}),
-      ...(query.tags ? { tags: { hasEvery: query.tags } } : {}),
-      ...(ownerProfileFilters.length > 0
-        ? { owner: { profile: { AND: ownerProfileFilters } } }
-        : {}),
-      ...(query.licenseType
-        ? {
-            licenseOfferings: {
-              some: {
-                isActive: true,
-                licenseTemplate: { scope: query.licenseType, isActive: true },
-              },
-            },
-          }
-        : {}),
-    },
-    orderBy,
-    take: query.limit,
-    include: beatInclude,
-  });
+          },
+        }
+      : {}),
+  };
+}
+
+/**
+ * Liste les beats publics en appliquant les filtres de catalogue.
+ * @param query Filtres et tri deja valides par parseBeatListQuery.
+ * @returns Beats publics visibles et nombre total de resultats.
+ */
+export async function findPublishedBeats(query: BeatListQuery) {
+  const prisma = getPrisma();
+  const where = buildPublishedBeatWhere(query);
+  const orderBy =
+    query.sort === "price_asc"
+      ? [{ basePriceAmount: "asc" as const }, { publishedAt: "desc" as const }]
+      : query.sort === "price_desc"
+        ? [{ basePriceAmount: "desc" as const }, { publishedAt: "desc" as const }]
+        : query.sort === "bpm_asc"
+          ? [{ bpm: "asc" as const }, { publishedAt: "desc" as const }]
+          : query.sort === "bpm_desc"
+            ? [{ bpm: "desc" as const }, { publishedAt: "desc" as const }]
+            : [{ publishedAt: "desc" as const }, { createdAt: "desc" as const }];
+  const [items, totalItems] = await prisma.$transaction([
+    prisma.beat.findMany({
+      where,
+      orderBy,
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
+      include: beatInclude,
+    }),
+    prisma.beat.count({ where }),
+  ]);
+
+  return { items, totalItems };
 }
 
 /**
@@ -696,7 +727,8 @@ export async function findVisibleBeatBySlug(slug: string, viewerClerkUserId: str
 }
 
 /**
- * Modifie un beat appartenant au vendeur et remplace certains assets si demandes.
+ * Modifie un beat appartenant au vendeur, remplace certains assets si demandes
+ * et resynchronise le catalogue Stripe.
  * @param ownerId Identifiant utilisateur interne du vendeur.
  * @param slug Slug du beat a modifier.
  * @param input Patch valide par parseUpdateBeatInput.
@@ -724,6 +756,12 @@ export async function updateBeatBySlug(ownerId: string, slug: string, input: Upd
     input.audioAsset,
     input.thumbnailAsset,
   ]);
+
+  if (input.status === "PUBLISHED") {
+    await assertStripeCatalogReadyForPublication(existing.id);
+  }
+
+  let defaultOfferingIdForPriceSync: string | null = null;
 
   const beat = await prisma.$transaction(async (tx) => {
     const updated = await tx.beat.update({
@@ -762,6 +800,16 @@ export async function updateBeatBySlug(ownerId: string, slug: string, input: Upd
     });
 
     if (priceAmount !== undefined || input.currency !== undefined) {
+      const defaultOffering = await tx.beatLicenseOffering.findFirst({
+        where: {
+          beatId: updated.id,
+          isDefault: true,
+        },
+        select: { id: true },
+      });
+
+      defaultOfferingIdForPriceSync = defaultOffering?.id ?? null;
+
       await tx.beatLicenseOffering.updateMany({
         where: {
           beatId: updated.id,
@@ -770,6 +818,7 @@ export async function updateBeatBySlug(ownerId: string, slug: string, input: Upd
         data: {
           ...(priceAmount !== undefined ? { priceAmount } : {}),
           ...(input.currency !== undefined ? { currency: input.currency } : {}),
+          stripePriceActive: false,
         },
       });
     }
@@ -835,6 +884,12 @@ export async function updateBeatBySlug(ownerId: string, slug: string, input: Upd
 
     throw error;
   });
+
+  if (defaultOfferingIdForPriceSync) {
+    await replaceStripePriceForOffering(defaultOfferingIdForPriceSync);
+  } else {
+    await syncStripeCatalogForBeat(beat.id);
+  }
 
   await refreshSellerBeatCount(ownerId);
 
@@ -1022,7 +1077,8 @@ export async function resetBeatPreviewJobForOwner(
 }
 
 /**
- * Supprime logiquement un beat en le rendant prive et DELETED.
+ * Supprime logiquement un beat en le rendant prive et DELETED, puis desactive
+ * son catalogue Stripe.
  * @param ownerId Identifiant utilisateur interne du vendeur.
  * @param slug Slug du beat a supprimer.
  * @returns true si une suppression a ete appliquee, false si le beat est absent/deja supprime.
@@ -1051,6 +1107,8 @@ export async function softDeleteBeatBySlug(ownerId: string, slug: string) {
       archivedAt: new Date(),
     },
   });
+
+  await deactivateStripeCatalogForBeat(existing.id);
 
   await refreshSellerBeatCount(ownerId);
 

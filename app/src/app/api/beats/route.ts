@@ -47,12 +47,18 @@ export async function GET(request: Request) {
   });
   if (limited) return limited;
 
-  const beats = await listPublishedBeatsPayload(parseBeatListQuery(new URL(request.url)));
+  const page = await listPublishedBeatsPayload(parseBeatListQuery(new URL(request.url)));
 
   return NextResponse.json(
     {
-      items: beats,
-      count: beats.length,
+      items: page.items,
+      count: page.items.length,
+      page: page.page,
+      limit: page.limit,
+      totalItems: page.totalItems,
+      totalPages: page.totalPages,
+      hasPreviousPage: page.hasPreviousPage,
+      hasNextPage: page.hasNextPage,
     },
     {
       status: 200,

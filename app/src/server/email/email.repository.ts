@@ -238,3 +238,55 @@ export async function findChatUnreadReminderCandidates(cutoff: Date) {
     },
   });
 }
+
+/**
+ * Charge le contexte d'un abonnement pour email transactionnel.
+ * @param providerSubscriptionId Identifiant subscription Stripe.
+ */
+export async function findSubscriptionEmailContext(providerSubscriptionId: string) {
+  const subscription = await getPrisma().userSubscription.findUnique({
+    where: {
+      providerSubscriptionId,
+    },
+    select: {
+      id: true,
+      providerSubscriptionId: true,
+      status: true,
+      currentPeriodEnd: true,
+      user: {
+        select: {
+          id: true,
+          email: true,
+          profile: {
+            select: {
+              displayName: true,
+            },
+          },
+        },
+      },
+      plan: {
+        select: {
+          name: true,
+          reducedCommissionRateBp: true,
+        },
+      },
+    },
+  });
+
+  if (!subscription) {
+    return null;
+  }
+
+  return {
+    id: subscription.id,
+    providerSubscriptionId: subscription.providerSubscriptionId,
+    status: subscription.status,
+    currentPeriodEnd: subscription.currentPeriodEnd,
+    user: {
+      id: subscription.user.id,
+      email: subscription.user.email,
+      displayName: subscription.user.profile?.displayName ?? null,
+    },
+    plan: subscription.plan,
+  };
+}

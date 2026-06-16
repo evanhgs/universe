@@ -460,6 +460,22 @@ export function FeedClient({
     [isAudioPlaying, items, pauseAudio, playBeat, playingBeatId],
   );
 
+  const seekBySeconds = useCallback((seconds: number) => {
+    const audio = audioRef.current;
+
+    if (!audio) {
+      return;
+    }
+
+    const maxTime = Number.isFinite(audio.duration) && audio.duration > 0
+      ? audio.duration
+      : Number.POSITIVE_INFINITY;
+    const nextTime = Math.min(Math.max(audio.currentTime + seconds, 0), maxTime);
+
+    audio.currentTime = nextTime;
+    setCurrentTime(nextTime);
+  }, []);
+
   useEffect(() => {
     if (!preloadNode || !hasMore || isLoading) {
       return;
@@ -562,12 +578,12 @@ export function FeedClient({
 
       if (event.key === "j") {
         event.preventDefault();
-        //TODO reculer le son de 5 secondes
+        seekBySeconds(-5);
       }
 
       if (event.key === "l") {
         event.preventDefault();
-        //TODO avancer le son de 5 secondes
+        seekBySeconds(5);
       }
     }
 
@@ -587,7 +603,7 @@ export function FeedClient({
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("wheel", onWheel);
     };
-  }, [scrollToBeat, shouldIgnoreNavigationTarget, toggleBeatPlayback]);
+  }, [scrollToBeat, seekBySeconds, shouldIgnoreNavigationTarget, toggleBeatPlayback]);
 
   function seekTo(value: number) {
     const audio = audioRef.current;

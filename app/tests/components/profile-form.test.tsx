@@ -34,6 +34,12 @@ const initialAccount = {
   },
   roles: ["BUYER"],
 };
+const subscription = {
+  isPremium: true,
+  commissionRateBp: 900,
+  currentPeriodEnd: "2026-07-16T00:00:00.000Z",
+  canManageSubscription: true,
+};
 
 describe("ProfileForm", () => {
   beforeEach(() => {
@@ -49,7 +55,7 @@ describe("ProfileForm", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ roles: ["BUYER"] }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<ProfileForm initialAccount={initialAccount} />);
+    render(<ProfileForm initialAccount={initialAccount} subscription={subscription} />);
 
     await userEvent.clear(screen.getByLabelText("Nom public"));
     await userEvent.type(screen.getByLabelText("Nom public"), "Universe Seller");
@@ -90,7 +96,7 @@ describe("ProfileForm", () => {
       ),
     );
 
-    render(<ProfileForm initialAccount={initialAccount} />);
+    render(<ProfileForm initialAccount={initialAccount} subscription={subscription} />);
 
     await userEvent.click(screen.getByRole("button", { name: "Enregistrer" }));
 
@@ -99,10 +105,17 @@ describe("ProfileForm", () => {
   });
 
   it("opens Clerk user profile settings", async () => {
-    render(<ProfileForm initialAccount={initialAccount} />);
+    render(<ProfileForm initialAccount={initialAccount} subscription={subscription} />);
 
     await userEvent.click(screen.getByRole("button", { name: "Ouvrir Clerk" }));
 
     expect(openUserProfileMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows subscription management from the profile page", () => {
+    render(<ProfileForm initialAccount={initialAccount} subscription={subscription} />);
+
+    expect(screen.getByText(/Universe est actif avec 9% de commission/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Gérer mon abonnement" })).toBeInTheDocument();
   });
 });
