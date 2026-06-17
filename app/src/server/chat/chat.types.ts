@@ -11,6 +11,11 @@ export type SendMessageInput = {
   body: string;
 };
 
+export type CreateChatOfferInput = {
+  amount: number;
+  message?: string;
+};
+
 export type MessagePageInput = {
   before?: Date;
   limit: number;
@@ -27,7 +32,23 @@ export type ChatBeatPayload = {
   id: string;
   slug: string;
   title: string;
+  exclusiveOffering: {
+    id: string;
+    title: string | null;
+    priceAmount: number;
+    currency: string;
+  } | null;
 } | null;
+
+export type MessageOfferPayload = {
+  id: string;
+  status: string;
+  amount: number;
+  currency: string;
+  beatTitle: string;
+  beatSlug: string;
+  direction: "buyer_offer" | "seller_offer";
+};
 
 export type MessagePayload = {
   id: string;
@@ -35,6 +56,7 @@ export type MessagePayload = {
   sender: ChatUserPayload | null;
   type: MessageType;
   body: string | null;
+  offer: MessageOfferPayload | null;
   createdAt: string;
   editedAt: string | null;
 };

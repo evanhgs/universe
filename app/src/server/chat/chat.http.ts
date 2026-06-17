@@ -15,7 +15,9 @@ export function chatErrorResponse(error: unknown) {
       ? 403
       : message === "chat_target_not_found"
         ? 404
-        : message === "self_conversation_forbidden"
+        : message === "exclusive_license_not_found"
+          ? 404
+        : message === "self_conversation_forbidden" || message === "conversation_beat_required"
           ? 409
           : message === "account_not_found"
             ? 401

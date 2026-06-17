@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { API_PATHS, PAGE_PATHS } from "@/lib/paths";
+import { Button } from "@/components/ui/button";
 
 type OrderStatus =
   | "DRAFT"
@@ -82,11 +83,6 @@ type JsonBody = {
   error?: unknown;
   message?: unknown;
 };
-
-const buttonClass =
-  "inline-flex h-10 items-center justify-center rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:bg-primary/35";
-const secondaryButtonClass =
-  "inline-flex h-10 items-center justify-center rounded-full border border-input px-4 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:text-foreground/35";
 
 /**
  * Formate un montant de commande dans la devise fournie.
@@ -363,9 +359,9 @@ export function PurchasesClient() {
             {error}
           </p>
         ) : null}
-        <button className={`mt-6 ${buttonClass}`} onClick={() => openSignIn()} type="button">
+        <Button className="mt-6" onClick={() => openSignIn()} type="button">
           Se connecter
-        </button>
+        </Button>
       </main>
     );
   }
@@ -399,7 +395,7 @@ export function PurchasesClient() {
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Les licences achetées apparaitront ici apres paiement valide.
           </p>
-          <Link className={`mt-5 ${secondaryButtonClass}`} href={PAGE_PATHS.beats.catalog.getHref()}>
+          <Link className="" href={PAGE_PATHS.beats.catalog.getHref()}>
             Voir le catalogue
           </Link>
         </div>
@@ -475,8 +471,11 @@ export function PurchasesClient() {
                           )}
                         </div>
                       </div>
-                      <button
-                        className={`mt-4 ${buttonClass}`}
+                      {/** 
+                       * TODO: Doit permettre de télécharger une licence (sans ouvrir de page) et sil y a plusieurs licence alors télécharge le tout dans un fichier zip
+                       */}
+                      <Button
+                        className="mt-4"
                         disabled={!canDownload || downloadingId === entitlement?.id}
                         onClick={() => entitlement && void download(entitlement.id)}
                         type="button"
@@ -484,7 +483,7 @@ export function PurchasesClient() {
                         {downloadingId === entitlement?.id
                           ? "Generation du lien..."
                           : "Telecharger"}
-                      </button>
+                      </Button>
                     </div>
                   );
                 })}

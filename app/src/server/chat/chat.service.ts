@@ -7,7 +7,9 @@ import type { ConversationType } from "../../../generated/prisma/enums";
 import {
   countUnreadMessages,
   createConversation,
+  createExclusiveOfferMessage,
   createTextMessage,
+  findChatBeatSeller,
   findChatBeatsByIds,
   findChatTargetByBeatSlug,
   findChatTargetByProfileSlug,
@@ -21,11 +23,13 @@ import type {
   ChatBeatPayload,
   ChatUserPayload,
   ConversationSummary,
+  CreateChatOfferInput,
   CreateConversationInput,
   MessagePageInput,
   MessagePayload,
   SendMessageInput,
 } from "./chat.types";
+import { Prisma } from "../../../generated/prisma/client";
 
 type Account = Awaited<ReturnType<typeof syncCurrentAccountFromClerk>>;
 type ConversationRecord = Awaited<ReturnType<typeof listUserConversations>>[number];
@@ -78,14 +82,59 @@ async function serializeUser(user: {
  * @param message Message charge avec sender.
  */
 async function serializeMessage(message: MessageRecord): Promise<MessagePayload> {
+  const metadata = parseMessageMetadata(message.metadataJson);
+
   return {
     id: message.id,
     conversationId: message.conversationId,
     sender: message.sender ? await serializeUser(message.sender) : null,
     type: message.type,
     body: message.body,
+    offer: metadata?.kind === "exclusive_offer"
+      ? {
+          id: metadata.offerId,
+          status: metadata.status,
+          amount: metadata.amount,
+          currency: metadata.currency,
+          beatTitle: metadata.beatTitle,
+          beatSlug: metadata.beatSlug,
+          direction: metadata.direction,
+        }
+      : null,
     createdAt: message.createdAt.toISOString(),
     editedAt: message.editedAt?.toISOString() ?? null,
+  };
+}
+
+function parseMessageMetadata(value: Prisma.JsonValue) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const metadata = value as Record<string, unknown>;
+
+  if (
+    metadata.kind !== "exclusive_offer" ||
+    typeof metadata.offerId !== "string" ||
+    typeof metadata.status !== "string" ||
+    typeof metadata.amount !== "number" ||
+    typeof metadata.currency !== "string" ||
+    typeof metadata.beatTitle !== "string" ||
+    typeof metadata.beatSlug !== "string" ||
+    (metadata.direction !== "buyer_offer" && metadata.direction !== "seller_offer")
+  ) {
+    return null;
+  }
+
+  return {
+    kind: "exclusive_offer" as const,
+    offerId: metadata.offerId,
+    status: metadata.status,
+    amount: metadata.amount,
+    currency: metadata.currency,
+    beatTitle: metadata.beatTitle,
+    beatSlug: metadata.beatSlug,
+    direction: metadata.direction as "buyer_offer" | "seller_offer",
   };
 }
 
@@ -125,6 +174,9 @@ async function serializeConversations(args: {
   return Promise.all(
     args.conversations.map(async (conversation) => {
       const beat = conversation.beatId ? beatById.get(conversation.beatId) : null;
+      const exclusiveOffering = beat && "licenseOfferings" in beat
+        ? beat.licenseOfferings[0]
+        : null;
       const since = unreadSince(conversation, args.userId);
       const unreadCount = await countUnreadMessages({
         conversationId: conversation.id,
@@ -137,10 +189,18 @@ async function serializeConversations(args: {
         type: conversation.type,
         beat: beat
           ? {
-              id: beat.id,
-              slug: beat.slug,
-              title: beat.title,
-            }
+            id: beat.id,
+            slug: beat.slug,
+            title: beat.title,
+            exclusiveOffering: exclusiveOffering
+              ? {
+                  id: exclusiveOffering.id,
+                  title: exclusiveOffering.title,
+                  priceAmount: Number(exclusiveOffering.priceAmount.toString()),
+                  currency: exclusiveOffering.currency,
+                }
+              : null,
+          }
           : (null satisfies ChatBeatPayload),
         participants: await Promise.all(
           conversation.participants.map((participant) => serializeUser(participant.user)),
@@ -289,6 +349,53 @@ export async function sendCurrentUserMessage(
       conversationId,
       senderId: account.id,
       input,
+    }),
+  );
+}
+
+export async function createCurrentUserChatOffer(
+  clerkUserId: string,
+  conversationId: string,
+  input: CreateChatOfferInput,
+) {
+  const account = await assertCurrentAccount(clerkUserId);
+  const conversation = await findParticipantConversation({
+    conversationId,
+    userId: account.id,
+  });
+
+  if (!conversation) {
+    throw new Error("conversation_forbidden");
+  }
+
+  if (!conversation.beatId) {
+    throw new Error("conversation_beat_required");
+  }
+
+  const beat = await findChatBeatSeller(conversation.beatId);
+
+  if (!beat) {
+    throw new Error("chat_target_not_found");
+  }
+
+  const isSeller = beat.ownerId === account.id;
+  const buyerId = isSeller
+    ? conversation.participants.find((participant) => participant.userId !== account.id)?.userId
+    : account.id;
+
+  if (!buyerId) {
+    throw new Error("conversation_forbidden");
+  }
+
+  return serializeMessage(
+    await createExclusiveOfferMessage({
+      conversationId,
+      senderId: account.id,
+      buyerId,
+      sellerId: beat.ownerId,
+      beatId: beat.id,
+      input,
+      direction: isSeller ? "seller_offer" : "buyer_offer",
     }),
   );
 }

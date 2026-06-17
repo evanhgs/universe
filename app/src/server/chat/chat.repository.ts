@@ -3,7 +3,7 @@ import "server-only";
 import { getPrisma } from "@/lib/prisma";
 
 import type { ConversationType } from "../../../generated/prisma/enums";
-import type { MessagePageInput, SendMessageInput } from "./chat.types";
+import type { CreateChatOfferInput, MessagePageInput, SendMessageInput } from "./chat.types";
 
 const chatUserSelect = {
   id: true,
@@ -92,6 +92,24 @@ export async function findChatTargetByBeatSlug(slug: string) {
       id: true,
       slug: true,
       title: true,
+      ownerId: true,
+    },
+  });
+}
+
+export async function findChatBeatSeller(beatId: string) {
+  return getPrisma().beat.findFirst({
+    where: {
+      id: beatId,
+      status: "PUBLISHED",
+      visibility: "PUBLIC",
+      moderationStatus: "CLEAN",
+      owner: {
+        status: "ACTIVE",
+      },
+    },
+    select: {
+      id: true,
       ownerId: true,
     },
   });
@@ -258,6 +276,105 @@ export async function createTextMessage(args: {
   });
 }
 
+export async function createExclusiveOfferMessage(args: {
+  conversationId: string;
+  senderId: string;
+  buyerId: string;
+  sellerId: string;
+  beatId: string;
+  input: CreateChatOfferInput;
+  direction: "buyer_offer" | "seller_offer";
+}) {
+  const offering = await getPrisma().beatLicenseOffering.findFirst({
+    where: {
+      beatId: args.beatId,
+      sellerId: args.sellerId,
+      isActive: true,
+      beat: {
+        status: "PUBLISHED",
+        visibility: "PUBLIC",
+        moderationStatus: "CLEAN",
+      },
+      licenseTemplate: {
+        scope: "EXCLUSIVE",
+        isActive: true,
+      },
+    },
+    include: {
+      beat: {
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+        },
+      },
+      licenseTemplate: true,
+    },
+    orderBy: {
+      priceAmount: "asc",
+    },
+  });
+
+  if (!offering) {
+    throw new Error("exclusive_license_not_found");
+  }
+
+  const status = args.direction === "seller_offer" ? "ACCEPTED" : "PENDING";
+
+  return getPrisma().$transaction(async (tx) => {
+    const offer = await tx.exclusiveLicenseOffer.create({
+      data: {
+        beatId: offering.beat.id,
+        beatLicenseOfferingId: offering.id,
+        buyerId: args.buyerId,
+        sellerId: args.sellerId,
+        status,
+        proposedAmount: args.input.amount,
+        acceptedAmount: args.direction === "seller_offer" ? args.input.amount : undefined,
+        currency: offering.currency,
+        buyerMessage: args.direction === "buyer_offer" ? args.input.message : undefined,
+        sellerMessage: args.direction === "seller_offer" ? args.input.message : undefined,
+        acceptedAt: args.direction === "seller_offer" ? new Date() : undefined,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    });
+    const body =
+      args.direction === "seller_offer"
+        ? `Offre exclusive approuvee pour ${offering.beat.title}: ${args.input.amount} ${offering.currency}.`
+        : `Proposition d'offre exclusive pour ${offering.beat.title}: ${args.input.amount} ${offering.currency}.`;
+    const message = await tx.message.create({
+      data: {
+        conversationId: args.conversationId,
+        senderId: args.senderId,
+        type: "TEXT",
+        body: args.input.message ? `${body}\n${args.input.message}` : body,
+        metadataJson: {
+          kind: "exclusive_offer",
+          offerId: offer.id,
+          status,
+          amount: args.input.amount,
+          currency: offering.currency,
+          beatTitle: offering.beat.title,
+          beatSlug: offering.beat.slug,
+          direction: args.direction,
+        },
+      },
+      include: messageInclude,
+    });
+
+    await tx.conversation.update({
+      where: {
+        id: args.conversationId,
+      },
+      data: {
+        lastMessageAt: message.createdAt,
+      },
+    });
+
+    return message;
+  });
+}
+
 /**
  * Marque une conversation comme lue pour un participant.
  * @param args Identifiants conversation/utilisateur.
@@ -320,6 +437,25 @@ export async function findChatBeatsByIds(beatIds: string[]) {
       id: true,
       slug: true,
       title: true,
+      licenseOfferings: {
+        where: {
+          isActive: true,
+          licenseTemplate: {
+            scope: "EXCLUSIVE",
+            isActive: true,
+          },
+        },
+        orderBy: {
+          priceAmount: "asc",
+        },
+        take: 1,
+        select: {
+          id: true,
+          title: true,
+          priceAmount: true,
+          currency: true,
+        },
+      },
     },
   });
 }

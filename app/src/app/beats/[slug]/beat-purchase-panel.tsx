@@ -178,20 +178,20 @@ export function BeatPurchasePanel({
         <div>
           <p className="text-sm font-semibold text-foreground">Licences</p>
           <p className="mt-1 text-sm leading-6 text-muted-foreground">
-            Choisis une licence. Le prix TTC est calcule et affiche dans Stripe avant paiement.
+            {"Choisissez une licence. Le prix TTC est calculé et affiché dans Stripe avant paiement."}
           </p>
         </div>
       </div>
 
       {checkoutCancelled ? (
         <Alert className="mt-4 font-medium" variant="warning">
-          Paiement annule. Tu peux choisir une licence et relancer le paiement.
+          {"Paiement annulé. Vous pouvez choisir une licence et relancer le paiement."}
         </Alert>
       ) : null}
 
       {licenseOfferings.length === 0 ? (
         <p className="mt-4 rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
-          Aucune licence active pour cette instrumentale.
+          {"Malheureusement ce beat ne possède aucune licence active. Veuillez contacter le support"}
         </p>
       ) : (
         <div className="mt-4 grid gap-3">

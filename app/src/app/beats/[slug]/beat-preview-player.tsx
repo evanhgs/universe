@@ -208,10 +208,10 @@ export function BeatPreviewPlayer({
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-foreground">
-                    Preview audio
+                    {"Preview audio"}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
-                    Extrait de l&apos;instrumentale
+                    {"Extrait du beat"}
                   </p>
                 </div>
 

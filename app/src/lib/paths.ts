@@ -113,6 +113,8 @@ export const API_PATHS = {
     conversations: () => "/api/chat/conversations",
     conversationMessages: (conversationId: string) =>
       `/api/chat/conversations/${conversationId}/messages`,
+    conversationOffers: (conversationId: string) =>
+      `/api/chat/conversations/${conversationId}/offers`,
     conversationRead: (conversationId: string) =>
       `/api/chat/conversations/${conversationId}/read`,
     unreadCount: () => "/api/chat/unread-count",

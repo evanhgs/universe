@@ -1,0 +1,1 @@
+// TODO formulaire qui s'affiche en popup (comme pour la création d'un beat) mais ça permet de le modifier avec les données existantes déjà dans les champs, reprends le meme formulaire utilisé pour l'upload d'un beat
