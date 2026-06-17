@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { API_PATHS, PAGE_PATHS } from "@/lib/paths";
 
 type ChatContactButtonProps = {
   beatSlug?: string;
@@ -51,7 +52,7 @@ export function ChatContactButton({
 
     try {
       const token = await getToken();
-      const response = await fetch("/api/chat/conversations", {
+      const response = await fetch(API_PATHS.chat.conversations(), {
         body: JSON.stringify({
           ...(beatSlug ? { beatSlug } : {}),
           ...(targetProfileSlug ? { targetProfileSlug } : {}),
@@ -72,7 +73,7 @@ export function ChatContactButton({
       }
 
       const conversation = (await response.json()) as { id: string };
-      router.push(`/account/messages?conversationId=${conversation.id}`);
+      router.push(PAGE_PATHS.account.messages.getHref(conversation.id));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inconnue.");
     } finally {

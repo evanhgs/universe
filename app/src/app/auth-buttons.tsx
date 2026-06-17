@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { API_PATHS, PAGE_PATHS } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 
 type HeaderAccount = {
@@ -70,8 +71,8 @@ export function SignedInActions() {
     user?.primaryEmailAddress?.emailAddress ??
     "Profil";
   const publicProfileHref = account?.profile.slug
-    ? `/profiles/${account.profile.slug}`
-    : "/account";
+    ? PAGE_PATHS.profiles.detail.getHref(account.profile.slug)
+    : PAGE_PATHS.account.dashboard.getHref();
   const isSeller = account?.roles.includes("SELLER") ?? false;
 
   useEffect(() => {
@@ -88,7 +89,7 @@ export function SignedInActions() {
         headers.set("Authorization", `Bearer ${token}`);
       }
 
-      const response = await fetch("/api/account/me", {
+      const response = await fetch(API_PATHS.account.me(), {
         credentials: "same-origin",
         headers,
       });
@@ -115,7 +116,7 @@ export function SignedInActions() {
     async function refreshUnreadCount() {
       try {
         const token = await getToken();
-        const response = await fetch("/api/chat/unread-count", {
+        const response = await fetch(API_PATHS.chat.unreadCount(), {
           credentials: "same-origin",
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
@@ -220,7 +221,7 @@ export function SignedInActions() {
           <div className="grid py-2 text-sm">
             <Link
               className={menuItemClass}
-              href="/account"
+              href={PAGE_PATHS.account.dashboard.getHref()}
               onClick={() => setIsOpen(false)}
               role="menuitem"
             >
@@ -228,7 +229,7 @@ export function SignedInActions() {
             </Link>
             <Link
               className={menuItemClass}
-              href="/account/profile"
+              href={PAGE_PATHS.account.profile.getHref()}
               onClick={() => setIsOpen(false)}
               role="menuitem"
             >
@@ -244,7 +245,7 @@ export function SignedInActions() {
             </Link>
             <Link
               className={menuItemClass}
-              href="/account/messages"
+              href={PAGE_PATHS.account.messages.getHref()}
               onClick={() => setIsOpen(false)}
               role="menuitem"
             >
@@ -259,7 +260,7 @@ export function SignedInActions() {
             </Link>
             <Link
               className={menuItemClass}
-              href="/account/purchases"
+              href={PAGE_PATHS.account.purchases.getHref()}
               onClick={() => setIsOpen(false)}
               role="menuitem"
             >
@@ -268,7 +269,7 @@ export function SignedInActions() {
             {isSeller ? (
               <Link
                 className={menuItemClass}
-                href="/account/sales"
+                href={PAGE_PATHS.account.sales.getHref()}
                 onClick={() => setIsOpen(false)}
                 role="menuitem"
               >

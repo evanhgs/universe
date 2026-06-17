@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { API_PATHS } from "@/lib/paths";
 import { getRedis } from "@/lib/redis";
 
 export type RateLimitPolicy = {
@@ -228,7 +229,7 @@ export async function enforceRateLimit({
 }
 
 export async function enforceGlobalApiRateLimit(request: Request): Promise<Response | null> {
-  if (!new URL(request.url).pathname.startsWith("/api/")) {
+  if (!new URL(request.url).pathname.startsWith(API_PATHS.root.path)) {
     return null;
   }
 

@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { PAGE_PATHS } from "@/lib/paths";
 import { getCurrentAccountSnapshot } from "@/server/account/account.service";
 import { getSubscriptionSummaryForUserId } from "@/server/subscriptions/subscription.service";
 
@@ -43,7 +44,6 @@ export default async function AccountPage() {
 
   const account = await getCurrentAccountSnapshot();
   const subscription = await getSubscriptionSummaryForUserId(account.user.id);
-  const isSeller = account.roles.includes("SELLER");
   const fullName = [account.user.firstName, account.user.lastName].filter(Boolean).join(" ");
 
   return (
@@ -69,10 +69,10 @@ export default async function AccountPage() {
           </div>
           <div className="flex flex-wrap gap-3">
             <Button asChild>
-              <Link href="/account/profile">Modifier le profil</Link>
+              <Link href={PAGE_PATHS.account.profile.getHref()}>Modifier le profil</Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href={`/profiles/${account.profile.slug}`}>Voir le profil public</Link>
+              <Link href={PAGE_PATHS.profiles.detail.getHref(account.profile.slug)}>Voir le profil public</Link>
             </Button>
           </div>
         </div>
@@ -123,7 +123,7 @@ export default async function AccountPage() {
               <SubscriptionPortalButton />
             ) : (
               <Button asChild>
-                <Link href="/pricing">Passer à Universe</Link>
+                <Link href={PAGE_PATHS.pricing.getHref()}>Passer à Universe</Link>
               </Button>
             )}
           </CardContent>
@@ -139,7 +139,7 @@ export default async function AccountPage() {
           <CardContent>
             <div className="mt-4 flex flex-wrap gap-2">
               <Button asChild>
-                <Link href="/account/sales">Dashboard vendeur</Link>
+                <Link href={PAGE_PATHS.account.sales.getHref()}>Dashboard vendeur</Link>
               </Button>
             </div>
           </CardContent>
@@ -149,25 +149,25 @@ export default async function AccountPage() {
       <section className="mt-8">
         <h2 className="text-2xl font-semibold text-foreground">{"Accès rapides"}</h2>
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Link className="rounded-lg border border-border bg-card p-5 transition hover:border-ring/60" href="/account/messages">
+          <Link className="rounded-lg border border-border bg-card p-5 transition hover:border-ring/60" href={PAGE_PATHS.account.messages.getHref()}>
             <h3 className="font-semibold text-foreground">Messagerie</h3>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               {"Echangez avec les vendeurs et les acheteurs depuis la messagerie sécurisée Universe"}
             </p>
           </Link>
-          <Link className="rounded-lg border border-border bg-card p-5 transition hover:border-ring/60" href="/account/purchases">
+          <Link className="rounded-lg border border-border bg-card p-5 transition hover:border-ring/60" href={PAGE_PATHS.account.purchases.getHref()}>
             <h3 className="font-semibold text-foreground">Mes achats</h3>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               {"Retrouvez vos beats payés et vos liens de téléchargement."}
             </p>
           </Link>
-          <Link className="rounded-lg border border-border bg-card p-5 transition hover:border-ring/60 md:col-span-2 xl:col-span-1" href="/beats">
+          <Link className="rounded-lg border border-border bg-card p-5 transition hover:border-ring/60 md:col-span-2 xl:col-span-1" href={PAGE_PATHS.beats.catalog.getHref()}>
             <h3 className="font-semibold text-foreground">Catalogue</h3>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               {"Retrouvez tout le contenu de Universe grâce au catalogue de beat."} 
             </p>
           </Link>
-          <Link className="rounded-lg border border-border bg-card p-5 transition hover:border-ring/60" href="/feed">
+          <Link className="rounded-lg border border-border bg-card p-5 transition hover:border-ring/60" href={PAGE_PATHS.feed.getHref()}>
             <h3 className="font-semibold text-foreground">Rush</h3>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               {"Découvrez de nouvelles pépites grâce au contenu rapide et personnalisé"}

@@ -4,6 +4,7 @@ import { SignInButton, useAuth } from "@clerk/nextjs";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { API_PATHS, PAGE_PATHS } from "@/lib/paths";
 
 type RedirectPayload = {
   checkoutUrl?: string;
@@ -54,7 +55,7 @@ export function PricingActions(props: { isPremium: boolean }) {
 
   if (!isSignedIn) {
     return (
-      <SignInButton mode="redirect" forceRedirectUrl="/pricing">
+      <SignInButton mode="redirect" forceRedirectUrl={PAGE_PATHS.pricing.getHref()}>
         <Button className="w-full" size="lg">
           Activer Universe
         </Button>
@@ -69,8 +70,8 @@ export function PricingActions(props: { isPremium: boolean }) {
         disabled={loading}
         onClick={() =>
           props.isPremium
-            ? redirectToStripe("/api/subscriptions/portal/stripe", "portalUrl")
-            : redirectToStripe("/api/subscriptions/checkout/stripe", "checkoutUrl")
+            ? redirectToStripe(API_PATHS.subscriptions.portalStripe(), "portalUrl")
+            : redirectToStripe(API_PATHS.subscriptions.checkoutStripe(), "checkoutUrl")
         }
         size="lg"
       >

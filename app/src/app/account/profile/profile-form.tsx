@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { API_PATHS, PAGE_PATHS } from "@/lib/paths";
 
 import { SubscriptionPortalButton } from "../subscription-portal-button";
 
@@ -126,7 +127,7 @@ export function ProfileForm({ initialAccount, subscription }: ProfileFormProps) 
       };
 
       await readJsonResponse<AccountSnapshot>(
-        await fetch("/api/account/me/profile", {
+        await fetch(API_PATHS.account.profile(), {
           method: "PATCH",
           credentials: "same-origin",
           headers: await buildAuthHeaders({
@@ -138,7 +139,7 @@ export function ProfileForm({ initialAccount, subscription }: ProfileFormProps) 
       );
 
       await readJsonResponse<{ roles: string[] }>(
-        await fetch("/api/account/me/roles", {
+        await fetch(API_PATHS.account.roles(), {
           method: "PUT",
           credentials: "same-origin",
           headers: await buildAuthHeaders({
@@ -231,7 +232,7 @@ export function ProfileForm({ initialAccount, subscription }: ProfileFormProps) 
                 required
                 value={slug}
               />
-              <span className={helperClass}>URL publique: /profiles/{slug || "mon-profil"}</span>
+              <span className={helperClass}>URL publique: {PAGE_PATHS.profiles.detail.getHref(slug || "mon-profil")}</span>
             </Label>
             <div className="grid gap-5 md:grid-cols-2">
               <Label>
@@ -292,7 +293,7 @@ export function ProfileForm({ initialAccount, subscription }: ProfileFormProps) 
               {isSaving ? "Enregistrement..." : "Enregistrer"}
             </Button>
             <Button asChild size="lg" variant="outline">
-              <Link href="/account">Retour au compte</Link>
+              <Link href={PAGE_PATHS.account.dashboard.getHref()}>Retour au compte</Link>
             </Button>
           </div>
         </Card>
@@ -312,7 +313,7 @@ export function ProfileForm({ initialAccount, subscription }: ProfileFormProps) 
               <SubscriptionPortalButton />
             ) : (
               <Button asChild variant="outline">
-                <Link href="/pricing">{"Voir l'abonnement"}</Link>
+                <Link href={PAGE_PATHS.pricing.getHref()}>{"Voir l'abonnement"}</Link>
               </Button>
             )}
           </div>

@@ -8,6 +8,8 @@ export const metadata: Metadata = {
 
 const lastUpdated = "6 juin 2026";
 
+import { PAGE_PATHS } from "@/lib/paths";
+
 const sections = [
   {
     title: "1. Objet",
@@ -74,7 +76,7 @@ const sections = [
       "Les informations détaillées sur les traitements, les bases légales, les durées de conservation, les destinataires et les droits des personnes sont disponibles dans la politique de confidentialité.",
     ],
     link: {
-      href: "/privacy-policy",
+      href: PAGE_PATHS.legal.privacyPolicy.getHref(),
       label: "Consulter la politique de confidentialité",
     },
   },

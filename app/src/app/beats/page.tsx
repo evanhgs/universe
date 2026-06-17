@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { MAIN_GENRES, type MainGenre } from "@/lib/beat-metadata";
+import { PAGE_PATHS } from "@/lib/paths";
 import { listPublishedBeatsPayload } from "@/server/beats/beat.service";
 import { BeatsCatalogClient } from "./beats-catalog-client";
 
@@ -67,10 +68,10 @@ export default async function BeatsPage({ searchParams }: BeatsPageProps) {
         </div>
         <div className="flex flex-wrap gap-3">
           <Button asChild size="lg">
-            <Link href="/beats/upload">Uploader un beat</Link>
+            <Link href={PAGE_PATHS.beats.upload.getHref()}>Uploader un beat</Link>
           </Button>
           <Button asChild size="lg" variant="outline">
-            <Link href="/account-test">Tester mon compte</Link>
+            <Link href={PAGE_PATHS.account.test.getHref()}>Tester mon compte</Link>
           </Button>
         </div>
       </div>

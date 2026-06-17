@@ -17,6 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { API_PATHS, PAGE_PATHS } from "@/lib/paths";
 import type {
   ConversationSummary,
   MessagePayload,
@@ -149,7 +150,7 @@ export function MessagesClient() {
 
       try {
         const token = await getToken();
-        const response = await fetch("/api/chat/conversations", {
+        const response = await fetch(API_PATHS.chat.conversations(), {
           credentials: "same-origin",
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
@@ -193,7 +194,7 @@ export function MessagesClient() {
         const token = await getToken();
         const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
         const response = await fetch(
-          `/api/chat/conversations/${selectedConversationIdForLoad}/messages`,
+          API_PATHS.chat.conversationMessages(selectedConversationIdForLoad),
           {
             credentials: "same-origin",
             headers,
@@ -201,7 +202,7 @@ export function MessagesClient() {
         );
         const payload = await readJsonOrThrow<MessagePayload[]>(response);
 
-        await fetch(`/api/chat/conversations/${selectedConversationIdForLoad}/read`, {
+        await fetch(API_PATHS.chat.conversationRead(selectedConversationIdForLoad), {
           credentials: "same-origin",
           headers,
           method: "PATCH",
@@ -240,7 +241,7 @@ export function MessagesClient() {
    * @param conversationId Identifiant conversation.
    */
   function selectConversation(conversationId: string) {
-    router.replace(`/account/messages?conversationId=${conversationId}`);
+    router.replace(PAGE_PATHS.account.messages.getHref(conversationId));
   }
 
   /**
@@ -260,7 +261,7 @@ export function MessagesClient() {
     try {
       const token = await getToken();
       const response = await fetch(
-        `/api/chat/conversations/${selectedConversation.id}/messages`,
+        API_PATHS.chat.conversationMessages(selectedConversation.id),
         {
           body: JSON.stringify({ body: draft }),
           credentials: "same-origin",
@@ -338,7 +339,7 @@ export function MessagesClient() {
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 Vous pouvez contacter un vendeur depuis son profil ou depuis le catalogue avant d&#39;effectuer un achat.
               </p>
-              <Link className="mt-4 inline-flex text-sm font-medium text-foreground" href="/beats">
+              <Link className="mt-4 inline-flex text-sm font-medium text-foreground" href={PAGE_PATHS.beats.catalog.getHref()}>
                 Explorer le catalogue
               </Link>
             </div>
@@ -394,7 +395,7 @@ export function MessagesClient() {
                 {selectedConversation.beat ? (
                   <Link
                     className="mt-1 inline-flex text-sm text-muted-foreground hover:text-foreground"
-                    href={`/beats/${selectedConversation.beat.slug}`}
+                    href={PAGE_PATHS.beats.detail.getHref(selectedConversation.beat.slug)}
                   >
                     Voir l&apos;instrumentale
                   </Link>

@@ -13,6 +13,7 @@ import { AudioTimeline } from "@/components/audio/audio-timeline";
 import { FeedMoodBackdrop } from "@/components/feed/feed-mood-backdrop";
 import { VolumeControl } from "@/components/audio/volume-control";
 import { Button } from "@/components/ui/button";
+import { API_PATHS, PAGE_PATHS } from "@/lib/paths";
 
 type FeedAsset = {
   id: string;
@@ -86,7 +87,7 @@ function postFeedAnalyticsEvent(payload: {
   watchMs?: number;
   playPercentage?: number;
 }) {
-  const request = fetch("/api/analytics/events", {
+  const request = fetch(API_PATHS.analytics.events(), {
     method: "POST",
     cache: "no-store",
     keepalive: true,
@@ -211,7 +212,7 @@ export function FeedClient({
         params.set("sessionId", sessionId);
       }
 
-      const response = await fetch(`/api/feed?${params.toString()}`, {
+      const response = await fetch(API_PATHS.feed.list(params), {
         cache: "no-store",
         headers: { Accept: "application/json" },
       });
@@ -835,7 +836,7 @@ export function FeedClient({
                     <div className="mt-5 flex flex-wrap items-center gap-3">
                       <Link
                         className="inline-flex h-11 items-center justify-center rounded-full bg-white px-5 text-sm font-semibold text-black transition hover:bg-orange-100"
-                        href={`/beats/${beat.slug}`}
+                        href={PAGE_PATHS.beats.detail.getHref(beat.slug)}
                         onClick={() => trackEvent(beat.id, "license_click")}
                       >
                         Voir licences

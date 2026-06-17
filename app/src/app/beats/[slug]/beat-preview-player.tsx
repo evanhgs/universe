@@ -9,6 +9,7 @@ import { VolumeControl } from "@/components/audio/volume-control";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { API_PATHS } from "@/lib/paths";
 
 type PreviewStatus = "waiting" | "loading" | "ready" | "error";
 
@@ -54,7 +55,7 @@ export function BeatPreviewPlayer({
 
     async function loadPreview() {
       try {
-        const response = await fetch(`/api/beats/${beatSlug}/preview`, {
+        const response = await fetch(API_PATHS.beats.preview(beatSlug), {
           cache: "no-store",
           headers: { Accept: "application/json" },
         });

@@ -6,6 +6,7 @@ import { type SyntheticEvent, useCallback, useEffect, useMemo, useState } from "
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { API_PATHS, PAGE_PATHS } from "@/lib/paths";
 import {
   Select,
   SelectContent,
@@ -100,7 +101,7 @@ function buildCatalogParams(filters: {
 }
 
 /**
- * Catalogue client: filtre et pagine via /api/beats sans navigation complete.
+ * Catalogue client: filtre et pagine via l'API beats sans navigation complete.
  */
 export function BeatsCatalogClient({
   initialPage,
@@ -136,7 +137,7 @@ export function BeatsCatalogClient({
       setError(null);
 
       try {
-        const response = await fetch(`/api/beats?${query}`, {
+        const response = await fetch(API_PATHS.beats.list(query), {
           cache: "no-store",
           headers: {
             Accept: "application/json",
@@ -155,7 +156,7 @@ export function BeatsCatalogClient({
         const resolvedQuery = resolvedParams.toString();
 
         setPage(nextPage);
-        window.history.pushState(null, "", resolvedQuery ? `/beats?${resolvedQuery}` : "/beats");
+        window.history.pushState(null, "", resolvedQuery ? `${PAGE_PATHS.beats.catalog.getHref()}?${resolvedQuery}` : PAGE_PATHS.beats.catalog.getHref());
       } catch {
         setError("Impossible de charger le catalogue pour le moment.");
       } finally {
@@ -208,7 +209,7 @@ export function BeatsCatalogClient({
   return (
     <>
       <form
-        action="/beats"
+        action={PAGE_PATHS.beats.catalog.getHref()}
         className="mt-6 grid gap-3 md:grid-cols-[1fr_180px_140px_auto]"
         onSubmit={onSubmit}
       >
@@ -265,7 +266,7 @@ export function BeatsCatalogClient({
 
               return (
                 <Card className="overflow-hidden" key={beat.id}>
-                  <Link href={`/beats/${beat.slug}`}>
+                  <Link href={PAGE_PATHS.beats.detail.getHref(beat.slug)}>
                     <div className="aspect-video bg-muted">
                       {thumbnail?.url ? (
                         // eslint-disable-next-line @next/next/no-img-element

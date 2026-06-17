@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PAGE_PATHS } from "@/lib/paths";
 
 type SearchScope = "all" | "tracks" | "artists" | "beats" | "styles";
 
@@ -24,12 +25,12 @@ export function SearchBar({ defaultQuery = "", scope = "all" }: SearchBarProps) 
 
   return (
     <form
-      action="/beats"
+      action={PAGE_PATHS.beats.catalog.getHref()}
       aria-label="Recherche globale"
       className="relative w-full"
       method="get"
       onSubmit={(event) => {
-        if (pathname !== "/beats") {
+        if (pathname !== PAGE_PATHS.beats.catalog.getHref()) {
           return;
         }
 

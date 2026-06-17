@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { API_PATHS, PAGE_PATHS } from "@/lib/paths";
 
 type LicenseOffering = {
   id: string;
@@ -144,7 +145,7 @@ export function BeatPurchasePanel({
       }
 
       const order = await readJsonResponse<OrderPayload>(
-        await fetch("/api/marketplace/orders", {
+        await fetch(API_PATHS.marketplace.orders.create(), {
           method: "POST",
           credentials: "same-origin",
           headers,
@@ -153,13 +154,13 @@ export function BeatPurchasePanel({
       );
 
       const checkout = await readJsonResponse<StripeCheckoutPayload>(
-        await fetch(`/api/marketplace/orders/${order.id}/checkout/stripe`, {
+        await fetch(API_PATHS.marketplace.orders.checkoutStripe(order.id), {
           method: "POST",
           credentials: "same-origin",
           headers,
           body: JSON.stringify({
-            successUrl: `${window.location.origin}/account/purchases?orderId=${order.id}&stripeSessionId={CHECKOUT_SESSION_ID}`,
-            cancelUrl: `${window.location.origin}/beats/${beatSlug}?checkout=cancelled`,
+            successUrl: `${window.location.origin}${PAGE_PATHS.account.purchases.stripeSuccess(order.id)}`,
+            cancelUrl: `${window.location.origin}${PAGE_PATHS.beats.detail.checkoutCancelled(beatSlug)}`,
           }),
         }),
       );

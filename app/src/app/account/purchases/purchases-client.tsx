@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { API_PATHS, PAGE_PATHS } from "@/lib/paths";
+
 type OrderStatus =
   | "DRAFT"
   | "PENDING_PAYMENT"
@@ -238,7 +240,7 @@ export function PurchasesClient() {
 
   const loadPurchases = useCallback(async () => {
     const response = await readJsonResponse<PurchasesResponse>(
-      await fetch("/api/marketplace/purchases", {
+      await fetch(API_PATHS.marketplace.purchases(), {
         credentials: "same-origin",
         headers: await buildAuthHeaders({
           Accept: "application/json",
@@ -267,7 +269,7 @@ export function PurchasesClient() {
       try {
         if (orderId && stripeSessionId) {
           await readJsonResponse<PurchaseOrder>(
-            await fetch(`/api/marketplace/orders/${orderId}/payments/stripe/confirm`, {
+            await fetch(API_PATHS.marketplace.orders.confirmStripePayment(orderId), {
               method: "POST",
               credentials: "same-origin",
               headers: await buildAuthHeaders({
@@ -280,7 +282,7 @@ export function PurchasesClient() {
 
           if (!isCancelled) {
             setNotice("Paiement confirme. Ton telechargement est disponible.");
-            router.replace("/account/purchases", { scroll: false });
+            router.replace(PAGE_PATHS.account.purchases.getHref(), { scroll: false });
           }
         }
 
@@ -315,7 +317,7 @@ export function PurchasesClient() {
 
     try {
       const response = await readJsonResponse<DownloadResponse>(
-        await fetch(`/api/marketplace/downloads/${entitlementId}`, {
+        await fetch(API_PATHS.marketplace.downloads(entitlementId), {
           credentials: "same-origin",
           headers: await buildAuthHeaders({
             Accept: "application/json",
@@ -395,9 +397,9 @@ export function PurchasesClient() {
         <div className="mt-8 border border-dashed border-border p-8">
           <h2 className="text-xl font-semibold text-foreground">Aucun achat</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Les licences achetees apparaitront ici apres paiement valide.
+            Les licences achetées apparaitront ici apres paiement valide.
           </p>
-          <Link className={`mt-5 ${secondaryButtonClass}`} href="/beats">
+          <Link className={`mt-5 ${secondaryButtonClass}`} href={PAGE_PATHS.beats.catalog.getHref()}>
             Voir le catalogue
           </Link>
         </div>
@@ -451,7 +453,7 @@ export function PurchasesClient() {
                           {item.beat?.slug ? (
                             <Link
                               className="mt-2 inline-flex text-sm font-medium text-foreground hover:text-muted-foreground"
-                              href={`/beats/${item.beat.slug}`}
+                              href={PAGE_PATHS.beats.detail.getHref(item.beat.slug)}
                             >
                               Ouvrir la fiche
                             </Link>

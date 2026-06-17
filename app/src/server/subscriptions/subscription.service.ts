@@ -10,6 +10,7 @@ import {
   retrieveStripeSubscription,
 } from "@/lib/stripe.client";
 import { syncCurrentAccountFromClerk } from "@/server/account/account.sync";
+import { PAGE_PATHS } from "@/lib/paths";
 
 import type { SubscriptionStatus } from "../../../generated/prisma/enums";
 import {
@@ -252,8 +253,8 @@ export async function createUniverseSubscriptionCheckoutForCurrentUser(
     userId: account.id,
     planCode: plan.code,
     priceId: plan.stripePriceId ?? getUniverseMonthlyPriceId(),
-    successUrl: buildUrl(origin, "/pricing?subscription=success&stripeSessionId={CHECKOUT_SESSION_ID}"),
-    cancelUrl: buildUrl(origin, "/pricing?subscription=cancelled"),
+    successUrl: buildUrl(origin, PAGE_PATHS.pricing.checkoutSuccess()),
+    cancelUrl: buildUrl(origin, PAGE_PATHS.pricing.checkoutCancelled()),
   });
 
   if (!session.url) {
@@ -287,7 +288,7 @@ export async function createUniverseSubscriptionPortalForCurrentUser(
   const origin = getPublicOrigin(requestUrl);
   const session = await createStripeBillingPortalSession({
     customerId: account.stripeCustomerId,
-    returnUrl: buildUrl(origin, "/pricing"),
+    returnUrl: buildUrl(origin, PAGE_PATHS.pricing.getHref()),
   });
   if (!session.url) {
     throw new Error("stripe_portal_url_missing");

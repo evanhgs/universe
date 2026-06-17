@@ -4,6 +4,8 @@ import { useAuth, useClerk, useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { API_PATHS, PAGE_PATHS } from "@/lib/paths";
+
 type SaleItem = {
   id: string;
   orderId: string;
@@ -244,7 +246,7 @@ export function SalesClient() {
 
       try {
         const response = await readJsonResponse<SalesResponse>(
-          await fetch("/api/marketplace/sales", {
+          await fetch(API_PATHS.marketplace.sales(), {
             credentials: "same-origin",
             headers: await buildAuthHeaders({
               Accept: "application/json",
@@ -315,7 +317,7 @@ export function SalesClient() {
         <div className="mt-6 border border-rose-200 bg-rose-50 px-4 py-3">
           <p className="text-sm font-medium text-rose-700">{error}</p>
           {error.includes("vendeur") ? (
-            <Link className={`mt-4 ${secondaryButtonClass}`} href="/account/profile">
+            <Link className={`mt-4 ${secondaryButtonClass}`} href={PAGE_PATHS.account.profile.getHref()}>
               Activer vendeur
             </Link>
           ) : null}
@@ -399,7 +401,7 @@ export function SalesClient() {
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Les achats payes par tes clients apparaitront ici.
           </p>
-          <Link className={`mt-5 ${secondaryButtonClass}`} href="/beats">
+          <Link className={`mt-5 ${secondaryButtonClass}`} href={PAGE_PATHS.beats.catalog.getHref()}>
             Voir le catalogue
           </Link>
         </div>
@@ -413,7 +415,7 @@ export function SalesClient() {
               Suis la visibilite, le prix et les ventes de chaque publication.
             </p>
           </div>
-          <Link className={secondaryButtonClass} href="/beats">
+          <Link className={secondaryButtonClass} href={PAGE_PATHS.beats.catalog.getHref()}>
             Gerer le catalogue
           </Link>
         </div>
@@ -424,7 +426,7 @@ export function SalesClient() {
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               Publie ta premiere instrumentale pour commencer a vendre.
             </p>
-            <Link className={`mt-5 ${secondaryButtonClass}`} href="/beats">
+            <Link className={`mt-5 ${secondaryButtonClass}`} href={PAGE_PATHS.beats.catalog.getHref()}>
               Ajouter une instru
             </Link>
           </div>
@@ -464,7 +466,7 @@ export function SalesClient() {
                   </dl>
                   <Link
                     className="inline-flex text-sm font-medium text-foreground hover:text-muted-foreground"
-                    href={`/beats/${beat.slug}`}
+                    href={PAGE_PATHS.beats.detail.getHref(beat.slug)}
                   >
                     Ouvrir
                   </Link>
@@ -495,7 +497,7 @@ export function SalesClient() {
                   {sale.beat ? (
                     <Link
                       className="mt-3 inline-flex text-sm font-medium text-foreground hover:text-muted-foreground"
-                      href={`/beats/${sale.beat.slug}`}
+                      href={PAGE_PATHS.beats.detail.getHref(sale.beat.slug)}
                     >
                       Ouvrir la fiche
                     </Link>

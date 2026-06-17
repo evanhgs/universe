@@ -2,6 +2,7 @@ import "server-only";
 
 import { emailService } from "@/server/email/email.service";
 import { syncCurrentAccountFromClerk } from "@/server/account/account.sync";
+import { PAGE_PATHS } from "@/lib/paths";
 import {
   actorFromAccount,
   assertCan,
@@ -215,11 +216,11 @@ function buildDefaultCheckoutUrls(orderId: string, requestUrl: string) {
   return {
     successUrl: buildCheckoutUrl(
       origin,
-      `/account/purchases?orderId=${encodeURIComponent(orderId)}&stripeSessionId={CHECKOUT_SESSION_ID}`,
+      PAGE_PATHS.account.purchases.stripeSuccess(orderId),
     ),
     cancelUrl: buildCheckoutUrl(
       origin,
-      `/account/purchases?orderId=${encodeURIComponent(orderId)}&checkout=cancelled`,
+      PAGE_PATHS.account.purchases.checkoutCancelled(orderId),
     ),
   };
 }

@@ -2,6 +2,7 @@
 
 import { Alert, type AlertProps } from "@/components/ui/alert";
 import { notify } from "@/components/ui/notification";
+import { API_PATHS } from "@/lib/paths";
 import { useAuth } from "@clerk/nextjs";
 import { useState } from "react";
 
@@ -553,7 +554,7 @@ export default function AccountTestPage() {
     const startedAt = performance.now();
 
     try {
-      const response = await fetch("/api/account-test/rate-limit", {
+      const response = await fetch(API_PATHS.account.test.rateLimit(), {
         method: "POST",
         credentials: "same-origin",
         headers: {
@@ -624,7 +625,7 @@ export default function AccountTestPage() {
     setIsAnalyticsLoading(true);
 
     try {
-      const response = await request("/api/account-test/analytics");
+      const response = await request(API_PATHS.account.test.analytics());
 
       setAnalyticsStatus(response.status);
       setAnalyticsRaw(response.body);
@@ -642,7 +643,7 @@ export default function AccountTestPage() {
     setIsRecomputingAnalytics(true);
 
     try {
-      const response = await request("/api/account-test/analytics", {
+      const response = await request(API_PATHS.account.test.analytics(), {
         method: "POST",
         body: JSON.stringify({ action: "recompute" }),
       });
@@ -1111,7 +1112,7 @@ export default function AccountTestPage() {
               className={`mt-4 ${buttonClass}`}
               onClick={() =>
                 run(async () => {
-                  setMe(await request("/api/account/me"));
+                  setMe(await request(API_PATHS.account.me()));
                 })
               }
               type="button"
@@ -1131,7 +1132,7 @@ export default function AccountTestPage() {
               className={`mt-4 ${buttonClass}`}
               onClick={() =>
                 run(async () => {
-                  setProfile(await request("/api/account/me/profile"));
+                  setProfile(await request(API_PATHS.account.profile()));
                 })
               }
               type="button"
@@ -1157,7 +1158,7 @@ export default function AccountTestPage() {
               onClick={() =>
                 run(async () => {
                   setProfile(
-                    await request("/api/account/me/profile", {
+                    await request(API_PATHS.account.profile(), {
                       method: "PATCH",
                       body: profilePayload,
                     }),
@@ -1180,7 +1181,7 @@ export default function AccountTestPage() {
               className={`mt-4 ${buttonClass}`}
               onClick={() =>
                 run(async () => {
-                  setRoles(await request("/api/account/me/roles"));
+                  setRoles(await request(API_PATHS.account.roles()));
                 })
               }
               type="button"
@@ -1205,7 +1206,7 @@ export default function AccountTestPage() {
             onClick={() =>
               run(async () => {
                 setRoles(
-                  await request("/api/account/me/roles", {
+                  await request(API_PATHS.account.roles(), {
                     method: "PUT",
                     body: rolesPayload,
                   }),
@@ -1233,7 +1234,7 @@ export default function AccountTestPage() {
             onClick={() =>
               run(async () => {
                 setSentryTest(
-                  await request("/api/account-test/sentry", {
+                  await request(API_PATHS.account.test.sentry(), {
                     method: "POST",
                     body: JSON.stringify({
                       source: "account-test",
@@ -1266,7 +1267,7 @@ export default function AccountTestPage() {
               className={secondaryButtonClass}
               onClick={() =>
                 run(async () => {
-                  setEmailConfig(await request("/api/account-test/email"));
+                  setEmailConfig(await request(API_PATHS.account.test.email()));
                 })
               }
               type="button"
@@ -1287,7 +1288,7 @@ export default function AccountTestPage() {
             onClick={() =>
               run(async () => {
                 setEmailTest(
-                  await request("/api/account-test/email", {
+                  await request(API_PATHS.account.test.email(), {
                     method: "POST",
                     body: emailPayload,
                   }),
