@@ -107,7 +107,7 @@ function formatDate(value: string | null) {
  */
 function beatStatusLabel(status: string) {
   if (status === "PUBLISHED") {
-    return "Publiee";
+    return "Publiée";
   }
 
   if (status === "PROCESSING") {
@@ -119,11 +119,11 @@ function beatStatusLabel(status: string) {
   }
 
   if (status === "HIDDEN") {
-    return "Masquee";
+    return "Masquée";
   }
 
   if (status === "ARCHIVED") {
-    return "Archivee";
+    return "Archivée";
   }
 
   return status;
@@ -177,11 +177,11 @@ function payoutStatusLabel(reason: string | null | undefined) {
   }
 
   if (reason === "PENDING_KYC") {
-    return "Verification d'identite requise avant retrait";
+    return "Vérification d'identitée requise avant le retrait";
   }
 
   if (reason === "PAYOUT_ACCOUNT_REQUIRED") {
-    return "Compte de retrait a configurer";
+    return "Compte de retrait à configurer";
   }
 
   if (reason === "ACCOUNT_NOT_ACTIVE") {
