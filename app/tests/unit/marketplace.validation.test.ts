@@ -20,7 +20,7 @@ describe("marketplace validation", () => {
 
   it("requires a beat or license offering", () => {
     expect(() => parseCreateDirectPurchaseOrderInput({})).toThrow(
-      "beatSlug or licenseOfferingId is required.",
+      "Provide exactly one purchase target.",
     );
     expect(() => parseCreateDirectPurchaseOrderInput([])).toThrow(
       "Invalid marketplace payload.",

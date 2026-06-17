@@ -41,8 +41,29 @@ describe("marketplace sales API route", () => {
         processingBeatCount: 0,
         hiddenBeatCount: 0,
         revenueByCurrency: [],
+        payoutEligibility: {
+          canReceivePayouts: false,
+          kycStatus: "NOT_STARTED",
+          payoutAccountReady: false,
+          reason: "PENDING_KYC",
+        },
       },
       beats: [{ id: "beat_123" }],
+      analyticsSummary: {
+        impressions: 0,
+        plays: 0,
+        fullPlays: 0,
+        licenseClicks: 0,
+        addToCart: 0,
+        purchases: 0,
+        revenue: 0,
+        playRate: 0,
+        licenseClickRate: 0,
+        conversionRate: 0,
+      },
+      beatPerformance: [],
+      exclusiveOffers: [],
+      promotions: [],
     });
     const { GET } = await import("@/app/api/marketplace/sales/route");
 
@@ -57,13 +78,13 @@ describe("marketplace sales API route", () => {
     });
   });
 
-  it("maps seller role errors to 403", async () => {
+  it("maps inactive account errors to 400", async () => {
     authMock.mockResolvedValue({ isAuthenticated: true, userId: "user_123" });
-    getCurrentSellerDashboardMock.mockRejectedValue(new Error("seller_role_required"));
+    getCurrentSellerDashboardMock.mockRejectedValue(new Error("account_not_active"));
     const { GET } = await import("@/app/api/marketplace/sales/route");
 
     const response = await GET();
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(400);
   });
 });

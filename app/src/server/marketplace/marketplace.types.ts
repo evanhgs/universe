@@ -1,15 +1,57 @@
 import "server-only";
 
 import type {
+  ExclusiveOfferStatus,
   EntitlementStatus,
   KycStatus,
   OrderStatus,
   PaymentStatus,
+  PromotionDiscountType,
+  PromotionType,
 } from "../../../generated/prisma/enums";
 
 export type CreateDirectPurchaseOrderInput = {
   beatSlug?: string;
   licenseOfferingId?: string;
+  exclusiveOfferId?: string;
+  items?: Array<{
+    licenseOfferingId: string;
+    quantity?: number;
+  }>;
+  promotionCode?: string;
+};
+
+export type CreateExclusiveOfferInput = {
+  beatLicenseOfferingId: string;
+  proposedAmount: number;
+  buyerMessage?: string;
+};
+
+export type UpdateExclusiveOfferInput = {
+  action: "accept" | "reject" | "counter";
+  counterAmount?: number;
+  sellerMessage?: string;
+};
+
+export type CreatePromotionInput = {
+  type: PromotionType;
+  discountType: PromotionDiscountType;
+  title: string;
+  code?: string;
+  discountValue: number;
+  currency?: string;
+  minItems?: number;
+  usageLimit?: number;
+  startsAt?: string;
+  endsAt?: string;
+  scope?: {
+    beatIds?: string[];
+    licenseOfferingIds?: string[];
+  };
+};
+
+export type UpdatePromotionInput = Partial<CreatePromotionInput> & {
+  isActive?: boolean;
 };
 
 export type StripeCheckoutInput = {
@@ -104,6 +146,68 @@ export type SellerBeatPayload = {
   paidSalesCount: number;
 };
 
+export type SellerAnalyticsSummaryPayload = {
+  impressions: number;
+  plays: number;
+  fullPlays: number;
+  licenseClicks: number;
+  addToCart: number;
+  purchases: number;
+  revenue: number;
+  playRate: number;
+  licenseClickRate: number;
+  conversionRate: number;
+};
+
+export type SellerBeatPerformancePayload = SellerBeatPayload & {
+  impressions: number;
+  plays: number;
+  fullPlays: number;
+  licenseClicks: number;
+  addToCart: number;
+  purchases: number;
+  revenue: number;
+  conversionRate: number;
+};
+
+export type ExclusiveOfferPayload = {
+  id: string;
+  status: ExclusiveOfferStatus;
+  proposedAmount: number;
+  counterAmount: number | null;
+  acceptedAmount: number | null;
+  currency: string;
+  buyerMessage: string | null;
+  sellerMessage: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  beat: {
+    id: string;
+    slug: string;
+    title: string;
+  };
+  buyer: {
+    id: string;
+    displayName: string | null;
+  };
+};
+
+export type PromotionPayload = {
+  id: string;
+  type: PromotionType;
+  discountType: PromotionDiscountType;
+  title: string;
+  code: string | null;
+  discountValue: number;
+  currency: string | null;
+  minItems: number;
+  usageLimit: number | null;
+  usageCount: number;
+  isActive: boolean;
+  startsAt: string | null;
+  endsAt: string | null;
+};
+
 export type SellerDashboardPayload = {
   items: Array<{
     id: string;
@@ -142,4 +246,8 @@ export type SellerDashboardPayload = {
     };
   };
   beats: SellerBeatPayload[];
+  analyticsSummary: SellerAnalyticsSummaryPayload;
+  beatPerformance: SellerBeatPerformancePayload[];
+  exclusiveOffers: ExclusiveOfferPayload[];
+  promotions: PromotionPayload[];
 };

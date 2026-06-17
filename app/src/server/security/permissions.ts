@@ -80,7 +80,7 @@ const DEFAULT_PERMISSION_ERROR: Record<Permission, string> = {
   "beat:create": "account_not_active",
   "beat:update:own": "beat_forbidden",
   "beat:delete:own": "beat_forbidden",
-  "sellerDashboard:read:own": "seller_role_required",
+  "sellerDashboard:read:own": "account_not_active",
   "order:buy": "buyer_role_required",
   "payout:setup": "payout_forbidden",
   "payout:receive": "payout_not_eligible",
@@ -172,12 +172,11 @@ const POLICIES = [
       isActive(subject) && resource.kind === "beat" && owns(subject, resource),
   },
   {
-    id: "allow-seller-own-dashboard",
+    id: "allow-active-own-dashboard",
     effect: "allow",
     actions: ["sellerDashboard:read:own"],
     condition: ({ subject, resource }) =>
       isActive(subject) &&
-      hasRole(subject, "SELLER") &&
       (resource.kind == null || resource.kind === "sellerDashboard") &&
       (hasNoOwnershipAttribute(resource) || owns(subject, resource)),
   },

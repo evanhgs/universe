@@ -7,7 +7,13 @@ import {
   DEFAULT_DOWNLOAD_LIMIT,
   DEFAULT_PLATFORM_COMMISSION_RATE_BP,
 } from "./marketplace.constants";
-import type { CreateDirectPurchaseOrderInput } from "./marketplace.types";
+import type {
+  CreateDirectPurchaseOrderInput,
+  CreateExclusiveOfferInput,
+  CreatePromotionInput,
+  UpdateExclusiveOfferInput,
+  UpdatePromotionInput,
+} from "./marketplace.types";
 
 const orderInclude = {
   items: {
@@ -63,12 +69,24 @@ function commissionDescription(commissionRateBp: number) {
   return `Platform commission ${commissionRateBp / 100}%`;
 }
 
+function discountFromPromotion(args: {
+  amount: number;
+  discountType: "PERCENT" | "FIXED";
+  discountValue: number;
+}) {
+  const discount = args.discountType === "PERCENT"
+    ? args.amount * (args.discountValue / 100)
+    : args.discountValue;
+
+  return Math.min(args.amount, roundMoney(discount));
+}
+
 /**
  * Convertit un Decimal Prisma en number nullable.
  * @param value Montant Decimal, number ou null.
  */
-function decimalToNumber(value: Prisma.Decimal | number | null) {
-  if (value === null) {
+function decimalToNumber(value: Prisma.Decimal | number | null | undefined) {
+  if (value === null || value === undefined) {
     return null;
   }
 
@@ -80,7 +98,24 @@ function decimalToNumber(value: Prisma.Decimal | number | null) {
  * @param offering Offre purchasable chargee avec son template.
  * @returns Snapshot JSON des droits et conditions.
  */
-function buildRightsSnapshot(offering: Awaited<ReturnType<typeof findPurchasableOffering>>) {
+function buildRightsSnapshot(offering: {
+  customTermsJson: Prisma.JsonValue | null;
+  licenseTemplate: {
+    code: string;
+    name: string;
+    scope: string;
+    allowStreaming: boolean;
+    allowCommercialUse: boolean;
+    allowBroadcast: boolean;
+    allowDistribution: boolean;
+    allowExclusiveTransfer: boolean;
+    allowStemsDownload: boolean;
+    maxStreams: number | null;
+    maxSales: number | null;
+    maxMusicVideos: number | null;
+    maxRadioStations: number | null;
+  };
+} | null) {
   if (!offering) {
     return {};
   }
@@ -150,6 +185,56 @@ export async function findPurchasableOffering(input: CreateDirectPurchaseOrderIn
   });
 }
 
+export async function findPurchasableOfferingById(licenseOfferingId: string) {
+  return findPurchasableOffering({ licenseOfferingId });
+}
+
+export async function findPurchasableOfferingsByIds(licenseOfferingIds: string[]) {
+  const uniqueIds = Array.from(new Set(licenseOfferingIds));
+  const rows = await getPrisma().beatLicenseOffering.findMany({
+    where: {
+      id: {
+        in: uniqueIds,
+      },
+      isActive: true,
+      stripePriceId: {
+        not: null,
+      },
+      stripePriceActive: true,
+      beat: {
+        status: "PUBLISHED",
+        visibility: "PUBLIC",
+        moderationStatus: "CLEAN",
+        stripeProductId: {
+          not: null,
+        },
+        stripeSyncStatus: "SYNCED",
+      },
+      licenseTemplate: {
+        isActive: true,
+      },
+    },
+    include: {
+      beat: {
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          ownerId: true,
+        },
+      },
+      licenseTemplate: true,
+    },
+  });
+  const byId = new Map(rows.map((row) => [row.id, row]));
+
+  return uniqueIds.flatMap((id) => {
+    const row = byId.get(id);
+
+    return row ? [row] : [];
+  });
+}
+
 /**
  * Verifie si l'acheteur possede deja une licence active pour cette offre.
  * @param args.buyerId Identifiant utilisateur interne de l'acheteur.
@@ -212,6 +297,167 @@ export async function createOrderForOffering(args: {
           stripePriceIdSnapshot: args.offering.stripePriceId,
           commissionRateBpSnapshot: commissionRateBp,
           rightsSnapshotJson: rightsSnapshot,
+        },
+      },
+    },
+    include: orderInclude,
+  });
+}
+
+export async function createOrderForCart(args: {
+  buyerId: string;
+  items: Array<{
+    offering: NonNullable<Awaited<ReturnType<typeof findPurchasableOffering>>>;
+    quantity: number;
+  }>;
+  promotion?: Awaited<ReturnType<typeof findApplicablePromotion>> | null;
+}) {
+  if (args.items.length === 0) {
+    throw new Error("cart_empty");
+  }
+
+  const currency = args.items[0]?.offering.currency ?? "EUR";
+
+  if (args.items.some((item) => item.offering.currency !== currency)) {
+    throw new Error("mixed_currency_cart");
+  }
+
+  const subtotalAmount = roundMoney(
+    args.items.reduce((sum, item) => {
+      const priceAmount = decimalToNumber(item.offering.priceAmount) ?? 0;
+
+      return sum + priceAmount * item.quantity;
+    }, 0),
+  );
+  const promotion = args.promotion;
+  const discountAmount = promotion
+    ? discountFromPromotion({
+        amount: subtotalAmount,
+        discountType: promotion.discountType,
+        discountValue: decimalToNumber(promotion.discountValue) ?? 0,
+      })
+    : 0;
+  const totalAmount = roundMoney(subtotalAmount - discountAmount);
+
+  if (totalAmount <= 0) {
+    throw new Error("invalid_discount_total");
+  }
+
+  const commissionRateBySellerId = new Map<string, number>();
+
+  for (const item of args.items) {
+    if (!commissionRateBySellerId.has(item.offering.sellerId)) {
+      commissionRateBySellerId.set(
+        item.offering.sellerId,
+        await findSellerCommissionRateBp(item.offering.sellerId),
+      );
+    }
+  }
+
+  const orderItems = args.items.map((item) => {
+    const unitAmount = decimalToNumber(item.offering.priceAmount) ?? 0;
+    const lineSubtotal = roundMoney(unitAmount * item.quantity);
+    const lineDiscount = subtotalAmount > 0
+      ? roundMoney(discountAmount * (lineSubtotal / subtotalAmount))
+      : 0;
+    const lineTotalAmount = roundMoney(lineSubtotal - lineDiscount);
+    const commissionRateBp = commissionRateBySellerId.get(item.offering.sellerId) ??
+      DEFAULT_PLATFORM_COMMISSION_RATE_BP;
+
+    return {
+      type: "BEAT_LICENSE" as const,
+      beatId: item.offering.beat.id,
+      beatLicenseOfferingId: item.offering.id,
+      sellerId: item.offering.sellerId,
+      titleSnapshot: item.offering.beat.title,
+      licenseNameSnapshot: item.offering.title ?? item.offering.licenseTemplate.name,
+      unitAmount,
+      quantity: item.quantity,
+      lineTotalAmount,
+      discountAmount: lineDiscount,
+      stripePriceIdSnapshot: lineDiscount > 0 ? null : item.offering.stripePriceId,
+      commissionRateBpSnapshot: commissionRateBp,
+      rightsSnapshotJson: buildRightsSnapshot(item.offering),
+      promotionSnapshotJson: promotion
+        ? {
+            id: promotion.id,
+            type: promotion.type,
+            code: promotion.code,
+            title: promotion.title,
+            discountType: promotion.discountType,
+            discountValue: decimalToNumber(promotion.discountValue) ?? 0,
+          }
+        : undefined,
+    };
+  });
+  const commissionAmount = roundMoney(
+    orderItems.reduce(
+      (sum, item) => sum + commissionFromBp(item.lineTotalAmount, item.commissionRateBpSnapshot),
+      0,
+    ),
+  );
+
+  return getPrisma().order.create({
+    data: {
+      buyerId: args.buyerId,
+      status: "PENDING_PAYMENT",
+      currency,
+      subtotalAmount,
+      discountAmount,
+      commissionAmount,
+      taxAmount: 0,
+      totalAmount,
+      promotionId: promotion?.id,
+      items: {
+        create: orderItems,
+      },
+    },
+    include: orderInclude,
+  });
+}
+
+export async function createOrderForExclusiveOffer(args: {
+  buyerId: string;
+  offer: NonNullable<Awaited<ReturnType<typeof findAcceptedExclusiveOfferForBuyer>>>;
+}) {
+  const amount = decimalToNumber(args.offer.acceptedAmount) ??
+    decimalToNumber(args.offer.counterAmount) ??
+    decimalToNumber(args.offer.proposedAmount) ??
+    0;
+  const commissionRateBp = await findSellerCommissionRateBp(args.offer.sellerId);
+  const commissionAmount = commissionFromBp(amount, commissionRateBp);
+  const rightsSnapshot = buildRightsSnapshot(args.offer.beatLicenseOffering);
+
+  return getPrisma().order.create({
+    data: {
+      buyerId: args.buyerId,
+      status: "PENDING_PAYMENT",
+      currency: args.offer.currency,
+      subtotalAmount: amount,
+      discountAmount: 0,
+      commissionAmount,
+      taxAmount: 0,
+      totalAmount: amount,
+      negotiatedOfferId: args.offer.id,
+      items: {
+        create: {
+          type: "BEAT_LICENSE",
+          beatId: args.offer.beat.id,
+          beatLicenseOfferingId: args.offer.beatLicenseOffering.id,
+          sellerId: args.offer.sellerId,
+          titleSnapshot: args.offer.beat.title,
+          licenseNameSnapshot:
+            args.offer.beatLicenseOffering.title ??
+            args.offer.beatLicenseOffering.licenseTemplate.name,
+          unitAmount: amount,
+          quantity: 1,
+          lineTotalAmount: amount,
+          stripePriceIdSnapshot: null,
+          commissionRateBpSnapshot: commissionRateBp,
+          rightsSnapshotJson: {
+            ...rightsSnapshot,
+            negotiatedExclusiveOfferId: args.offer.id,
+          },
         },
       },
     },
@@ -705,6 +951,363 @@ export async function listSellerBeats(sellerId: string) {
       currency: true,
       publishedAt: true,
       updatedAt: true,
+      stats: true,
+    },
+  });
+}
+
+export async function createExclusiveOffer(args: {
+  buyerId: string;
+  input: CreateExclusiveOfferInput;
+}) {
+  const offering = await findPurchasableOfferingById(args.input.beatLicenseOfferingId);
+
+  if (!offering || offering.licenseTemplate.scope !== "EXCLUSIVE") {
+    throw new Error("exclusive_license_not_found");
+  }
+
+  if (offering.sellerId === args.buyerId) {
+    throw new Error("cannot_offer_own_beat");
+  }
+
+  const paidExclusive = await getPrisma().purchaseEntitlement.findFirst({
+    where: {
+      beatId: offering.beat.id,
+      status: "ACTIVE",
+      beatLicenseOffering: {
+        licenseTemplate: {
+          scope: "EXCLUSIVE",
+        },
+      },
+      order: {
+        status: "PAID",
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (paidExclusive) {
+    throw new Error("exclusive_license_unavailable");
+  }
+
+  return getPrisma().exclusiveLicenseOffer.create({
+    data: {
+      beatId: offering.beat.id,
+      beatLicenseOfferingId: offering.id,
+      buyerId: args.buyerId,
+      sellerId: offering.sellerId,
+      proposedAmount: args.input.proposedAmount,
+      currency: offering.currency,
+      buyerMessage: args.input.buyerMessage,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    },
+    include: exclusiveOfferInclude,
+  });
+}
+
+const exclusiveOfferInclude = {
+  beat: {
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+    },
+  },
+  beatLicenseOffering: {
+    include: {
+      licenseTemplate: true,
+    },
+  },
+  buyer: {
+    select: {
+      id: true,
+      profile: {
+        select: {
+          displayName: true,
+        },
+      },
+    },
+  },
+} as const;
+
+export async function listSellerExclusiveOffers(sellerId: string) {
+  return getPrisma().exclusiveLicenseOffer.findMany({
+    where: {
+      sellerId,
+      status: {
+        in: ["PENDING", "COUNTERED", "ACCEPTED"],
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: 20,
+    include: exclusiveOfferInclude,
+  });
+}
+
+export async function findAcceptedExclusiveOfferForBuyer(args: {
+  exclusiveOfferId: string;
+  buyerId: string;
+}) {
+  return getPrisma().exclusiveLicenseOffer.findFirst({
+    where: {
+      id: args.exclusiveOfferId,
+      buyerId: args.buyerId,
+      status: "ACCEPTED",
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      order: null,
+    },
+    include: {
+      ...exclusiveOfferInclude,
+      beatLicenseOffering: {
+        include: {
+          licenseTemplate: true,
+        },
+      },
+    },
+  });
+}
+
+export async function updateSellerExclusiveOffer(args: {
+  sellerId: string;
+  offerId: string;
+  input: UpdateExclusiveOfferInput;
+}) {
+  const existing = await getPrisma().exclusiveLicenseOffer.findFirst({
+    where: {
+      id: args.offerId,
+      sellerId: args.sellerId,
+      status: {
+        in: ["PENDING", "COUNTERED"],
+      },
+    },
+    select: {
+      id: true,
+      proposedAmount: true,
+    },
+  });
+
+  if (!existing) {
+    throw new Error("exclusive_offer_not_found");
+  }
+
+  const data =
+    args.input.action === "accept"
+      ? {
+          status: "ACCEPTED" as const,
+          acceptedAmount: existing.proposedAmount,
+          acceptedAt: new Date(),
+          sellerMessage: args.input.sellerMessage,
+        }
+      : args.input.action === "reject"
+        ? {
+            status: "REJECTED" as const,
+            rejectedAt: new Date(),
+            sellerMessage: args.input.sellerMessage,
+          }
+        : {
+            status: "COUNTERED" as const,
+            counterAmount: args.input.counterAmount,
+            acceptedAmount: args.input.counterAmount,
+            sellerMessage: args.input.sellerMessage,
+          };
+
+  return getPrisma().exclusiveLicenseOffer.update({
+    where: {
+      id: existing.id,
+    },
+    data,
+    include: exclusiveOfferInclude,
+  });
+}
+
+export async function markExclusiveOfferPaid(orderId: string) {
+  const order = await getPrisma().order.findUnique({
+    where: {
+      id: orderId,
+    },
+    select: {
+      negotiatedOfferId: true,
+    },
+  });
+
+  if (!order?.negotiatedOfferId) {
+    return;
+  }
+
+  await getPrisma().exclusiveLicenseOffer.update({
+    where: {
+      id: order.negotiatedOfferId,
+    },
+    data: {
+      status: "PAID",
+      paidAt: new Date(),
+    },
+  });
+}
+
+export async function markPromotionUsed(orderId: string) {
+  const order = await getPrisma().order.findUnique({
+    where: {
+      id: orderId,
+    },
+    select: {
+      promotionId: true,
+    },
+  });
+
+  if (!order?.promotionId) {
+    return;
+  }
+
+  await getPrisma().promotion.update({
+    where: {
+      id: order.promotionId,
+    },
+    data: {
+      usageCount: {
+        increment: 1,
+      },
+    },
+  });
+}
+
+export async function listSellerPromotions(sellerId: string) {
+  return getPrisma().promotion.findMany({
+    where: {
+      sellerId,
+    },
+    orderBy: [{ isActive: "desc" }, { updatedAt: "desc" }],
+    take: 20,
+  });
+}
+
+export async function findApplicablePromotion(args: {
+  sellerIds: string[];
+  itemCount: number;
+  currency: string;
+  promotionCode?: string;
+  beatIds?: string[];
+  licenseOfferingIds?: string[];
+}) {
+  const now = new Date();
+  const promotions = await getPrisma().promotion.findMany({
+    where: {
+      sellerId: {
+        in: args.sellerIds,
+      },
+      isActive: true,
+      minItems: {
+        lte: args.itemCount,
+      },
+      OR: args.promotionCode
+        ? [{ code: args.promotionCode }]
+        : [{ type: "BUNDLE" }],
+      AND: [
+        {
+          OR: [{ startsAt: null }, { startsAt: { lte: now } }],
+        },
+        {
+          OR: [{ endsAt: null }, { endsAt: { gt: now } }],
+        },
+        {
+          OR: [{ currency: null }, { currency: args.currency }],
+        },
+      ],
+    },
+    orderBy: [{ type: "asc" }, { discountValue: "desc" }],
+    take: 20,
+  });
+
+  return promotions.find((promotion) => {
+    if (promotion.usageLimit !== null && promotion.usageCount >= promotion.usageLimit) {
+      return false;
+    }
+
+    if (!promotion.scopeJson || typeof promotion.scopeJson !== "object" || Array.isArray(promotion.scopeJson)) {
+      return true;
+    }
+
+    const scope = promotion.scopeJson as {
+      beatIds?: unknown;
+      licenseOfferingIds?: unknown;
+    };
+    const beatIds = Array.isArray(scope.beatIds)
+      ? scope.beatIds.filter((id): id is string => typeof id === "string")
+      : [];
+    const licenseOfferingIds = Array.isArray(scope.licenseOfferingIds)
+      ? scope.licenseOfferingIds.filter((id): id is string => typeof id === "string")
+      : [];
+
+    return (
+      (beatIds.length === 0 || args.beatIds?.some((id) => beatIds.includes(id))) &&
+      (licenseOfferingIds.length === 0 ||
+        args.licenseOfferingIds?.some((id) => licenseOfferingIds.includes(id)))
+    );
+  }) ?? null;
+}
+
+export async function createSellerPromotion(args: {
+  sellerId: string;
+  input: CreatePromotionInput;
+}) {
+  return getPrisma().promotion.create({
+    data: {
+      sellerId: args.sellerId,
+      type: args.input.type,
+      discountType: args.input.discountType,
+      title: args.input.title,
+      code: args.input.type === "COUPON" ? args.input.code : null,
+      discountValue: args.input.discountValue,
+      currency: args.input.currency,
+      minItems: args.input.type === "BUNDLE" ? args.input.minItems ?? 2 : args.input.minItems ?? 1,
+      usageLimit: args.input.usageLimit,
+      startsAt: args.input.startsAt ? new Date(args.input.startsAt) : undefined,
+      endsAt: args.input.endsAt ? new Date(args.input.endsAt) : undefined,
+      scopeJson: args.input.scope,
+    },
+  });
+}
+
+export async function updateSellerPromotion(args: {
+  sellerId: string;
+  promotionId: string;
+  input: UpdatePromotionInput;
+}) {
+  const existing = await getPrisma().promotion.findFirst({
+    where: {
+      id: args.promotionId,
+      sellerId: args.sellerId,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!existing) {
+    throw new Error("promotion_not_found");
+  }
+
+  return getPrisma().promotion.update({
+    where: {
+      id: existing.id,
+    },
+    data: {
+      type: args.input.type,
+      discountType: args.input.discountType,
+      title: args.input.title,
+      code: args.input.code,
+      discountValue: args.input.discountValue,
+      currency: args.input.currency,
+      minItems: args.input.minItems,
+      usageLimit: args.input.usageLimit,
+      startsAt: args.input.startsAt ? new Date(args.input.startsAt) : undefined,
+      endsAt: args.input.endsAt ? new Date(args.input.endsAt) : undefined,
+      scopeJson: args.input.scope,
+      isActive: args.input.isActive,
     },
   });
 }

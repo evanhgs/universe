@@ -135,6 +135,16 @@ export const API_PATHS = {
     },
     purchases: () => "/api/marketplace/purchases",
     sales: () => "/api/marketplace/sales",
+    exclusiveOffers: {
+      list: () => "/api/marketplace/exclusive-offers",
+      detail: (offerId: string) =>
+        `/api/marketplace/exclusive-offers/${encodeURIComponent(offerId)}`,
+    },
+    promotions: {
+      list: () => "/api/marketplace/promotions",
+      detail: (promotionId: string) =>
+        `/api/marketplace/promotions/${encodeURIComponent(promotionId)}`,
+    },
   },
   storage: {
     uploads: {

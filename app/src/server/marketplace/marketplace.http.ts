@@ -13,9 +13,12 @@ export function marketplaceErrorResponse(error: unknown) {
   const message = error instanceof Error ? error.message : "Unknown error.";
   const code = message.startsWith("stripe_error:") ? "stripe_error" : message;
   const status =
-    code === "seller_role_required"
+    code === "beat_forbidden" || code === "payout_forbidden"
       ? 403
       : code === "beat_or_license_not_found" ||
+          code === "exclusive_license_not_found" ||
+          code === "exclusive_offer_not_found" ||
+          code === "promotion_not_found" ||
           code === "order_not_found" ||
           code === "stripe_payment_not_found" ||
           code === "entitlement_not_found" ||
@@ -23,6 +26,12 @@ export function marketplaceErrorResponse(error: unknown) {
         ? 404
         : code === "already_purchased" ||
             code === "cannot_buy_own_beat" ||
+            code === "cannot_offer_own_beat" ||
+            code === "exclusive_license_unavailable" ||
+            code === "exclusive_offer_not_payable" ||
+            code === "cart_empty" ||
+            code === "mixed_currency_cart" ||
+            code === "invalid_discount_total" ||
             code === "order_not_payable" ||
             code === "stripe_catalog_not_ready" ||
             code === "stripe_price_missing" ||

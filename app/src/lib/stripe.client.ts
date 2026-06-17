@@ -110,7 +110,13 @@ export async function createStripeCheckoutSession(args: {
   orderId: string;
   paymentId: string;
   buyerId: string;
-  stripePriceIdSnapshots: string[];
+  stripePriceIdSnapshots?: string[];
+  dynamicLineItems?: Array<{
+    name: string;
+    amount: number;
+    currency: string;
+    quantity: number;
+  }>;
   successUrl: string;
   cancelUrl: string;
 }) {
@@ -121,6 +127,29 @@ export async function createStripeCheckoutSession(args: {
   };
   const taxRateId = await getDefaultFrenchVatTaxRateId();
 
+  const lineItems = args.stripePriceIdSnapshots?.length
+    ? args.stripePriceIdSnapshots.map((price) => ({
+        price,
+        quantity: 1,
+        tax_rates: taxRateId ? [taxRateId] : undefined,
+      }))
+    : args.dynamicLineItems?.map((item) => ({
+        price_data: {
+          currency: item.currency.toLowerCase(),
+          product_data: {
+            name: item.name,
+          },
+          unit_amount: Math.round(item.amount * 100),
+          tax_behavior: "exclusive" as const,
+        },
+        quantity: item.quantity,
+        tax_rates: taxRateId ? [taxRateId] : undefined,
+      }));
+
+  if (!lineItems?.length) {
+    throw new Error("stripe_price_missing");
+  }
+
   return getStripeClient().checkout.sessions.create({
     mode: "payment",
     client_reference_id: args.orderId,
@@ -130,11 +159,7 @@ export async function createStripeCheckoutSession(args: {
     automatic_tax: {
       enabled: !taxRateId && getStripeAutomaticTaxEnabled(),
     },
-    line_items: args.stripePriceIdSnapshots.map((price) => ({
-      price,
-      quantity: 1,
-      tax_rates: taxRateId ? [taxRateId] : undefined,
-    })),
+    line_items: lineItems,
     metadata,
     payment_intent_data: {
       metadata,

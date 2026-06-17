@@ -73,7 +73,6 @@ export function SignedInActions() {
   const publicProfileHref = account?.profile.slug
     ? PAGE_PATHS.profiles.detail.getHref(account.profile.slug)
     : PAGE_PATHS.account.dashboard.getHref();
-  const isSeller = account?.roles.includes("SELLER") ?? false;
 
   useEffect(() => {
     let isCancelled = false;
@@ -225,23 +224,7 @@ export function SignedInActions() {
               onClick={() => setIsOpen(false)}
               role="menuitem"
             >
-              Tableau de bord
-            </Link>
-            <Link
-              className={menuItemClass}
-              href={PAGE_PATHS.account.profile.getHref()}
-              onClick={() => setIsOpen(false)}
-              role="menuitem"
-            >
-              Modifier mon profil
-            </Link>
-            <Link
-              className={menuItemClass}
-              href={publicProfileHref}
-              onClick={() => setIsOpen(false)}
-              role="menuitem"
-            >
-              Voir mon profil public
+              Dashboard
             </Link>
             <Link
               className={menuItemClass}
@@ -250,7 +233,7 @@ export function SignedInActions() {
               role="menuitem"
             >
               <span className="flex items-center justify-between gap-3">
-                <span>Messages</span>
+                <span>Messagerie</span>
                 {unreadCount > 0 ? (
                   <Badge className="min-w-6 justify-center px-2 py-0 text-xs" variant="primary">
                     {unreadCount}
@@ -266,8 +249,7 @@ export function SignedInActions() {
             >
               Mes achats
             </Link>
-            {isSeller ? (
-              <Link
+            <Link
                 className={menuItemClass}
                 href={PAGE_PATHS.account.sales.getHref()}
                 onClick={() => setIsOpen(false)}
@@ -275,7 +257,6 @@ export function SignedInActions() {
               >
                 Mes ventes
               </Link>
-            ) : null}
           </div>
 
           <div className="grid border-t border-border py-2 text-sm">
@@ -288,7 +269,7 @@ export function SignedInActions() {
               role="menuitem"
               type="button"
             >
-              Parametres Clerk
+              Paramètres
             </button>
             <button
               className={cn(menuItemClass, "text-left")}
@@ -296,7 +277,7 @@ export function SignedInActions() {
               role="menuitem"
               type="button"
             >
-              Se deconnecter
+              Se déconnecter
             </button>
           </div>
         </div>
