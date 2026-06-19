@@ -22,6 +22,14 @@ async function readRedirect(response: Response) {
   return payload;
 }
 
+function subscriptionErrorMessage(error: string) {
+  if (error === "subscription_already_active") {
+    return "Un abonnement Universe existe deja pour ce compte. Recharge la page ou ouvre le portail de facturation.";
+  }
+
+  return error;
+}
+
 export function PricingActions(props: { isPremium: boolean }) {
   const { isSignedIn } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -48,7 +56,11 @@ export function PricingActions(props: { isPremium: boolean }) {
 
       window.location.assign(url);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "subscription_request_failed");
+      setError(
+        subscriptionErrorMessage(
+          caught instanceof Error ? caught.message : "subscription_request_failed",
+        ),
+      );
       setLoading(false);
     }
   }

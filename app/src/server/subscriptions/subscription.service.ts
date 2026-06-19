@@ -7,6 +7,7 @@ import {
   createStripeBillingPortalSession,
   createStripeCustomer,
   createStripeSubscriptionCheckoutSession,
+  listStripeCustomerSubscriptions,
   retrieveStripeSubscription,
 } from "@/lib/stripe.client";
 import { syncCurrentAccountFromClerk } from "@/server/account/account.sync";
@@ -145,8 +146,8 @@ async function ensureUniverseMonthlyPlan() {
   });
 }
 
-async function findLatestUniverseSubscription(userId: string) {
-  return getPrisma().userSubscription.findFirst({
+async function findPreferredUniverseSubscription(userId: string) {
+  const subscriptions = await getPrisma().userSubscription.findMany({
     where: {
       userId,
       plan: {
@@ -161,6 +162,26 @@ async function findLatestUniverseSubscription(userId: string) {
       updatedAt: "desc",
     },
   });
+
+  return (
+    subscriptions.find((subscription) =>
+      isPremiumStatus(subscription.status, subscription.currentPeriodEnd),
+    ) ?? subscriptions[0] ?? null
+  );
+}
+
+function isLocalSubscriptionBlockingCheckout(subscription: {
+  status: SubscriptionStatus;
+  currentPeriodEnd: Date | null;
+}) {
+  return (
+    isPremiumStatus(subscription.status, subscription.currentPeriodEnd) ||
+    subscription.status === "PAST_DUE"
+  );
+}
+
+function isStripeSubscriptionBlockingCheckout(subscription: Stripe.Subscription) {
+  return !["canceled", "incomplete_expired"].includes(subscription.status);
 }
 
 async function getOrCreateStripeCustomer(account: Awaited<ReturnType<typeof syncCurrentAccountFromClerk>>) {
@@ -210,16 +231,37 @@ export async function getSubscriptionSummaryForClerkUser(clerkUserId: string | n
 }
 
 export async function getSubscriptionSummaryForUserId(userId: string) {
-  const [subscription, user] = await Promise.all([
-    findLatestUniverseSubscription(userId),
+  const [initialSubscription, user] = await Promise.all([
+    findPreferredUniverseSubscription(userId),
     getPrisma().user.findUnique({
       where: { id: userId },
       select: { stripeCustomerId: true },
     }),
   ]);
-  const isPremium = subscription
+  let subscription = initialSubscription;
+  let isPremium = subscription
     ? isPremiumStatus(subscription.status, subscription.currentPeriodEnd)
     : false;
+
+  if (!isPremium && user?.stripeCustomerId) {
+    try {
+      const stripeSubscriptions = await listStripeCustomerSubscriptions(user.stripeCustomerId);
+      const stripeSubscription =
+        stripeSubscriptions.data.find((item) =>
+          item.status === "active" || item.status === "trialing",
+        ) ?? stripeSubscriptions.data.find(isStripeSubscriptionBlockingCheckout);
+
+      if (stripeSubscription) {
+        await syncStripeSubscription(stripeSubscription as SubscriptionLike);
+        subscription = await findPreferredUniverseSubscription(userId);
+        isPremium = subscription
+          ? isPremiumStatus(subscription.status, subscription.currentPeriodEnd)
+          : false;
+      }
+    } catch {
+      // Keep account pages available if Stripe is temporarily unreachable.
+    }
+  }
 
   return {
     isPremium,
@@ -228,7 +270,9 @@ export async function getSubscriptionSummaryForUserId(userId: string) {
       : DEFAULT_PLATFORM_COMMISSION_RATE_BP,
     status: subscription?.status ?? "INACTIVE",
     currentPeriodEnd: subscription?.currentPeriodEnd?.toISOString() ?? null,
-    canManageSubscription: Boolean(user?.stripeCustomerId),
+    canManageSubscription: Boolean(
+      user?.stripeCustomerId && subscription?.providerSubscriptionId,
+    ),
   };
 }
 
@@ -245,8 +289,24 @@ export async function createUniverseSubscriptionCheckoutForCurrentUser(
     throw new Error("account_not_found");
   }
 
+  const localSubscription = await findPreferredUniverseSubscription(account.id);
+
+  if (localSubscription && isLocalSubscriptionBlockingCheckout(localSubscription)) {
+    throw new Error("subscription_already_active");
+  }
+
   const plan = await ensureUniverseMonthlyPlan();
   const customerId = await getOrCreateStripeCustomer(account);
+  const stripeSubscriptions = await listStripeCustomerSubscriptions(customerId);
+  const blockingStripeSubscription = stripeSubscriptions.data.find(
+    isStripeSubscriptionBlockingCheckout,
+  );
+
+  if (blockingStripeSubscription) {
+    await syncStripeSubscription(blockingStripeSubscription as SubscriptionLike);
+    throw new Error("subscription_already_active");
+  }
+
   const origin = getPublicOrigin(requestUrl);
   const session = await createStripeSubscriptionCheckoutSession({
     customerId,
@@ -336,8 +396,23 @@ export async function syncStripeSubscription(subscription: SubscriptionLike) {
     });
   }
 
+  const existingSubscription = await prisma.userSubscription.findUnique({
+    where: { userId: user.id },
+  });
+
+  if (
+    existingSubscription?.providerSubscriptionId &&
+    existingSubscription.providerSubscriptionId !== subscription.id &&
+    isPremiumStatus(
+      existingSubscription.status,
+      existingSubscription.currentPeriodEnd,
+    )
+  ) {
+    return existingSubscription;
+  }
+
   const savedSubscription = await prisma.userSubscription.upsert({
-    where: { providerSubscriptionId: subscription.id },
+    where: { userId: user.id },
     update: {
       userId: user.id,
       planId: plan.id,

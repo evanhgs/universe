@@ -12,6 +12,8 @@ function subscriptionErrorResponse(error: unknown) {
   const status =
     code === "account_not_found"
       ? 401
+      : code === "subscription_already_active"
+        ? 409
       : code === "stripe_not_configured" || code === "stripe_universe_price_not_configured"
         ? 503
         : 400;

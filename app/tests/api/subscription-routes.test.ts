@@ -60,6 +60,23 @@ describe("subscription API routes", () => {
     expect(await response.json()).toEqual({ checkoutUrl: "https://stripe.test/checkout" });
   });
 
+  it("returns 409 when the user already has a subscription", async () => {
+    authMock.mockResolvedValue({ isAuthenticated: true, userId: "user_123" });
+    checkoutMock.mockRejectedValue(new Error("subscription_already_active"));
+    const { POST } = await import("@/app/api/subscriptions/checkout/stripe/route");
+
+    const response = await POST(
+      new Request("https://universe.test/api/subscriptions/checkout/stripe", {
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: "subscription_already_active",
+    });
+  });
+
   it("creates a Customer Portal session for authenticated users", async () => {
     authMock.mockResolvedValue({ isAuthenticated: true, userId: "clerk_1" });
     portalMock.mockResolvedValue({ portalUrl: "https://stripe.test/portal" });

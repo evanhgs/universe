@@ -70,10 +70,6 @@ export function SignedInActions() {
     user?.fullName ??
     user?.primaryEmailAddress?.emailAddress ??
     "Profil";
-  const publicProfileHref = account?.profile.slug
-    ? PAGE_PATHS.profiles.detail.getHref(account.profile.slug)
-    : PAGE_PATHS.account.dashboard.getHref();
-
   useEffect(() => {
     let isCancelled = false;
 

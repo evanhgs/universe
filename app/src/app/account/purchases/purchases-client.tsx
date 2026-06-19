@@ -57,7 +57,7 @@ type PurchaseOrder = {
     id: string;
     status: EntitlementStatus;
     beatLicenseOfferingId: string | null;
-    downloadLimit: number | null;
+    //downloadLimit: number | null;
     downloadCount: number;
     accessGrantedAt: string | null;
     expiresAt: string | null;
@@ -347,7 +347,7 @@ export function PurchasesClient() {
       <main className="mx-auto min-h-[calc(100vh-73px)] w-full max-w-5xl px-6 py-10">
         <h1 className="text-3xl font-semibold tracking-tight text-foreground">Mes achats</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          Connecte-toi pour consulter tes licences et telecharger tes fichiers.
+          {"Connectez-vous pour consulter vos licences et télécharger vos fichiers."}
         </p>
         {notice ? (
           <p className="mt-6 border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
@@ -407,11 +407,11 @@ export function PurchasesClient() {
                 <div>
                   <p className="text-sm font-semibold text-foreground">{statusLabel(order.status)}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Commande {order.id} - creee le {formatDate(order.createdAt)}
+                    Commande {order.id} - créée le {formatDate(order.createdAt)}
                   </p>
                   {order.paidAt ? (
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Payee le {formatDate(order.paidAt)}
+                      Payée le {formatDate(order.paidAt)}
                     </p>
                   ) : null}
                 </div>
@@ -451,11 +451,12 @@ export function PurchasesClient() {
                               className="mt-2 inline-flex text-sm font-medium text-foreground hover:text-muted-foreground"
                               href={PAGE_PATHS.beats.detail.getHref(item.beat.slug)}
                             >
-                              Ouvrir la fiche
+                              Ouvrir la page
                             </Link>
                           ) : null}
                         </div>
-                        <div className="text-sm text-muted-foreground">
+                        {/**
+                         * <div className="text-sm text-muted-foreground">
                           {entitlement ? (
                             <>
                               <p>
@@ -464,12 +465,13 @@ export function PurchasesClient() {
                                   ? ""
                                   : `/${entitlement.downloadLimit}`}
                               </p>
-                              <p>Acces: {entitlement.status}</p>
+                              
                             </>
                           ) : (
                             <p>Acces en attente du paiement.</p>
                           )}
                         </div>
+                         */}
                       </div>
                       {/** 
                        * TODO: Doit permettre de télécharger une licence (sans ouvrir de page) et sil y a plusieurs licence alors télécharge le tout dans un fichier zip

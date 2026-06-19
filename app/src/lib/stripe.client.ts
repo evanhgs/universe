@@ -254,6 +254,18 @@ export async function retrieveStripeSubscription(subscriptionId: string) {
 }
 
 /**
+ * Liste les abonnements Stripe d'un Customer pour eviter les Checkout Billing
+ * concurrents avant que les webhooks aient synchronise l'etat local.
+ */
+export async function listStripeCustomerSubscriptions(customerId: string) {
+  return getStripeClient().subscriptions.list({
+    customer: customerId,
+    status: "all",
+    limit: 20,
+  });
+}
+
+/**
  * Verifie et construit un evenement webhook Stripe depuis le payload brut.
  * @param payload Corps texte exact recu par Stripe.
  * @param signature Header stripe-signature.

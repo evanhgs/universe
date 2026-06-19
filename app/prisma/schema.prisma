@@ -1165,7 +1165,7 @@ model SubscriptionPlan {
 
 model UserSubscription {
   id                      String              @id @default(cuid())
-  userId                  String
+  userId                  String              @unique
   planId                  String
   provider                PaymentProvider     @default(STRIPE)
   providerSubscriptionId  String?             @unique
@@ -1180,7 +1180,7 @@ model UserSubscription {
   user                    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   plan                    SubscriptionPlan    @relation(fields: [planId], references: [id], onDelete: Restrict)
 
-  @@index([userId, status])
+  @@index([status])
 }
 
 model BeatScoreSnapshot {
