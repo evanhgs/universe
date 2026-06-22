@@ -21,7 +21,9 @@ const mocks = vi.hoisted(() => ({
       update: vi.fn(),
     },
     userSubscription: {
+      findMany: vi.fn(),
       findFirst: vi.fn(),
+      findUnique: vi.fn(),
       upsert: vi.fn(),
     },
   },
@@ -29,6 +31,7 @@ const mocks = vi.hoisted(() => ({
     createCustomer: vi.fn(),
     createSubscriptionCheckout: vi.fn(),
     createPortalSession: vi.fn(),
+    listCustomerSubscriptions: vi.fn(),
     retrieveSubscription: vi.fn(),
   },
   email: {
@@ -49,6 +52,7 @@ vi.mock("@/lib/stripe.client", () => ({
   createStripeCustomer: mocks.stripe.createCustomer,
   createStripeSubscriptionCheckoutSession: mocks.stripe.createSubscriptionCheckout,
   createStripeBillingPortalSession: mocks.stripe.createPortalSession,
+  listStripeCustomerSubscriptions: mocks.stripe.listCustomerSubscriptions,
   retrieveStripeSubscription: mocks.stripe.retrieveSubscription,
 }));
 
@@ -79,6 +83,8 @@ describe("subscription service", () => {
     mocks.prisma.user.findUnique.mockResolvedValue({ id: "user_1" });
     mocks.prisma.user.update.mockResolvedValue({});
     mocks.prisma.userSubscription.findFirst.mockResolvedValue(null);
+    mocks.prisma.userSubscription.findMany.mockResolvedValue([]);
+    mocks.prisma.userSubscription.findUnique.mockResolvedValue(null);
     mocks.prisma.userSubscription.upsert.mockResolvedValue({ id: "sub_local_1" });
     mocks.stripe.createCustomer.mockResolvedValue({ id: "cus_1" });
     mocks.stripe.createSubscriptionCheckout.mockResolvedValue({
@@ -88,6 +94,7 @@ describe("subscription service", () => {
     mocks.stripe.createPortalSession.mockResolvedValue({
       url: "https://stripe.test/portal",
     });
+    mocks.stripe.listCustomerSubscriptions.mockResolvedValue({ data: [] });
   });
 
   it("creates a subscription Checkout Session with the monthly Price id", async () => {
@@ -145,6 +152,136 @@ describe("subscription service", () => {
     });
   });
 
+  it("blocks Checkout when an active local subscription already exists", async () => {
+    mocks.prisma.userSubscription.findMany.mockResolvedValue([
+      {
+        id: "sub_local_active",
+        providerSubscriptionId: "sub_active",
+        status: "ACTIVE",
+        currentPeriodEnd: new Date("2099-01-01T00:00:00.000Z"),
+        plan: { reducedCommissionRateBp: 900 },
+      },
+    ]);
+    const { createUniverseSubscriptionCheckoutForCurrentUser } = await import(
+      "@/server/subscriptions/subscription.service"
+    );
+
+    await expect(
+      createUniverseSubscriptionCheckoutForCurrentUser(
+        "clerk_1",
+        "https://universe.test/api/subscriptions/checkout/stripe",
+      ),
+    ).rejects.toThrow("subscription_already_active");
+    expect(mocks.stripe.createSubscriptionCheckout).not.toHaveBeenCalled();
+  });
+
+  it("blocks Checkout and synchronizes when Stripe already has a subscription", async () => {
+    mocks.account.stripeCustomerId = "cus_existing";
+    mocks.stripe.listCustomerSubscriptions.mockResolvedValue({
+      data: [
+        {
+          id: "sub_stripe_active",
+          status: "active",
+          customer: "cus_existing",
+          current_period_start: 1_700_000_000,
+          current_period_end: 1_800_000_000,
+          canceled_at: null,
+          metadata: {
+            userId: "user_1",
+            planCode: "universe_monthly",
+          },
+        },
+      ],
+    });
+    const { createUniverseSubscriptionCheckoutForCurrentUser } = await import(
+      "@/server/subscriptions/subscription.service"
+    );
+
+    await expect(
+      createUniverseSubscriptionCheckoutForCurrentUser(
+        "clerk_1",
+        "https://universe.test/api/subscriptions/checkout/stripe",
+      ),
+    ).rejects.toThrow("subscription_already_active");
+    expect(mocks.prisma.userSubscription.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: "user_1" } }),
+    );
+    expect(mocks.stripe.createSubscriptionCheckout).not.toHaveBeenCalled();
+  });
+
+  it("prefers an active subscription over a more recently updated canceled row", async () => {
+    mocks.prisma.userSubscription.findMany.mockResolvedValue([
+      {
+        id: "sub_canceled",
+        providerSubscriptionId: "sub_old",
+        status: "CANCELED",
+        currentPeriodEnd: null,
+        plan: { reducedCommissionRateBp: 900 },
+      },
+      {
+        id: "sub_active",
+        providerSubscriptionId: "sub_live",
+        status: "ACTIVE",
+        currentPeriodEnd: new Date("2099-01-01T00:00:00.000Z"),
+        plan: { reducedCommissionRateBp: 900 },
+      },
+    ]);
+    mocks.prisma.user.findUnique.mockResolvedValue({ stripeCustomerId: "cus_1" });
+    const { getSubscriptionSummaryForUserId } = await import(
+      "@/server/subscriptions/subscription.service"
+    );
+
+    await expect(getSubscriptionSummaryForUserId("user_1")).resolves.toMatchObject({
+      isPremium: true,
+      status: "ACTIVE",
+      canManageSubscription: true,
+    });
+  });
+
+  it("repairs a non-premium local summary from an active Stripe subscription", async () => {
+    const activeSubscription = {
+      id: "sub_local_repaired",
+      providerSubscriptionId: "sub_stripe_active",
+      status: "ACTIVE",
+      currentPeriodEnd: new Date("2099-01-01T00:00:00.000Z"),
+      plan: { reducedCommissionRateBp: 900 },
+    };
+    mocks.prisma.userSubscription.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([activeSubscription]);
+    mocks.prisma.user.findUnique
+      .mockResolvedValueOnce({ stripeCustomerId: "cus_existing" })
+      .mockResolvedValue({ id: "user_1" });
+    mocks.stripe.listCustomerSubscriptions.mockResolvedValue({
+      data: [
+        {
+          id: "sub_stripe_active",
+          status: "active",
+          customer: "cus_existing",
+          current_period_start: 1_700_000_000,
+          current_period_end: 4_000_000_000,
+          canceled_at: null,
+          metadata: {
+            userId: "user_1",
+            planCode: "universe_monthly",
+          },
+        },
+      ],
+    });
+    const { getSubscriptionSummaryForUserId } = await import(
+      "@/server/subscriptions/subscription.service"
+    );
+
+    await expect(getSubscriptionSummaryForUserId("user_1")).resolves.toMatchObject({
+      isPremium: true,
+      status: "ACTIVE",
+      commissionRateBp: 900,
+    });
+    expect(mocks.prisma.userSubscription.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: "user_1" } }),
+    );
+  });
+
   it("syncs active Stripe subscriptions to local premium status", async () => {
     const { syncStripeSubscription } = await import(
       "@/server/subscriptions/subscription.service"
@@ -165,7 +302,7 @@ describe("subscription service", () => {
 
     expect(mocks.prisma.userSubscription.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { providerSubscriptionId: "sub_1" },
+        where: { userId: "user_1" },
         update: expect.objectContaining({
           status: "ACTIVE",
           planId: "plan_1",

@@ -897,6 +897,174 @@ export async function updateBeatBySlug(ownerId: string, slug: string, input: Upd
 }
 
 /**
+ * Taille maximale d'un lot traite par le cron de publication programmee. Borne
+ * la charge par execution ; le reste est repris au tick suivant.
+ */
+const SCHEDULED_PUBLISH_BATCH_SIZE = 100;
+
+/**
+ * Programme la publication d'un beat : il reste prive (status SCHEDULED +
+ * visibility PRIVATE, donc invisible du catalogue public) jusqu'au jour J. On
+ * exige des maintenant un catalogue Stripe pret afin que le drop par le cron
+ * soit garanti de reussir, exactement comme une publication manuelle.
+ * @param ownerId Identifiant interne du vendeur proprietaire.
+ * @param slug Slug du beat a programmer.
+ * @param scheduledPublishAt Date de drop validee (future).
+ * @returns Beat mis a jour, ou null si introuvable.
+ */
+export async function scheduleBeatPublication(
+  ownerId: string,
+  slug: string,
+  scheduledPublishAt: Date,
+) {
+  const prisma = getPrisma();
+
+  const existing = await prisma.beat.findUnique({
+    where: { slug },
+    select: { id: true, ownerId: true, status: true },
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  if (existing.ownerId !== ownerId) {
+    throw new Error("beat_forbidden");
+  }
+
+  if (existing.status === "PUBLISHED") {
+    throw new Error("beat_already_published");
+  }
+
+  if (existing.status === "ARCHIVED" || existing.status === "DELETED") {
+    throw new Error("beat_not_schedulable");
+  }
+
+  await assertStripeCatalogReadyForPublication(existing.id);
+
+  return prisma.beat.update({
+    where: { id: existing.id },
+    data: {
+      status: "SCHEDULED",
+      visibility: "PRIVATE",
+      scheduledPublishAt,
+    },
+    include: beatInclude,
+  });
+}
+
+/**
+ * Annule la programmation d'un beat et le repasse en brouillon prive.
+ * @param ownerId Identifiant interne du vendeur proprietaire.
+ * @param slug Slug du beat programme.
+ * @returns Beat mis a jour, ou null si introuvable.
+ */
+export async function cancelBeatPublicationSchedule(ownerId: string, slug: string) {
+  const prisma = getPrisma();
+
+  const existing = await prisma.beat.findUnique({
+    where: { slug },
+    select: { id: true, ownerId: true, status: true },
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  if (existing.ownerId !== ownerId) {
+    throw new Error("beat_forbidden");
+  }
+
+  if (existing.status !== "SCHEDULED") {
+    throw new Error("beat_not_scheduled");
+  }
+
+  return prisma.beat.update({
+    where: { id: existing.id },
+    data: {
+      status: "DRAFT",
+      visibility: "PRIVATE",
+      scheduledPublishAt: null,
+    },
+    include: beatInclude,
+  });
+}
+
+/**
+ * Publie tous les beats dont la date de drop est echue. Concu pour etre appele
+ * par un cron : chaque beat est traite independamment, une erreur sur l'un
+ * n'interrompt pas les autres et le laisse programme pour le tick suivant.
+ *
+ * Chaque drop reverifie que le catalogue Stripe est pret puis effectue un
+ * claim atomique (`updateMany` filtre sur `status = SCHEDULED`) afin d'etre
+ * idempotent et protege d'une double execution concurrente du cron.
+ * @param now Horodatage de reference (injectable pour les tests).
+ * @returns Synthese : nombre echu, publie, ignore, en echec.
+ */
+export async function publishDueScheduledBeats(now: Date = new Date()) {
+  const prisma = getPrisma();
+
+  const due = await prisma.beat.findMany({
+    where: {
+      status: "SCHEDULED",
+      scheduledPublishAt: { not: null, lte: now },
+    },
+    select: {
+      id: true,
+      ownerId: true,
+      firstPublishedAt: true,
+      scheduledPublishAt: true,
+    },
+    orderBy: { scheduledPublishAt: "asc" },
+    take: SCHEDULED_PUBLISH_BATCH_SIZE,
+  });
+
+  let published = 0;
+  let skipped = 0;
+  const failures: Array<{ beatId: string; error: string }> = [];
+
+  for (const beat of due) {
+    try {
+      await assertStripeCatalogReadyForPublication(beat.id);
+
+      const publishedAt = beat.scheduledPublishAt ?? now;
+      const claimed = await prisma.beat.updateMany({
+        where: { id: beat.id, status: "SCHEDULED" },
+        data: {
+          status: "PUBLISHED",
+          visibility: "PUBLIC",
+          publishedAt,
+          scheduledPublishAt: null,
+          ...(beat.firstPublishedAt ? {} : { firstPublishedAt: publishedAt }),
+        },
+      });
+
+      if (claimed.count === 0) {
+        skipped += 1;
+        continue;
+      }
+
+      await syncStripeCatalogForBeat(beat.id);
+      await refreshSellerBeatCount(beat.ownerId);
+      published += 1;
+    } catch (error) {
+      failures.push({
+        beatId: beat.id,
+        error: error instanceof Error ? error.message : "unknown_error",
+      });
+    }
+  }
+
+  return {
+    due: due.length,
+    published,
+    skipped,
+    failed: failures.length,
+    failures,
+  };
+}
+
+/**
  * Periode au-dela de laquelle un job PREVIEW_GENERATION encore en PROCESSING
  * est considere comme gele (worker mort entre claim et completion). Un job
  * gele est eligible au retry meme si son statut n'est pas FAILED. Coherent

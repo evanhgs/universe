@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { PAGE_PATHS } from "@/lib/paths";
 
 /**
  * Page d'accueil serveur affichant l'etat d'authentification Clerk et les liens principaux.
@@ -25,13 +26,13 @@ export default async function Home() {
         </p>
         <div className="flex flex-wrap gap-3">
           <Button asChild size="lg">
-            <Link href="/beats">Voir le catalogue</Link>
+            <Link href={PAGE_PATHS.beats.catalog.getHref()}>Voir le catalogue</Link>
           </Button>
           <Button asChild size="lg" variant="outline">
-            <Link href="/account-test">Tester le compte</Link>
+            <Link href={PAGE_PATHS.account.test.getHref()}>Tester le compte</Link>
           </Button>
           <Button asChild size="lg" variant="secondary">
-            <Link href="/feed">Feed decouverte</Link>
+            <Link href={PAGE_PATHS.feed.getHref()}>Feed decouverte</Link>
           </Button>
         </div>
         <Card>

@@ -57,10 +57,6 @@ describe("SignedInActions", () => {
       "href",
       "/account/sales",
     );
-    expect(screen.getByRole("menuitem", { name: "Voir mon profil public" })).toHaveAttribute(
-      "href",
-      "/profiles/universe-seller",
-    );
   });
 
   it("closes the menu with Escape", async () => {

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { ChatContactButton } from "@/app/chat-contact-button";
 import { Badge } from "@/components/ui/badge";
+import { PAGE_PATHS } from "@/lib/paths";
 import { getProfilePayloadBySlug } from "@/server/profiles/profile.service";
 
 type ProfilePageProps = {
@@ -67,7 +68,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
       <section className="mt-8">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-2xl font-semibold text-foreground">Catalogue</h2>
-          <Link className="text-sm font-medium text-muted-foreground hover:text-foreground" href={`/beats?sellerSlug=${profile.slug}`}>
+          <Link className="text-sm font-medium text-muted-foreground hover:text-foreground" href={PAGE_PATHS.beats.catalog.getHref({ sellerSlug: profile.slug })}>
             Voir tout
           </Link>
         </div>
@@ -80,7 +81,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
             {profile.beats.map((beat) => (
               <Link
                 className="border border-border bg-card p-4"
-                href={`/beats/${beat.slug}`}
+                href={PAGE_PATHS.beats.detail.getHref(beat.slug)}
                 key={beat.id}
               >
                 <h3 className="font-semibold text-foreground">{beat.title}</h3>

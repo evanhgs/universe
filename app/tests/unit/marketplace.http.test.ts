@@ -8,7 +8,7 @@ async function json(response: Response) {
 
 describe("marketplace error response", () => {
   it.each([
-    ["seller_role_required", 403],
+    ["beat_forbidden", 403],
     ["beat_or_license_not_found", 404],
     ["already_purchased", 409],
     ["stripe_session_not_paid", 402],

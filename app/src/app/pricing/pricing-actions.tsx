@@ -4,6 +4,7 @@ import { SignInButton, useAuth } from "@clerk/nextjs";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { API_PATHS, PAGE_PATHS } from "@/lib/paths";
 
 type RedirectPayload = {
   checkoutUrl?: string;
@@ -19,6 +20,14 @@ async function readRedirect(response: Response) {
   }
 
   return payload;
+}
+
+function subscriptionErrorMessage(error: string) {
+  if (error === "subscription_already_active") {
+    return "Un abonnement Universe existe deja pour ce compte. Recharge la page ou ouvre le portail de facturation.";
+  }
+
+  return error;
 }
 
 export function PricingActions(props: { isPremium: boolean }) {
@@ -47,14 +56,18 @@ export function PricingActions(props: { isPremium: boolean }) {
 
       window.location.assign(url);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "subscription_request_failed");
+      setError(
+        subscriptionErrorMessage(
+          caught instanceof Error ? caught.message : "subscription_request_failed",
+        ),
+      );
       setLoading(false);
     }
   }
 
   if (!isSignedIn) {
     return (
-      <SignInButton mode="redirect" forceRedirectUrl="/pricing">
+      <SignInButton mode="redirect" forceRedirectUrl={PAGE_PATHS.pricing.getHref()}>
         <Button className="w-full" size="lg">
           Activer Universe
         </Button>
@@ -69,8 +82,8 @@ export function PricingActions(props: { isPremium: boolean }) {
         disabled={loading}
         onClick={() =>
           props.isPremium
-            ? redirectToStripe("/api/subscriptions/portal/stripe", "portalUrl")
-            : redirectToStripe("/api/subscriptions/checkout/stripe", "checkoutUrl")
+            ? redirectToStripe(API_PATHS.subscriptions.portalStripe(), "portalUrl")
+            : redirectToStripe(API_PATHS.subscriptions.checkoutStripe(), "checkoutUrl")
         }
         size="lg"
       >

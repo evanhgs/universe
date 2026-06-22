@@ -110,6 +110,7 @@ export type BeatApiPayload = {
   brandingRequired: boolean;
   firstPublishedAt: string | null;
   publishedAt: string | null;
+  scheduledPublishAt: string | null;
   createdAt: string;
   updatedAt: string;
   seller: {

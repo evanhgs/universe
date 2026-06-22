@@ -2,6 +2,7 @@ import "server-only";
 
 import { emailService } from "@/server/email/email.service";
 import { syncCurrentAccountFromClerk } from "@/server/account/account.sync";
+import { PAGE_PATHS } from "@/lib/paths";
 import {
   actorFromAccount,
   assertCan,
@@ -22,32 +23,49 @@ import {
   createOrderForOffering,
   createPendingStripePayment,
   findActiveEntitlementForOffering,
+  findAcceptedExclusiveOfferForBuyer,
+  findApplicablePromotion,
   findBuyerOrder,
   findDownloadEntitlement,
   findLatestKycVerificationForUser,
   findLatestPendingStripePayment,
   findPurchasableOffering,
+  findPurchasableOfferingsByIds,
   findStripePaymentForConfirmation,
   incrementEntitlementDownloadCount,
   countPaidSellerOrderItemsByBeat,
+  createExclusiveOffer,
+  createOrderForCart,
+  createOrderForExclusiveOffer,
+  createSellerPromotion,
   listSellerBeats,
+  listSellerExclusiveOffers,
+  listSellerPromotions,
   listBuyerOrders,
   listSellerRevenueLedgerEntries,
   listSellerOrderItems,
+  markExclusiveOfferPaid,
   markOrderPaidFromStripe,
+  markPromotionUsed,
   markStripePaymentFailedBySession,
   markWebhookEventFailed,
   markWebhookEventProcessed,
   recordWebhookEventStart,
+  updateSellerExclusiveOffer,
+  updateSellerPromotion,
 } from "./marketplace.repository";
 import { createStripeCheckoutSession, retrieveStripeCheckoutSession } from "@/lib/stripe.client";
 import type {
+  CreateExclusiveOfferInput,
   CreateDirectPurchaseOrderInput,
+  CreatePromotionInput,
   MarketplaceAssetPayload,
   SellerDashboardPayload,
   MarketplaceOrderPayload,
   StripeCheckoutInput,
   StripeConfirmationInput,
+  UpdateExclusiveOfferInput,
+  UpdatePromotionInput,
 } from "./marketplace.types";
 
 type OrderRecord = Awaited<ReturnType<typeof createOrderForOffering>>;
@@ -56,8 +74,8 @@ type OrderRecord = Awaited<ReturnType<typeof createOrderForOffering>>;
  * Convertit un Decimal Prisma en number nullable pour les payloads JSON.
  * @param value Montant Decimal, number ou null.
  */
-function decimalToNumber(value: Prisma.Decimal | number | null) {
-  if (value === null) {
+function decimalToNumber(value: Prisma.Decimal | number | null | undefined) {
+  if (value === null || value === undefined) {
     return null;
   }
 
@@ -90,6 +108,10 @@ function toCents(value: number) {
  */
 function fromCents(value: number) {
   return Math.round(value) / 100;
+}
+
+function ratio(numerator: number, denominator: number) {
+  return denominator > 0 ? Math.round((numerator / denominator) * 10_000) / 10_000 : 0;
 }
 
 /**
@@ -175,6 +197,52 @@ function serializeOrder(order: OrderRecord): MarketplaceOrderPayload {
   };
 }
 
+function serializeExclusiveOffer(
+  offer: Awaited<ReturnType<typeof listSellerExclusiveOffers>>[number],
+) {
+  return {
+    id: offer.id,
+    status: offer.status,
+    proposedAmount: decimalToNumber(offer.proposedAmount) ?? 0,
+    counterAmount: decimalToNumber(offer.counterAmount),
+    acceptedAmount: decimalToNumber(offer.acceptedAmount),
+    currency: offer.currency,
+    buyerMessage: offer.buyerMessage,
+    sellerMessage: offer.sellerMessage,
+    expiresAt: offer.expiresAt?.toISOString() ?? null,
+    createdAt: offer.createdAt.toISOString(),
+    beat: {
+      id: offer.beat.id,
+      slug: offer.beat.slug,
+      title: offer.beat.title,
+    },
+    buyer: {
+      id: offer.buyer.id,
+      displayName: offer.buyer.profile?.displayName ?? null,
+    },
+  };
+}
+
+function serializePromotion(
+  promotion: Awaited<ReturnType<typeof listSellerPromotions>>[number],
+) {
+  return {
+    id: promotion.id,
+    type: promotion.type,
+    discountType: promotion.discountType,
+    title: promotion.title,
+    code: promotion.code,
+    discountValue: decimalToNumber(promotion.discountValue) ?? 0,
+    currency: promotion.currency,
+    minItems: promotion.minItems,
+    usageLimit: promotion.usageLimit,
+    usageCount: promotion.usageCount,
+    isActive: promotion.isActive,
+    startsAt: promotion.startsAt?.toISOString() ?? null,
+    endsAt: promotion.endsAt?.toISOString() ?? null,
+  };
+}
+
 /**
  * Construit une URL absolue de checkout a partir d'une origine publique.
  * @param origin Origine publique de l'application.
@@ -215,11 +283,11 @@ function buildDefaultCheckoutUrls(orderId: string, requestUrl: string) {
   return {
     successUrl: buildCheckoutUrl(
       origin,
-      `/account/purchases?orderId=${encodeURIComponent(orderId)}&stripeSessionId={CHECKOUT_SESSION_ID}`,
+      PAGE_PATHS.account.purchases.stripeSuccess(orderId),
     ),
     cancelUrl: buildCheckoutUrl(
       origin,
-      `/account/purchases?orderId=${encodeURIComponent(orderId)}&checkout=cancelled`,
+      PAGE_PATHS.account.purchases.checkoutCancelled(orderId),
     ),
   };
 }
@@ -248,6 +316,71 @@ export async function createDirectPurchaseOrderForCurrentBuyer(
   input: CreateDirectPurchaseOrderInput,
 ) {
   const account = await assertMarketplaceAccount(clerkUserId);
+
+  if (input.exclusiveOfferId) {
+    const offer = await findAcceptedExclusiveOfferForBuyer({
+      buyerId: account.id,
+      exclusiveOfferId: input.exclusiveOfferId,
+    });
+
+    if (!offer) {
+      throw new Error("exclusive_offer_not_payable");
+    }
+
+    return serializeOrder(await createOrderForExclusiveOffer({ buyerId: account.id, offer }));
+  }
+
+  if (input.items || input.promotionCode) {
+    const requestedItems = input.items ?? (input.licenseOfferingId
+      ? [{ licenseOfferingId: input.licenseOfferingId, quantity: 1 }]
+      : []);
+    const offerings = await findPurchasableOfferingsByIds(
+      requestedItems.map((item) => item.licenseOfferingId),
+    );
+
+    if (offerings.length !== requestedItems.length) {
+      throw new Error("beat_or_license_not_found");
+    }
+
+    if (offerings.some((offering) => offering.sellerId === account.id)) {
+      throw new Error("cannot_buy_own_beat");
+    }
+
+    const currency = offerings[0]?.currency ?? "EUR";
+    const sellerIds = Array.from(new Set(offerings.map((offering) => offering.sellerId)));
+    const promotion = await findApplicablePromotion({
+      sellerIds,
+      itemCount: requestedItems.reduce((sum, item) => sum + (item.quantity ?? 1), 0),
+      currency,
+      promotionCode: input.promotionCode,
+      beatIds: offerings.map((offering) => offering.beat.id),
+      licenseOfferingIds: offerings.map((offering) => offering.id),
+    });
+
+    if (input.promotionCode && !promotion) {
+      throw new Error("promotion_not_found");
+    }
+
+    return serializeOrder(
+      await createOrderForCart({
+        buyerId: account.id,
+        items: requestedItems.map((item) => {
+          const offering = offerings.find((row) => row.id === item.licenseOfferingId);
+
+          if (!offering) {
+            throw new Error("beat_or_license_not_found");
+          }
+
+          return {
+            offering,
+            quantity: item.quantity ?? 1,
+          };
+        }),
+        promotion,
+      }),
+    );
+  }
+
   const offering = await findPurchasableOffering(input);
 
   if (!offering) {
@@ -268,6 +401,65 @@ export async function createDirectPurchaseOrderForCurrentBuyer(
   }
 
   return serializeOrder(await createOrderForOffering({ buyerId: account.id, offering }));
+}
+
+export async function createExclusiveOfferForCurrentBuyer(
+  clerkUserId: string,
+  input: CreateExclusiveOfferInput,
+) {
+  const account = await assertMarketplaceAccount(clerkUserId);
+
+  return serializeExclusiveOffer(await createExclusiveOffer({ buyerId: account.id, input }));
+}
+
+export async function updateExclusiveOfferForCurrentSeller(
+  clerkUserId: string,
+  offerId: string,
+  input: UpdateExclusiveOfferInput,
+) {
+  const account = await assertMarketplaceAccount(clerkUserId);
+  assertCan(actorFromAccount(account), "sellerDashboard:read:own");
+
+  return serializeExclusiveOffer(
+    await updateSellerExclusiveOffer({ sellerId: account.id, offerId, input }),
+  );
+}
+
+export async function listExclusiveOffersForCurrentSeller(clerkUserId: string) {
+  const account = await assertMarketplaceAccount(clerkUserId);
+  assertCan(actorFromAccount(account), "sellerDashboard:read:own");
+
+  return (await listSellerExclusiveOffers(account.id)).map(serializeExclusiveOffer);
+}
+
+export async function createPromotionForCurrentSeller(
+  clerkUserId: string,
+  input: CreatePromotionInput,
+) {
+  const account = await assertMarketplaceAccount(clerkUserId);
+  assertCan(actorFromAccount(account), "sellerDashboard:read:own");
+
+  return serializePromotion(await createSellerPromotion({ sellerId: account.id, input }));
+}
+
+export async function updatePromotionForCurrentSeller(
+  clerkUserId: string,
+  promotionId: string,
+  input: UpdatePromotionInput,
+) {
+  const account = await assertMarketplaceAccount(clerkUserId);
+  assertCan(actorFromAccount(account), "sellerDashboard:read:own");
+
+  return serializePromotion(
+    await updateSellerPromotion({ sellerId: account.id, promotionId, input }),
+  );
+}
+
+export async function listPromotionsForCurrentSeller(clerkUserId: string) {
+  const account = await assertMarketplaceAccount(clerkUserId);
+  assertCan(actorFromAccount(account), "sellerDashboard:read:own");
+
+  return (await listSellerPromotions(account.id)).map(serializePromotion);
 }
 
 /**
@@ -295,9 +487,19 @@ export async function createStripeCheckoutForCurrentBuyer(
   }
 
   const totalAmount = decimalToNumber(order.totalAmount) ?? 0;
+  const hasDiscount = (decimalToNumber(order.discountAmount) ?? 0) > 0;
+  const canUseDynamicPrices = hasDiscount || Boolean(order.negotiatedOfferId);
   const stripePriceIdSnapshots = order.items.map((item) => item.stripePriceIdSnapshot);
+  const canUseCatalogPrices =
+    !hasDiscount &&
+    stripePriceIdSnapshots.length > 0 &&
+    stripePriceIdSnapshots.every((priceId) => Boolean(priceId));
 
-  if (stripePriceIdSnapshots.length === 0 || stripePriceIdSnapshots.some((priceId) => !priceId)) {
+  if (order.items.length === 0 || (!canUseCatalogPrices && !canUseDynamicPrices)) {
+    throw new Error("stripe_price_missing");
+  }
+
+  if (!canUseCatalogPrices && totalAmount <= 0) {
     throw new Error("stripe_price_missing");
   }
 
@@ -334,7 +536,17 @@ export async function createStripeCheckoutForCurrentBuyer(
     orderId: order.id,
     paymentId: payment.id,
     buyerId: account.id,
-    stripePriceIdSnapshots: stripePriceIdSnapshots as string[],
+    stripePriceIdSnapshots: canUseCatalogPrices ? stripePriceIdSnapshots as string[] : undefined,
+    dynamicLineItems: canUseCatalogPrices
+      ? undefined
+      : order.items.map((item) => ({
+          name: item.licenseNameSnapshot
+            ? `${item.titleSnapshot} - ${item.licenseNameSnapshot}`
+            : item.titleSnapshot,
+          amount: decimalToNumber(item.lineTotalAmount) ?? 0,
+          currency: order.currency,
+          quantity: 1,
+        })),
     successUrl: input.successUrl ?? defaults.successUrl,
     cancelUrl: input.cancelUrl ?? defaults.cancelUrl,
   });
@@ -433,7 +645,7 @@ export async function fulfillStripeCheckoutSession(sessionId: string) {
     throw new Error("stripe_session_not_paid");
   }
 
-  const expectedSubtotal = toCents(decimalToNumber(payment.order.subtotalAmount) ?? 0);
+  const expectedSubtotal = toCents(decimalToNumber(payment.order.totalAmount) ?? 0);
   const stripeSubtotal = session.amount_subtotal ?? session.amount_total;
   const stripeTotal = session.amount_total ?? stripeSubtotal;
 
@@ -451,16 +663,19 @@ export async function fulfillStripeCheckoutSession(sessionId: string) {
   const taxAmount = fromCents(session.total_details?.amount_tax ?? stripeTotal - stripeSubtotal);
   const totalAmount = fromCents(stripeTotal);
 
-  const order = serializeOrder(
-    await markOrderPaidFromStripe({
+  const paidOrder = await markOrderPaidFromStripe({
       orderId: payment.orderId,
       paymentId: payment.id,
       providerPaymentIntentId: stripeObjectId(session.payment_intent),
       taxAmount,
       totalAmount,
       payload: stripePayloadJson(session),
-    }),
-  );
+    });
+
+  await markExclusiveOfferPaid(paidOrder.id);
+  await markPromotionUsed(paidOrder.id);
+
+  const order = serializeOrder(paidOrder);
 
   await emailService.sendOrderConfirmedEmails(order.id);
 
@@ -606,12 +821,22 @@ export async function getCurrentSellerDashboard(
   const actor = actorFromAccount(account);
   assertCan(actor, "sellerDashboard:read:own");
 
-  const [items, beats, paidCounts, ledgerEntries, kycVerification] = await Promise.all([
+  const [
+    items,
+    beats,
+    paidCounts,
+    ledgerEntries,
+    kycVerification,
+    exclusiveOffers,
+    promotions,
+  ] = await Promise.all([
     listSellerOrderItems(account.id),
     listSellerBeats(account.id),
     countPaidSellerOrderItemsByBeat(account.id),
     listSellerRevenueLedgerEntries(account.id),
     findLatestKycVerificationForUser(account.id),
+    listSellerExclusiveOffers(account.id),
+    listSellerPromotions(account.id),
   ]);
   const payoutEligibility = getPayoutEligibility(actor, {
     kycStatus: kycVerification?.status ?? "NOT_STARTED",
@@ -675,6 +900,59 @@ export async function getCurrentSellerDashboard(
     revenueByCurrency.set(entry.currency, current);
   }
 
+  const beatPerformance = beats.map((beat) => ({
+    id: beat.id,
+    slug: beat.slug,
+    title: beat.title,
+    status: beat.status,
+    visibility: beat.visibility,
+    priceAmount: decimalToNumber(beat.basePriceAmount),
+    currency: beat.currency,
+    publishedAt: beat.publishedAt?.toISOString() ?? null,
+    updatedAt: beat.updatedAt.toISOString(),
+    paidSalesCount: paidCountByBeatId.get(beat.id) ?? 0,
+    impressions: beat.stats?.impressions ?? 0,
+    plays: beat.stats?.plays ?? 0,
+    fullPlays: beat.stats?.fullPlays ?? 0,
+    licenseClicks: beat.stats?.licenseClicks ?? 0,
+    addToCart: beat.stats?.addToCart ?? 0,
+    purchases: beat.stats?.purchases ?? 0,
+    revenue: decimalToNumber(beat.stats?.revenue ?? null) ?? 0,
+    conversionRate: decimalToNumber(beat.stats?.conversionRate ?? null) ?? 0,
+  }));
+  const analyticsSummary = beatPerformance.reduce(
+    (summary, beat) => ({
+      impressions: summary.impressions + beat.impressions,
+      plays: summary.plays + beat.plays,
+      fullPlays: summary.fullPlays + beat.fullPlays,
+      licenseClicks: summary.licenseClicks + beat.licenseClicks,
+      addToCart: summary.addToCart + beat.addToCart,
+      purchases: summary.purchases + beat.purchases,
+      revenue: summary.revenue + beat.revenue,
+      playRate: 0,
+      licenseClickRate: 0,
+      conversionRate: 0,
+    }),
+    {
+      impressions: 0,
+      plays: 0,
+      fullPlays: 0,
+      licenseClicks: 0,
+      addToCart: 0,
+      purchases: 0,
+      revenue: 0,
+      playRate: 0,
+      licenseClickRate: 0,
+      conversionRate: 0,
+    },
+  );
+  analyticsSummary.playRate = ratio(analyticsSummary.plays, analyticsSummary.impressions);
+  analyticsSummary.licenseClickRate = ratio(
+    analyticsSummary.licenseClicks,
+    analyticsSummary.impressions,
+  );
+  analyticsSummary.conversionRate = ratio(analyticsSummary.purchases, analyticsSummary.impressions);
+
   return {
     items: sales,
     count: sales.length,
@@ -701,6 +979,10 @@ export async function getCurrentSellerDashboard(
       updatedAt: beat.updatedAt.toISOString(),
       paidSalesCount: paidCountByBeatId.get(beat.id) ?? 0,
     })),
+    analyticsSummary,
+    beatPerformance,
+    exclusiveOffers: exclusiveOffers.map(serializeExclusiveOffer),
+    promotions: promotions.map(serializePromotion),
   };
 }
 

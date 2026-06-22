@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { ChatContactButton } from "@/app/chat-contact-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { PAGE_PATHS } from "@/lib/paths";
 import { getBeatPayloadBySlug } from "@/server/beats/beat.service";
 import { BeatPreviewPlayer } from "./beat-preview-player";
 import { BeatPurchasePanel } from "./beat-purchase-panel";
@@ -74,7 +75,7 @@ export default async function BeatDetailPage({ params, searchParams }: BeatDetai
     <main className="mx-auto grid min-h-[calc(100vh-73px)] w-full max-w-6xl gap-8 px-6 py-10 lg:grid-cols-[1fr_360px]">
       <section>
         <Button asChild variant="link">
-          <Link href="/beats">Retour au catalogue</Link>
+          <Link href={PAGE_PATHS.beats.catalog.getHref()}>Retour au catalogue</Link>
         </Button>
         <div className="mt-6 aspect-video overflow-hidden rounded-lg border border-border bg-muted">
           {thumbnail?.url ? (
@@ -129,7 +130,7 @@ export default async function BeatDetailPage({ params, searchParams }: BeatDetai
         <div className="mt-6 border-t border-border pt-5">
           <p className="text-sm font-semibold text-foreground">Vendeur</p>
           {beat.seller.slug ? (
-            <Link className="mt-2 block text-sm text-muted-foreground hover:text-foreground" href={`/profiles/${beat.seller.slug}`}>
+            <Link className="mt-2 block text-sm text-muted-foreground hover:text-foreground" href={PAGE_PATHS.profiles.detail.getHref(beat.seller.slug)}>
               {beat.seller.displayName ?? beat.seller.slug}
             </Link>
           ) : (

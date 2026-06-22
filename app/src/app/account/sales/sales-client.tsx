@@ -4,6 +4,8 @@ import { useAuth, useClerk, useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { API_PATHS, PAGE_PATHS } from "@/lib/paths";
+
 type SaleItem = {
   id: string;
   orderId: string;
@@ -49,6 +51,10 @@ type SalesResponse = {
     };
   };
   beats?: SellerBeat[];
+  analyticsSummary?: SellerAnalyticsSummary;
+  beatPerformance?: SellerBeatPerformance[];
+  exclusiveOffers?: ExclusiveOffer[];
+  promotions?: Promotion[];
 };
 
 type SellerBeat = {
@@ -62,6 +68,68 @@ type SellerBeat = {
   publishedAt: string | null;
   updatedAt: string;
   paidSalesCount: number;
+};
+
+type SellerAnalyticsSummary = {
+  impressions: number;
+  plays: number;
+  fullPlays: number;
+  licenseClicks: number;
+  addToCart: number;
+  purchases: number;
+  revenue: number;
+  playRate: number;
+  licenseClickRate: number;
+  conversionRate: number;
+};
+
+type SellerBeatPerformance = SellerBeat & {
+  impressions: number;
+  plays: number;
+  fullPlays: number;
+  licenseClicks: number;
+  addToCart: number;
+  purchases: number;
+  revenue: number;
+  conversionRate: number;
+};
+
+type ExclusiveOffer = {
+  id: string;
+  status: string;
+  proposedAmount: number;
+  counterAmount: number | null;
+  acceptedAmount: number | null;
+  currency: string;
+  buyerMessage: string | null;
+  sellerMessage: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  beat: {
+    id: string;
+    slug: string;
+    title: string;
+  };
+  buyer: {
+    id: string;
+    displayName: string | null;
+  };
+};
+
+type Promotion = {
+  id: string;
+  type: string;
+  discountType: string;
+  title: string;
+  code: string | null;
+  discountValue: number;
+  currency: string | null;
+  minItems: number;
+  usageLimit: number | null;
+  usageCount: number;
+  isActive: boolean;
+  startsAt: string | null;
+  endsAt: string | null;
 };
 
 type JsonBody = {
@@ -101,13 +169,24 @@ function formatDate(value: string | null) {
   }).format(new Date(value));
 }
 
+function formatInteger(value: number) {
+  return new Intl.NumberFormat("fr-FR").format(value);
+}
+
+function formatPercent(value: number) {
+  return new Intl.NumberFormat("fr-FR", {
+    maximumFractionDigits: 1,
+    style: "percent",
+  }).format(value);
+}
+
 /**
  * Traduit un statut beat pour un dashboard vendeur lisible.
  * @param status Statut brut Prisma/API.
  */
 function beatStatusLabel(status: string) {
   if (status === "PUBLISHED") {
-    return "Publiee";
+    return "Publiée";
   }
 
   if (status === "PROCESSING") {
@@ -119,11 +198,11 @@ function beatStatusLabel(status: string) {
   }
 
   if (status === "HIDDEN") {
-    return "Masquee";
+    return "Masquée";
   }
 
   if (status === "ARCHIVED") {
-    return "Archivee";
+    return "Archivée";
   }
 
   return status;
@@ -156,15 +235,32 @@ async function readJsonResponse<T>(response: Response): Promise<T> {
  * @param error Code ou message brut.
  */
 function errorMessage(error: string) {
-  if (error === "seller_role_required") {
-    return "Active le role vendeur dans ton profil pour consulter tes ventes.";
-  }
-
   if (error === "unauthorized" || error === "HTTP 401") {
     return "Connecte-toi pour consulter tes ventes.";
   }
 
   return error;
+}
+
+function exclusiveOfferStatusLabel(status: string) {
+  if (status === "PENDING") return "A valider";
+  if (status === "COUNTERED") return "Contre-offre";
+  if (status === "ACCEPTED") return "Acceptee";
+  if (status === "PAID") return "Payee";
+  if (status === "REJECTED") return "Refusee";
+  if (status === "EXPIRED") return "Expiree";
+
+  return status;
+}
+
+function promotionDiscountLabel(promotion: Promotion) {
+  const value = promotion.discountType === "PERCENT"
+    ? formatPercent(promotion.discountValue / 100)
+    : formatMoney(promotion.discountValue, promotion.currency ?? "EUR");
+
+  return promotion.type === "BUNDLE"
+    ? `${value} des ${promotion.minItems} instrus`
+    : `${value} avec ${promotion.code ?? "code"}`;
 }
 
 /**
@@ -177,11 +273,11 @@ function payoutStatusLabel(reason: string | null | undefined) {
   }
 
   if (reason === "PENDING_KYC") {
-    return "Verification d'identite requise avant retrait";
+    return "Vérification d'identitée requise avant le retrait";
   }
 
   if (reason === "PAYOUT_ACCOUNT_REQUIRED") {
-    return "Compte de retrait a configurer";
+    return "Compte de retrait à configurer";
   }
 
   if (reason === "ACCOUNT_NOT_ACTIVE") {
@@ -201,6 +297,10 @@ export function SalesClient() {
   const { isLoaded, isSignedIn } = useUser();
   const [sales, setSales] = useState<SaleItem[]>([]);
   const [beats, setBeats] = useState<SellerBeat[]>([]);
+  const [beatPerformance, setBeatPerformance] = useState<SellerBeatPerformance[]>([]);
+  const [analyticsSummary, setAnalyticsSummary] = useState<SellerAnalyticsSummary | null>(null);
+  const [exclusiveOffers, setExclusiveOffers] = useState<ExclusiveOffer[]>([]);
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [summary, setSummary] = useState<SalesResponse["summary"] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -216,6 +316,26 @@ export function SalesClient() {
   const currency = primaryRevenue?.currency ?? sales[0]?.currency ?? "EUR";
   const grossPaid = primaryRevenue?.grossPaidAmount ?? fallbackGrossPaid;
   const sellerEarning = primaryRevenue?.sellerEarningAmount ?? fallbackGrossPaid;
+  const activePromotions = promotions.filter((promotion) => promotion.isActive);
+  const pendingExclusiveOffers = exclusiveOffers.filter((offer) =>
+    ["PENDING", "COUNTERED"].includes(offer.status),
+  );
+  const underperformingBeats = beatPerformance
+    .filter((beat) => beat.impressions >= 100 && beat.conversionRate < 0.01)
+    .slice(0, 3);
+  const performanceRows = beatPerformance.length > 0
+    ? beatPerformance
+    : beats.map((beat) => ({
+        ...beat,
+        impressions: 0,
+        plays: 0,
+        fullPlays: 0,
+        licenseClicks: 0,
+        addToCart: 0,
+        purchases: beat.paidSalesCount,
+        revenue: 0,
+        conversionRate: 0,
+      }));
 
   const buildAuthHeaders = useCallback(async (base: HeadersInit = {}) => {
     const headers = new Headers(base);
@@ -244,7 +364,7 @@ export function SalesClient() {
 
       try {
         const response = await readJsonResponse<SalesResponse>(
-          await fetch("/api/marketplace/sales", {
+          await fetch(API_PATHS.marketplace.sales(), {
             credentials: "same-origin",
             headers: await buildAuthHeaders({
               Accept: "application/json",
@@ -255,6 +375,10 @@ export function SalesClient() {
         if (!isCancelled) {
           setSales(response.items);
           setBeats(response.beats ?? []);
+          setBeatPerformance(response.beatPerformance ?? []);
+          setAnalyticsSummary(response.analyticsSummary ?? null);
+          setExclusiveOffers(response.exclusiveOffers ?? []);
+          setPromotions(response.promotions ?? []);
           setSummary(response.summary ?? null);
         }
       } catch (err) {
@@ -314,11 +438,6 @@ export function SalesClient() {
       {error ? (
         <div className="mt-6 border border-rose-200 bg-rose-50 px-4 py-3">
           <p className="text-sm font-medium text-rose-700">{error}</p>
-          {error.includes("vendeur") ? (
-            <Link className={`mt-4 ${secondaryButtonClass}`} href="/account/profile">
-              Activer vendeur
-            </Link>
-          ) : null}
         </div>
       ) : null}
 
@@ -376,6 +495,116 @@ export function SalesClient() {
         </article>
       </section>
 
+      <section className="mt-4 grid gap-4 md:grid-cols-4">
+        <article className="border border-border bg-card p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Impressions</p>
+          <p className="mt-1 text-xl font-semibold text-foreground">
+            {formatInteger(analyticsSummary?.impressions ?? 0)}
+          </p>
+        </article>
+        <article className="border border-border bg-card p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Ecoutes</p>
+          <p className="mt-1 text-xl font-semibold text-foreground">
+            {formatInteger(analyticsSummary?.plays ?? 0)}
+          </p>
+        </article>
+        <article className="border border-border bg-card p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Clic licence</p>
+          <p className="mt-1 text-xl font-semibold text-foreground">
+            {formatPercent(analyticsSummary?.licenseClickRate ?? 0)}
+          </p>
+        </article>
+        <article className="border border-border bg-card p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Conversion</p>
+          <p className="mt-1 text-xl font-semibold text-foreground">
+            {formatPercent(analyticsSummary?.conversionRate ?? 0)}
+          </p>
+        </article>
+      </section>
+
+      <section className="mt-4 border border-border bg-card p-5">
+        <div className="flex flex-col gap-3 border-b border-border pb-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-foreground">A traiter</h2>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              Offres exclusives, promotions actives et signaux faibles a surveiller.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center text-xs text-muted-foreground">
+            <span className="border border-border px-3 py-2">
+              <strong className="block text-base text-foreground">{pendingExclusiveOffers.length}</strong>
+              offres
+            </span>
+            <span className="border border-border px-3 py-2">
+              <strong className="block text-base text-foreground">{activePromotions.length}</strong>
+              promos
+            </span>
+            <span className="border border-border px-3 py-2">
+              <strong className="block text-base text-foreground">{underperformingBeats.length}</strong>
+              a optimiser
+            </span>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-4 lg:grid-cols-3">
+          <div>
+            <h3 className="text-sm font-medium text-foreground">Offres exclusives</h3>
+            <div className="mt-3 grid gap-2">
+              {pendingExclusiveOffers.slice(0, 3).map((offer) => (
+                <div className="border border-border p-3 text-sm" key={offer.id}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-foreground">{offer.beat.title}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {offer.buyer.displayName ?? "Acheteur"} - {exclusiveOfferStatusLabel(offer.status)}
+                      </p>
+                    </div>
+                    <span className="text-sm font-semibold text-foreground">
+                      {formatMoney(offer.acceptedAmount ?? offer.counterAmount ?? offer.proposedAmount, offer.currency)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {pendingExclusiveOffers.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Aucune offre exclusive en attente.</p>
+              ) : null}
+            </div>
+          </div>
+          <div>
+            <h3 className="text-sm font-medium text-foreground">Promotions</h3>
+            <div className="mt-3 grid gap-2">
+              {activePromotions.slice(0, 3).map((promotion) => (
+                <div className="border border-border p-3 text-sm" key={promotion.id}>
+                  <p className="font-medium text-foreground">{promotion.title}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {promotionDiscountLabel(promotion)} - {promotion.usageCount}
+                    {promotion.usageLimit ? `/${promotion.usageLimit}` : ""} usages
+                  </p>
+                </div>
+              ))}
+              {activePromotions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Aucune promotion active.</p>
+              ) : null}
+            </div>
+          </div>
+          <div>
+            <h3 className="text-sm font-medium text-foreground">A optimiser</h3>
+            <div className="mt-3 grid gap-2">
+              {underperformingBeats.map((beat) => (
+                <div className="border border-border p-3 text-sm" key={beat.id}>
+                  <p className="font-medium text-foreground">{beat.title}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {formatInteger(beat.impressions)} impressions - {formatPercent(beat.conversionRate)} conversion
+                  </p>
+                </div>
+              ))}
+              {underperformingBeats.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Aucun signal faible significatif.</p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="mt-4 border border-border bg-card p-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
@@ -399,7 +628,7 @@ export function SalesClient() {
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Les achats payes par tes clients apparaitront ici.
           </p>
-          <Link className={`mt-5 ${secondaryButtonClass}`} href="/beats">
+          <Link className={`mt-5 ${secondaryButtonClass}`} href={PAGE_PATHS.beats.catalog.getHref()}>
             Voir le catalogue
           </Link>
         </div>
@@ -413,7 +642,7 @@ export function SalesClient() {
               Suis la visibilite, le prix et les ventes de chaque publication.
             </p>
           </div>
-          <Link className={secondaryButtonClass} href="/beats">
+          <Link className={secondaryButtonClass} href={PAGE_PATHS.beats.catalog.getHref()}>
             Gerer le catalogue
           </Link>
         </div>
@@ -424,53 +653,60 @@ export function SalesClient() {
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               Publie ta premiere instrumentale pour commencer a vendre.
             </p>
-            <Link className={`mt-5 ${secondaryButtonClass}`} href="/beats">
+            <Link className={`mt-5 ${secondaryButtonClass}`} href={PAGE_PATHS.beats.catalog.getHref()}>
               Ajouter une instru
             </Link>
           </div>
         ) : null}
 
-        {beats.length > 0 ? (
-          <div className="mt-5 grid gap-4">
-            {beats.map((beat) => (
-              <article className="border border-border bg-card p-5" key={beat.id}>
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold text-foreground">{beat.title}</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {beatStatusLabel(beat.status)} - {beat.visibility}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Mis a jour le {formatDate(beat.updatedAt)}
-                    </p>
-                  </div>
-                  <dl className="grid min-w-56 gap-1 text-sm text-muted-foreground">
-                    <div className="flex justify-between gap-8">
-                      <dt>Prix</dt>
-                      <dd>
-                        {beat.priceAmount === null
-                          ? "Non renseigne"
-                          : formatMoney(beat.priceAmount, beat.currency)}
-                      </dd>
-                    </div>
-                    <div className="flex justify-between gap-8">
-                      <dt>Ventes payees</dt>
-                      <dd>{beat.paidSalesCount}</dd>
-                    </div>
-                    <div className="flex justify-between gap-8">
-                      <dt>Publiee le</dt>
-                      <dd>{formatDate(beat.publishedAt)}</dd>
-                    </div>
-                  </dl>
-                  <Link
-                    className="inline-flex text-sm font-medium text-foreground hover:text-muted-foreground"
-                    href={`/beats/${beat.slug}`}
-                  >
-                    Ouvrir
-                  </Link>
-                </div>
-              </article>
-            ))}
+        {performanceRows.length > 0 ? (
+          <div className="mt-5 overflow-x-auto border border-border bg-card">
+            <table className="min-w-[920px] w-full border-collapse text-sm">
+              <thead className="border-b border-border text-left text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Instru</th>
+                  <th className="px-4 py-3 font-medium">Prix</th>
+                  <th className="px-4 py-3 font-medium">Ventes</th>
+                  <th className="px-4 py-3 font-medium">Impressions</th>
+                  <th className="px-4 py-3 font-medium">Ecoutes</th>
+                  <th className="px-4 py-3 font-medium">Clic licence</th>
+                  <th className="px-4 py-3 font-medium">Conversion</th>
+                  <th className="px-4 py-3 font-medium">Revenu</th>
+                  <th className="px-4 py-3 font-medium">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {performanceRows.map((beat) => (
+                  <tr className="border-b border-border last:border-b-0" key={beat.id}>
+                    <td className="px-4 py-4">
+                      <p className="font-medium text-foreground">{beat.title}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {beatStatusLabel(beat.status)} - {beat.visibility} - maj {formatDate(beat.updatedAt)}
+                      </p>
+                    </td>
+                    <td className="px-4 py-4 text-muted-foreground">
+                      {beat.priceAmount === null ? "Non renseigne" : formatMoney(beat.priceAmount, beat.currency)}
+                    </td>
+                    <td className="px-4 py-4 text-muted-foreground">{formatInteger(beat.paidSalesCount)}</td>
+                    <td className="px-4 py-4 text-muted-foreground">{formatInteger(beat.impressions)}</td>
+                    <td className="px-4 py-4 text-muted-foreground">{formatInteger(beat.plays)}</td>
+                    <td className="px-4 py-4 text-muted-foreground">{formatInteger(beat.licenseClicks)}</td>
+                    <td className="px-4 py-4 text-muted-foreground">{formatPercent(beat.conversionRate)}</td>
+                    <td className="px-4 py-4 font-medium text-foreground">
+                      {formatMoney(beat.revenue, beat.currency)}
+                    </td>
+                    <td className="px-4 py-4">
+                      <Link
+                        className="inline-flex text-sm font-medium text-foreground hover:text-muted-foreground"
+                        href={PAGE_PATHS.beats.detail.getHref(beat.slug)}
+                      >
+                        Ouvrir
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : null}
       </section>
@@ -495,7 +731,7 @@ export function SalesClient() {
                   {sale.beat ? (
                     <Link
                       className="mt-3 inline-flex text-sm font-medium text-foreground hover:text-muted-foreground"
-                      href={`/beats/${sale.beat.slug}`}
+                      href={PAGE_PATHS.beats.detail.getHref(sale.beat.slug)}
                     >
                       Ouvrir la fiche
                     </Link>

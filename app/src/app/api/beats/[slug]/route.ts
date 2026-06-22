@@ -40,9 +40,7 @@ function invalidSlugResponse() {
 function mutationErrorResponse(error: unknown) {
   const code = error instanceof Error ? error.message : "Unknown error.";
   const status =
-    code === "seller_role_required"
-      ? 403
-      : code === "beat_forbidden"
+    code === "beat_forbidden"
         ? 403
       : code === "beat_asset_duplicate" || code === "stripe_catalog_not_ready"
         ? 409
@@ -52,8 +50,6 @@ function mutationErrorResponse(error: unknown) {
   const message =
     code === "beat_forbidden"
       ? "You do not have permissions to modify this beat."
-      : code === "seller_role_required"
-        ? "A seller account is required to modify beats."
       : code === "beat_asset_duplicate"
         ? "This beat asset is already attached to another beat."
       : code === "stripe_catalog_not_ready"

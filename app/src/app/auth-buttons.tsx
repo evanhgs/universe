@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { API_PATHS, PAGE_PATHS } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 
 type HeaderAccount = {
@@ -69,11 +70,6 @@ export function SignedInActions() {
     user?.fullName ??
     user?.primaryEmailAddress?.emailAddress ??
     "Profil";
-  const publicProfileHref = account?.profile.slug
-    ? `/profiles/${account.profile.slug}`
-    : "/account";
-  const isSeller = account?.roles.includes("SELLER") ?? false;
-
   useEffect(() => {
     let isCancelled = false;
 
@@ -88,7 +84,7 @@ export function SignedInActions() {
         headers.set("Authorization", `Bearer ${token}`);
       }
 
-      const response = await fetch("/api/account/me", {
+      const response = await fetch(API_PATHS.account.me(), {
         credentials: "same-origin",
         headers,
       });
@@ -115,7 +111,7 @@ export function SignedInActions() {
     async function refreshUnreadCount() {
       try {
         const token = await getToken();
-        const response = await fetch("/api/chat/unread-count", {
+        const response = await fetch(API_PATHS.chat.unreadCount(), {
           credentials: "same-origin",
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
@@ -220,36 +216,20 @@ export function SignedInActions() {
           <div className="grid py-2 text-sm">
             <Link
               className={menuItemClass}
-              href="/account"
+              href={PAGE_PATHS.account.dashboard.getHref()}
               onClick={() => setIsOpen(false)}
               role="menuitem"
             >
-              Tableau de bord
+              Dashboard
             </Link>
             <Link
               className={menuItemClass}
-              href="/account/profile"
-              onClick={() => setIsOpen(false)}
-              role="menuitem"
-            >
-              Modifier mon profil
-            </Link>
-            <Link
-              className={menuItemClass}
-              href={publicProfileHref}
-              onClick={() => setIsOpen(false)}
-              role="menuitem"
-            >
-              Voir mon profil public
-            </Link>
-            <Link
-              className={menuItemClass}
-              href="/account/messages"
+              href={PAGE_PATHS.account.messages.getHref()}
               onClick={() => setIsOpen(false)}
               role="menuitem"
             >
               <span className="flex items-center justify-between gap-3">
-                <span>Messages</span>
+                <span>Messagerie</span>
                 {unreadCount > 0 ? (
                   <Badge className="min-w-6 justify-center px-2 py-0 text-xs" variant="primary">
                     {unreadCount}
@@ -259,22 +239,20 @@ export function SignedInActions() {
             </Link>
             <Link
               className={menuItemClass}
-              href="/account/purchases"
+              href={PAGE_PATHS.account.purchases.getHref()}
               onClick={() => setIsOpen(false)}
               role="menuitem"
             >
               Mes achats
             </Link>
-            {isSeller ? (
-              <Link
+            <Link
                 className={menuItemClass}
-                href="/account/sales"
+                href={PAGE_PATHS.account.sales.getHref()}
                 onClick={() => setIsOpen(false)}
                 role="menuitem"
               >
                 Mes ventes
               </Link>
-            ) : null}
           </div>
 
           <div className="grid border-t border-border py-2 text-sm">
@@ -287,7 +265,7 @@ export function SignedInActions() {
               role="menuitem"
               type="button"
             >
-              Parametres Clerk
+              Paramètres
             </button>
             <button
               className={cn(menuItemClass, "text-left")}
@@ -295,7 +273,7 @@ export function SignedInActions() {
               role="menuitem"
               type="button"
             >
-              Se deconnecter
+              Se déconnecter
             </button>
           </div>
         </div>

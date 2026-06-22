@@ -127,6 +127,7 @@ Objectif : améliorer **engagement, monétisation et expérience utilisateur**
   * taux de conversion  
 * Code promo  
 * Dashboard enrichi
+* Remplacer le nom feed pour Rush comme pour les youtubes shorts, notre feed sera Rush
 
 ---
 

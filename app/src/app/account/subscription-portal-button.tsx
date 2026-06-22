@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { API_PATHS } from "@/lib/paths";
 
 type PortalPayload = {
   portalUrl?: string;
@@ -34,7 +35,7 @@ export function SubscriptionPortalButton() {
 
     try {
       const portalUrl = await readPortalResponse(
-        await fetch("/api/subscriptions/portal/stripe", {
+        await fetch(API_PATHS.subscriptions.portalStripe(), {
           method: "POST",
           headers: {
             Accept: "application/json",

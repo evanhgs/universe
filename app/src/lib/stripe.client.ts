@@ -2,6 +2,8 @@ import "server-only";
 
 import Stripe from "stripe";
 
+import { FRANCE_DEFAULT_VAT_RATE_PERCENT } from "@/server/marketplace/marketplace.constants";
+
 let stripeClient: Stripe | null = null;
 
 /**
@@ -40,6 +42,47 @@ function getStripeAutomaticTaxEnabled() {
   return process.env.STRIPE_AUTOMATIC_TAX_ENABLED === "true";
 }
 
+async function getDefaultFrenchVatTaxRateId() {
+  const configuredTaxRateId = process.env.STRIPE_FR_VAT_TAX_RATE_ID?.trim();
+
+  if (configuredTaxRateId) {
+    return configuredTaxRateId;
+  }
+
+  const stripe = getStripeClient();
+  const rates = await stripe.taxRates.list({
+    active: true,
+    limit: 100,
+  });
+  const existing = rates.data.find(
+    (rate) =>
+      rate.country === "FR" &&
+      rate.inclusive === false &&
+      rate.percentage === FRANCE_DEFAULT_VAT_RATE_PERCENT &&
+      rate.tax_type === "vat",
+  );
+
+  if (existing) {
+    return existing.id;
+  }
+
+  const created = await stripe.taxRates.create({
+    active: true,
+    country: "FR",
+    description: "TVA France appliquee par defaut aux achats marketplace Universe.",
+    display_name: "TVA",
+    inclusive: false,
+    jurisdiction: "FR",
+    metadata: {
+      purpose: "universe_marketplace_default_tax",
+    },
+    percentage: FRANCE_DEFAULT_VAT_RATE_PERCENT,
+    tax_type: "vat",
+  });
+
+  return created.id;
+}
+
 /**
  * Retourne un client Stripe singleton configure pour le serveur Next.js.
  * @returns Instance Stripe reutilisee en developpement et production.
@@ -67,7 +110,13 @@ export async function createStripeCheckoutSession(args: {
   orderId: string;
   paymentId: string;
   buyerId: string;
-  stripePriceIdSnapshots: string[];
+  stripePriceIdSnapshots?: string[];
+  dynamicLineItems?: Array<{
+    name: string;
+    amount: number;
+    currency: string;
+    quantity: number;
+  }>;
   successUrl: string;
   cancelUrl: string;
 }) {
@@ -76,20 +125,41 @@ export async function createStripeCheckoutSession(args: {
     paymentId: args.paymentId,
     buyerId: args.buyerId,
   };
+  const taxRateId = await getDefaultFrenchVatTaxRateId();
+
+  const lineItems = args.stripePriceIdSnapshots?.length
+    ? args.stripePriceIdSnapshots.map((price) => ({
+        price,
+        quantity: 1,
+        tax_rates: taxRateId ? [taxRateId] : undefined,
+      }))
+    : args.dynamicLineItems?.map((item) => ({
+        price_data: {
+          currency: item.currency.toLowerCase(),
+          product_data: {
+            name: item.name,
+          },
+          unit_amount: Math.round(item.amount * 100),
+          tax_behavior: "exclusive" as const,
+        },
+        quantity: item.quantity,
+        tax_rates: taxRateId ? [taxRateId] : undefined,
+      }));
+
+  if (!lineItems?.length) {
+    throw new Error("stripe_price_missing");
+  }
 
   return getStripeClient().checkout.sessions.create({
     mode: "payment",
     client_reference_id: args.orderId,
     success_url: args.successUrl,
     cancel_url: args.cancelUrl,
-    billing_address_collection: "auto",
+    billing_address_collection: "required",
     automatic_tax: {
-      enabled: getStripeAutomaticTaxEnabled(),
+      enabled: !taxRateId && getStripeAutomaticTaxEnabled(),
     },
-    line_items: args.stripePriceIdSnapshots.map((price) => ({
-      price,
-      quantity: 1,
-    })),
+    line_items: lineItems,
     metadata,
     payment_intent_data: {
       metadata,
@@ -181,6 +251,18 @@ export async function retrieveStripeCheckoutSession(sessionId: string) {
  */
 export async function retrieveStripeSubscription(subscriptionId: string) {
   return getStripeClient().subscriptions.retrieve(subscriptionId);
+}
+
+/**
+ * Liste les abonnements Stripe d'un Customer pour eviter les Checkout Billing
+ * concurrents avant que les webhooks aient synchronise l'etat local.
+ */
+export async function listStripeCustomerSubscriptions(customerId: string) {
+  return getStripeClient().subscriptions.list({
+    customer: customerId,
+    status: "all",
+    limit: 20,
+  });
 }
 
 /**

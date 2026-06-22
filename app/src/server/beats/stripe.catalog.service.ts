@@ -40,11 +40,56 @@ function shouldActivateProduct(beat: Pick<CatalogBeat, "status">) {
   return beat.status === "PUBLISHED" || beat.status === "PROCESSING" || beat.status === "DRAFT";
 }
 
-function productMetadata(beat: Pick<CatalogBeat, "id" | "ownerId" | "slug">) {
+function humanizeEnum(value: string) {
+  return value
+    .toLowerCase()
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatDuration(seconds: number | null) {
+  if (!seconds) {
+    return null;
+  }
+
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
+function joinEnumValues(values: string[]) {
+  return values.length > 0 ? values.map(humanizeEnum).join(", ") : null;
+}
+
+function productDescription(beat: CatalogBeat) {
+  const details = [
+    beat.description,
+    beat.bpm ? `BPM: ${beat.bpm}` : null,
+    beat.musicalKey ? `Tonalite: ${beat.musicalKey}` : null,
+    formatDuration(beat.durationSec) ? `Duree: ${formatDuration(beat.durationSec)}` : null,
+    joinEnumValues(beat.mainGenres) ? `Genres: ${joinEnumValues(beat.mainGenres)}` : null,
+    joinEnumValues(beat.moods) ? `Moods: ${joinEnumValues(beat.moods)}` : null,
+    joinEnumValues(beat.tags) ? `Tags: ${joinEnumValues(beat.tags)}` : null,
+  ].filter((value): value is string => Boolean(value));
+
+  return details.length > 0 ? details.join("\n") : undefined;
+}
+
+function productMetadata(
+  beat: Pick<
+    CatalogBeat,
+    "id" | "ownerId" | "slug" | "title" | "bpm" | "musicalKey" | "durationSec"
+  >,
+) {
   return {
     beatId: beat.id,
     ownerId: beat.ownerId,
     slug: beat.slug,
+    title: beat.title,
+    bpm: beat.bpm ? String(beat.bpm) : "",
+    musicalKey: beat.musicalKey ?? "",
+    durationSec: beat.durationSec ? String(beat.durationSec) : "",
   };
 }
 
@@ -95,7 +140,7 @@ async function markCatalogFailed(beatId: string, error: unknown) {
 async function createOrUpdateProduct(stripe: Stripe, beat: CatalogBeat) {
   const data = {
     name: beat.title,
-    description: beat.description ?? undefined,
+    description: productDescription(beat),
     active: shouldActivateProduct(beat),
     metadata: productMetadata(beat),
     tax_code: STRIPE_DIGITAL_SERVICE_TAX_CODE,
@@ -125,6 +170,7 @@ async function replaceOfferingPrice(args: {
     unit_amount: toMinorUnitAmount(offering.priceAmount),
     currency: offering.currency.toLowerCase(),
     tax_behavior: "exclusive",
+    nickname: offering.title ?? offering.licenseTemplate.scope,
     active: offering.isActive,
     metadata: priceMetadata(beat, offering),
   });
@@ -281,6 +327,7 @@ export async function replaceStripePriceForOffering(offeringId: string) {
       unit_amount: toMinorUnitAmount(offering.priceAmount),
       currency: offering.currency.toLowerCase(),
       tax_behavior: "exclusive",
+      nickname: offering.title ?? offering.licenseTemplate.scope,
       active: offering.isActive,
       metadata: {
         beatId: offering.beat.id,

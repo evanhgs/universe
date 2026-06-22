@@ -49,6 +49,7 @@ import {
   type Tag,
   type UsageTag,
 } from "@/lib/beat-metadata";
+import { API_PATHS, PAGE_PATHS } from "@/lib/paths";
 
 type UploadKind = "audio-source" | "audio-licensed-archive" | "image-thumbnail";
 type LicenseScope = "BASIC" | "PREMIUM" | "UNLIMITED" | "EXCLUSIVE" | "CUSTOM";
@@ -149,7 +150,7 @@ async function readJsonResponse<T>(response: Response): Promise<T> {
 }
 
 async function presignUpload(kind: UploadKind, file: File) {
-  const response = await fetch("/api/storage/uploads/presign", {
+  const response = await fetch(API_PATHS.storage.uploads.presign(), {
     method: "POST",
     credentials: "same-origin",
     headers: {
@@ -628,7 +629,7 @@ export function BeatUpload() {
       const isFree = uploadedLicenses.every((license) => license.price === 0);
 
       setStatus("Creation de la publication...");
-      const response = await fetch("/api/beats", {
+      const response = await fetch(API_PATHS.beats.list(), {
         method: "POST",
         credentials: "same-origin",
         headers: {
@@ -666,10 +667,10 @@ export function BeatUpload() {
       const beat = await readJsonResponse<CreatedBeatResponse>(response);
 
       setCreatedBeat(beat);
-      setStatus(beat.slug ? `Beat cree : /beats/${beat.slug}` : "Beat cree.");
+      setStatus(beat.slug ? `Beat cree : ${PAGE_PATHS.beats.detail.getHref(beat.slug)}` : "Beat cree.");
 
       if (beat.slug) {
-        router.push(`/beats/${beat.slug}`);
+        router.push(PAGE_PATHS.beats.detail.getHref(beat.slug));
       } else {
         router.refresh();
       }

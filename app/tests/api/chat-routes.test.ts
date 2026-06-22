@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.fn();
 const createOrGetCurrentUserConversationMock = vi.fn();
+const createCurrentUserChatOfferMock = vi.fn();
 const getCurrentUserUnreadCountMock = vi.fn();
 const listCurrentUserMessagesMock = vi.fn();
 const listCurrentUserConversationsMock = vi.fn();
@@ -13,6 +14,7 @@ vi.mock("@clerk/nextjs/server", () => ({
 }));
 
 vi.mock("@/server/chat/chat.service", () => ({
+  createCurrentUserChatOffer: createCurrentUserChatOfferMock,
   createOrGetCurrentUserConversation: createOrGetCurrentUserConversationMock,
   getCurrentUserUnreadCount: getCurrentUserUnreadCountMock,
   listCurrentUserMessages: listCurrentUserMessagesMock,
@@ -24,6 +26,7 @@ vi.mock("@/server/chat/chat.service", () => ({
 describe("chat API routes", () => {
   beforeEach(() => {
     authMock.mockReset();
+    createCurrentUserChatOfferMock.mockReset();
     createOrGetCurrentUserConversationMock.mockReset();
     getCurrentUserUnreadCountMock.mockReset();
     listCurrentUserMessagesMock.mockReset();
@@ -98,6 +101,28 @@ describe("chat API routes", () => {
     expect(response.status).toBe(201);
     expect(sendCurrentUserMessageMock).toHaveBeenCalledWith("user_123", "conv_123", {
       body: "Salut",
+    });
+  });
+
+  it("creates an exclusive offer from a participant conversation", async () => {
+    authMock.mockResolvedValue({ isAuthenticated: true, userId: "user_123" });
+    createCurrentUserChatOfferMock.mockResolvedValue({ id: "msg_offer" });
+    const { POST } = await import(
+      "@/app/api/chat/conversations/[conversationId]/offers/route"
+    );
+
+    const response = await POST(
+      new Request("https://example.com/api/chat/conversations/conv_123/offers", {
+        method: "POST",
+        body: JSON.stringify({ amount: 450, message: " Deal " }),
+      }),
+      { params: Promise.resolve({ conversationId: "conv_123" }) },
+    );
+
+    expect(response.status).toBe(201);
+    expect(createCurrentUserChatOfferMock).toHaveBeenCalledWith("user_123", "conv_123", {
+      amount: 450,
+      message: "Deal",
     });
   });
 

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { API_PATHS } from "@/lib/paths";
+
 type JobStatus = "PENDING" | "PROCESSING" | "READY" | "FAILED";
 
 type JobState = {
@@ -28,7 +30,7 @@ type Props = {
  * en FAILED ou gele en PROCESSING (audit B6, volet 3).
  *
  * Composant a integrer dans la future page d'edition vendeur. Attend que
- * /api/beats/:slug/preview/retry soit accessible cote routes (deja en place).
+ * l'endpoint de relance de preview soit accessible cote routes (deja en place).
  */
 export function PreviewJobPanel({ beatSlug, pollIntervalMs = 5000 }: Props) {
   const [state, setState] = useState<JobState | null>(null);
@@ -37,7 +39,7 @@ export function PreviewJobPanel({ beatSlug, pollIntervalMs = 5000 }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    const url = `/api/beats/${encodeURIComponent(beatSlug)}/preview/retry`;
+    const url = API_PATHS.beats.previewRetry(beatSlug);
 
     async function fetchState() {
       try {
@@ -73,10 +75,7 @@ export function PreviewJobPanel({ beatSlug, pollIntervalMs = 5000 }: Props) {
     setIsRetrying(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/beats/${encodeURIComponent(beatSlug)}/preview/retry`,
-        { method: "POST" },
-      );
+      const res = await fetch(API_PATHS.beats.previewRetry(beatSlug), { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
         setError(data?.error ?? "retry_failed");

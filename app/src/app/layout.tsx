@@ -5,6 +5,8 @@ import { cookies } from "next/headers";
 
 import { ThemeFooter } from "@/components/theme/theme-footer";
 import { ThemeProvider } from "@/components/theme/theme-provider";
+import { NotificationViewport } from "@/components/ui/notification";
+import { PAGE_PATHS } from "@/lib/paths";
 
 import { AuthActions } from "./auth-buttons";
 import { SearchBar } from "./search-bar";
@@ -47,13 +49,13 @@ export default async function RootLayout({
                 <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap sm:px-6 sm:py-4">
                   <Link
                     className="shrink-0 text-sm font-semibold uppercase text-muted-foreground"
-                    href="/"
+                    href={PAGE_PATHS.home.getHref()}
                   >
                     Universe
                   </Link>
                   <Link
                     className="shrink-0 text-sm font-medium text-muted-foreground transition hover:text-foreground"
-                    href="/pricing"
+                    href={PAGE_PATHS.pricing.getHref()}
                   >
                     Pricing
                   </Link>
@@ -66,6 +68,7 @@ export default async function RootLayout({
                 </div>
               </header>
               <div className="min-h-[calc(100vh-146px)]">{children}</div>
+              <NotificationViewport />
               <ThemeFooter />
             </div>
           </ClerkProvider>

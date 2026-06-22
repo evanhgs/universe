@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { PAGE_PATHS } from "@/lib/paths";
 import { getCurrentAccountSnapshot } from "@/server/account/account.service";
 import { getSubscriptionSummaryForUserId } from "@/server/subscriptions/subscription.service";
 
@@ -43,7 +44,6 @@ export default async function AccountPage() {
 
   const account = await getCurrentAccountSnapshot();
   const subscription = await getSubscriptionSummaryForUserId(account.user.id);
-  const isSeller = account.roles.includes("SELLER");
   const fullName = [account.user.firstName, account.user.lastName].filter(Boolean).join(" ");
 
   return (
@@ -69,10 +69,10 @@ export default async function AccountPage() {
           </div>
           <div className="flex flex-wrap gap-3">
             <Button asChild>
-              <Link href="/account/profile">Modifier le profil</Link>
+              <Link href={PAGE_PATHS.account.profile.getHref()}>Modifier le profil</Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href={`/profiles/${account.profile.slug}`}>Voir le profil public</Link>
+              <Link href={PAGE_PATHS.profiles.detail.getHref(account.profile.slug)}>Voir le profil public</Link>
             </Button>
           </div>
         </div>
@@ -103,124 +103,92 @@ export default async function AccountPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Profil public</CardTitle>
+            <CardTitle>Abonnement Universe</CardTitle>
+            <CardDescription>
+              {"Gere la facturation Stripe, la pause si elle est activee dans Stripe, les moyens de paiement et l'annulation depuis le portail securise."}
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-          <dl className="grid gap-3 text-sm text-muted-foreground">
+          <CardContent className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
             <div>
-              <dt className="text-xs uppercase text-muted-foreground">Slug</dt>
-              <dd className="mt-1 text-foreground">/{account.profile.slug}</dd>
+              <p className="mt-1 text-sm leading-6">
+                Commission actuelle: {subscription.commissionRateBp / 100}%
+                {subscription.currentPeriodEnd
+                  ? ` Prochaine echeance: ${new Intl.DateTimeFormat("fr-FR", {
+                      dateStyle: "long",
+                    }).format(new Date(subscription.currentPeriodEnd))}.`
+                  : ""}
+              </p>
             </div>
-            <div>
-              <dt className="text-xs uppercase text-muted-foreground">Visibilite</dt>
-              <dd className="mt-1 text-foreground">
-                {account.profile.isPublic ? "Public" : "Prive"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase text-muted-foreground">Localisation</dt>
-              <dd className="mt-1 text-foreground">
-                {[account.profile.city, account.profile.countryCode].filter(Boolean).join(", ") ||
-                  "Non renseignee"}
-              </dd>
-            </div>
-          </dl>
+            {subscription.canManageSubscription ? (
+              <SubscriptionPortalButton />
+            ) : (
+              <Button asChild>
+                <Link href={PAGE_PATHS.pricing.getHref()}>Passer à Universe</Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Roles</CardTitle>
+            <CardTitle className="text-base">{"Outils créateurs"}</CardTitle>
+            <CardDescription className="mt-4">
+              {"Accéder au dashboard vendeur pour suivre et tracker vos ventes grâce à nos outils performants."}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {account.roles.map((role) => (
-              <Badge key={role} variant="outline">
-                {role}
-              </Badge>
-            ))}
-          </div>
-          <CardDescription className="mt-4">
-            Tous les comptes restent acheteurs par defaut. Le role vendeur est attribue apres
-            verification du compte.
-          </CardDescription>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button asChild>
+                <Link href={PAGE_PATHS.account.sales.getHref()}>Dashboard vendeur</Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </section>
 
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle>Abonnement Universe</CardTitle>
-          <CardDescription>
-            {"Gere la facturation Stripe, la pause si elle est activee dans Stripe, les moyens de paiement et l'annulation depuis le portail securise."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
-          <div>
-            <p className="text-sm font-medium text-foreground">
-              {subscription.isPremium ? "Universe actif" : "Universe non actif"}
-            </p>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              Commission actuelle: {subscription.commissionRateBp / 100}%.
-              {subscription.currentPeriodEnd
-                ? ` Prochaine echeance: ${new Intl.DateTimeFormat("fr-FR", {
-                    dateStyle: "long",
-                  }).format(new Date(subscription.currentPeriodEnd))}.`
-                : ""}
-            </p>
-          </div>
-          {subscription.canManageSubscription ? (
-            <SubscriptionPortalButton />
-          ) : (
-            <Button asChild>
-              <Link href="/pricing">Passer à Universe</Link>
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle>{"Préférences d'interface"}</CardTitle>
-          <CardDescription>
-            {"Le thème reste stocké dans ce navigateur et suit l'ordinateur par defaut."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ThemeSelect />
-        </CardContent>
-      </Card>
-
       <section className="mt-8">
-        <h2 className="text-2xl font-semibold text-foreground">Acces rapides</h2>
+        <h2 className="text-2xl font-semibold text-foreground">{"Accès rapides"}</h2>
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Link className="rounded-lg border border-border bg-card p-5 transition hover:border-ring/60" href="/account/messages">
-            <h3 className="font-semibold text-foreground">Messages</h3>
+          <Link className="rounded-lg border border-border bg-card p-5 transition hover:border-ring/60" href={PAGE_PATHS.account.messages.getHref()}>
+            <h3 className="font-semibold text-foreground">Messagerie</h3>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Echange avec les vendeurs et les acheteurs depuis Universe.
+              {"Echangez avec les vendeurs et les acheteurs depuis la messagerie sécurisée Universe"}
             </p>
           </Link>
-          <Link className="rounded-lg border border-border bg-card p-5 transition hover:border-ring/60" href="/account/purchases">
+          <Link className="rounded-lg border border-border bg-card p-5 transition hover:border-ring/60" href={PAGE_PATHS.account.purchases.getHref()}>
             <h3 className="font-semibold text-foreground">Mes achats</h3>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Retrouve tes licences payees et tes liens de telechargement.
+              {"Retrouvez vos beats payés et vos liens de téléchargement."}
             </p>
           </Link>
-          <Link className="rounded-lg border border-border bg-card p-5 transition hover:border-ring/60" href="/account/sales">
-            <h3 className="font-semibold text-foreground">Mes ventes</h3>
+          <Link className="rounded-lg border border-border bg-card p-5 transition hover:border-ring/60 md:col-span-2 xl:col-span-1" href={PAGE_PATHS.beats.catalog.getHref()}>
+            <h3 className="font-semibold text-foreground">Catalogue</h3>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Consulte les lignes de commandes vendues avec ton role vendeur.
+              {"Retrouvez tout le contenu de Universe grâce au catalogue de beat."} 
             </p>
           </Link>
-          <Link className="rounded-lg border border-border bg-card p-5 transition hover:border-ring/60 md:col-span-2 xl:col-span-1" href="/beats">
-            <h3 className="font-semibold text-foreground">{isSeller ? "Catalogue" : "Explorer"}</h3>
+          <Link className="rounded-lg border border-border bg-card p-5 transition hover:border-ring/60" href={PAGE_PATHS.feed.getHref()}>
+            <h3 className="font-semibold text-foreground">Rush</h3>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              {isSeller
-                ? "Controle la visibilite de tes instrumentales depuis le catalogue."
-                : "Decouvre les instrumentales disponibles avant de passer vendeur."}
+              {"Découvrez de nouvelles pépites grâce au contenu rapide et personnalisé"}
             </p>
           </Link>
         </div>
+      </section>
+      
+      <section className="mt-8">
+        <h2 className="text-2xl font-semibold text-foreground">{"Préférences"}</h2>
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle>{"Préférences d'interface"}</CardTitle>
+            <CardDescription>
+              {"Le thème reste stocké dans ce navigateur et suit l'ordinateur par defaut."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ThemeSelect />
+          </CardContent>
+        </Card>
       </section>
     </main>
   );

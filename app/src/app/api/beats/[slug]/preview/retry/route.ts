@@ -29,9 +29,7 @@ function retryErrorResponse(error: unknown) {
       ? 404
       : code === "beat_forbidden"
         ? 403
-        : code === "seller_role_required"
-          ? 403
-          : code === "account_not_found"
+        : code === "account_not_found"
             ? 401
             : code === "beat_preview_job_missing"
               ? 404

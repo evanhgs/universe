@@ -26,7 +26,7 @@ describe("permissions", () => {
     expect(can(activeSeller, "beat:create")).toBe(true);
     expect(can(activeBuyer, "beat:create")).toBe(true);
     expect(can(activeSeller, "sellerDashboard:read:own")).toBe(true);
-    expect(can(activeBuyer, "sellerDashboard:read:own")).toBe(false);
+    expect(can(activeBuyer, "sellerDashboard:read:own")).toBe(true);
   });
 
   it("uses resource attributes for own beat mutations", () => {

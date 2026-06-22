@@ -40,7 +40,7 @@ describe("marketplace orders API route", () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({
-      error: "beatSlug or licenseOfferingId is required.",
+      error: "Provide exactly one purchase target.",
     });
     expect(createDirectPurchaseOrderForCurrentBuyerMock).not.toHaveBeenCalled();
   });

@@ -19,7 +19,7 @@ export default async function AccountMessagesPage() {
           Messagerie
         </p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground">
-          Connecte-toi pour consulter tes messages.
+          Connectez-vous pour consulter vos messages.
         </h1>
       </main>
     );

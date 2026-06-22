@@ -1,6 +1,11 @@
 import "server-only";
 
-import type { CreateConversationInput, MessagePageInput, SendMessageInput } from "./chat.types";
+import type {
+  CreateChatOfferInput,
+  CreateConversationInput,
+  MessagePageInput,
+  SendMessageInput,
+} from "./chat.types";
 
 export const CHAT_MESSAGE_MAX_LENGTH = 2000;
 export const CHAT_MESSAGES_DEFAULT_LIMIT = 50;
@@ -85,6 +90,30 @@ export function parseSendMessageInput(raw: unknown): SendMessageInput {
 
   return {
     body: normalized,
+  };
+}
+
+export function parseCreateChatOfferInput(raw: unknown): CreateChatOfferInput {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    throw new Error("offer payload is invalid.");
+  }
+
+  const input = raw as Record<string, unknown>;
+  const amount = input.amount;
+
+  if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) {
+    throw new Error("offer amount must be greater than 0.");
+  }
+
+  const message = typeof input.message === "string" ? input.message.trim() : undefined;
+
+  if (message && message.length > CHAT_MESSAGE_MAX_LENGTH) {
+    throw new Error(`offer message must be ${CHAT_MESSAGE_MAX_LENGTH} characters or less.`);
+  }
+
+  return {
+    amount: Math.round(amount * 100) / 100,
+    message: message || undefined,
   };
 }
 

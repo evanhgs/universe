@@ -17,6 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { API_PATHS, PAGE_PATHS } from "@/lib/paths";
 import type {
   ConversationSummary,
   MessagePayload,
@@ -57,6 +58,13 @@ function formatMessageDate(value: string) {
   }).format(new Date(value));
 }
 
+function formatMoney(value: number, currency: string) {
+  return new Intl.NumberFormat("fr-FR", {
+    currency,
+    style: "currency",
+  }).format(value);
+}
+
 /**
  * Traduit les codes erreur chat en message utilisateur.
  * @param error Code ou message brut.
@@ -68,6 +76,18 @@ function userMessage(error: string) {
 
   if (error === "message body is required.") {
     return "Ecris un message avant d'envoyer.";
+  }
+
+  if (error === "offer amount must be greater than 0.") {
+    return "Indique un montant d'offre valide.";
+  }
+
+  if (error === "exclusive_license_not_found") {
+    return "Ce beat n'a pas encore de licence exclusive disponible.";
+  }
+
+  if (error === "conversation_beat_required") {
+    return "Ouvre une conversation liee a un beat pour proposer une offre.";
   }
 
   return error;
@@ -123,8 +143,13 @@ export function MessagesClient() {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [messages, setMessages] = useState<MessagePayload[]>([]);
   const [draft, setDraft] = useState("");
+  const [offerAmount, setOfferAmount] = useState("");
+  const [offerMessage, setOfferMessage] = useState("");
+  const [isOfferOpen, setIsOfferOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [isSendingOffer, setIsSendingOffer] = useState(false);
+  const [payingOfferId, setPayingOfferId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -149,7 +174,7 @@ export function MessagesClient() {
 
       try {
         const token = await getToken();
-        const response = await fetch("/api/chat/conversations", {
+        const response = await fetch(API_PATHS.chat.conversations(), {
           credentials: "same-origin",
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
@@ -193,7 +218,7 @@ export function MessagesClient() {
         const token = await getToken();
         const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
         const response = await fetch(
-          `/api/chat/conversations/${selectedConversationIdForLoad}/messages`,
+          API_PATHS.chat.conversationMessages(selectedConversationIdForLoad),
           {
             credentials: "same-origin",
             headers,
@@ -201,7 +226,7 @@ export function MessagesClient() {
         );
         const payload = await readJsonOrThrow<MessagePayload[]>(response);
 
-        await fetch(`/api/chat/conversations/${selectedConversationIdForLoad}/read`, {
+        await fetch(API_PATHS.chat.conversationRead(selectedConversationIdForLoad), {
           credentials: "same-origin",
           headers,
           method: "PATCH",
@@ -240,7 +265,7 @@ export function MessagesClient() {
    * @param conversationId Identifiant conversation.
    */
   function selectConversation(conversationId: string) {
-    router.replace(`/account/messages?conversationId=${conversationId}`);
+    router.replace(PAGE_PATHS.account.messages.getHref(conversationId));
   }
 
   /**
@@ -260,7 +285,7 @@ export function MessagesClient() {
     try {
       const token = await getToken();
       const response = await fetch(
-        `/api/chat/conversations/${selectedConversation.id}/messages`,
+        API_PATHS.chat.conversationMessages(selectedConversation.id),
         {
           body: JSON.stringify({ body: draft }),
           credentials: "same-origin",
@@ -290,6 +315,99 @@ export function MessagesClient() {
       setError(userMessage(err instanceof Error ? err.message : "Erreur inconnue."));
     } finally {
       setIsSending(false);
+    }
+  }
+
+  async function handleOfferSubmit(event?: SyntheticEvent) {
+    event?.preventDefault();
+
+    if (!selectedConversation || isSendingOffer) {
+      return;
+    }
+
+    const amount = Number(offerAmount.replace(",", "."));
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError(userMessage("offer amount must be greater than 0."));
+      return;
+    }
+
+    setIsSendingOffer(true);
+    setError(null);
+
+    try {
+      const token = await getToken();
+      const response = await fetch(API_PATHS.chat.conversationOffers(selectedConversation.id), {
+        body: JSON.stringify({
+          amount,
+          message: offerMessage,
+        }),
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        method: "POST",
+      });
+      const message = await readJsonOrThrow<MessagePayload>(response);
+
+      setMessages((current) => [...current, message]);
+      setOfferAmount("");
+      setOfferMessage("");
+      setIsOfferOpen(false);
+      setConversations((current) =>
+        current.map((conversation) =>
+          conversation.id === selectedConversation.id
+            ? {
+                ...conversation,
+                lastMessage: message,
+                lastMessageAt: message.createdAt,
+              }
+            : conversation,
+        ),
+      );
+    } catch (err) {
+      setError(userMessage(err instanceof Error ? err.message : "Erreur inconnue."));
+    } finally {
+      setIsSendingOffer(false);
+    }
+  }
+
+  async function startOfferCheckout(offerId: string) {
+    setPayingOfferId(offerId);
+    setError(null);
+
+    try {
+      const token = await getToken();
+      const headers = {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      const order = await readJsonOrThrow<{ id: string }>(
+        await fetch(API_PATHS.marketplace.orders.create(), {
+          body: JSON.stringify({ exclusiveOfferId: offerId }),
+          credentials: "same-origin",
+          headers,
+          method: "POST",
+        }),
+      );
+      const checkout = await readJsonOrThrow<{ checkoutUrl: string }>(
+        await fetch(API_PATHS.marketplace.orders.checkoutStripe(order.id), {
+          body: JSON.stringify({
+            cancelUrl: `${window.location.origin}${PAGE_PATHS.account.messages.getHref(selectedConversation?.id)}`,
+            successUrl: `${window.location.origin}${PAGE_PATHS.account.purchases.stripeSuccess(order.id)}`,
+          }),
+          credentials: "same-origin",
+          headers,
+          method: "POST",
+        }),
+      );
+
+      window.location.assign(checkout.checkoutUrl);
+    } catch (err) {
+      setError(userMessage(err instanceof Error ? err.message : "Erreur inconnue."));
+    } finally {
+      setPayingOfferId(null);
     }
   }
 
@@ -338,7 +456,7 @@ export function MessagesClient() {
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 Vous pouvez contacter un vendeur depuis son profil ou depuis le catalogue avant d&#39;effectuer un achat.
               </p>
-              <Link className="mt-4 inline-flex text-sm font-medium text-foreground" href="/beats">
+              <Link className="mt-4 inline-flex text-sm font-medium text-foreground" href={PAGE_PATHS.beats.catalog.getHref()}>
                 Explorer le catalogue
               </Link>
             </div>
@@ -392,12 +510,24 @@ export function MessagesClient() {
                   {conversationTitle(selectedConversation)}
                 </h2>
                 {selectedConversation.beat ? (
-                  <Link
-                    className="mt-1 inline-flex text-sm text-muted-foreground hover:text-foreground"
-                    href={`/beats/${selectedConversation.beat.slug}`}
-                  >
-                    Voir l&apos;instrumentale
-                  </Link>
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    <Link
+                      className="inline-flex text-sm text-muted-foreground hover:text-foreground"
+                      href={PAGE_PATHS.beats.detail.getHref(selectedConversation.beat.slug)}
+                    >
+                      Voir l&apos;instrumentale
+                    </Link>
+                    {selectedConversation.beat.exclusiveOffering ? (
+                      <Button
+                        onClick={() => setIsOfferOpen((value) => !value)}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        Proposer une offre
+                      </Button>
+                    ) : null}
+                  </div>
                 ) : null}
               </header>
 
@@ -418,6 +548,43 @@ export function MessagesClient() {
                       <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
                         {message.body}
                       </p>
+                      {message.offer ? (
+                        <div className="mt-3 max-w-md border border-border bg-background p-4">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">
+                                Offre exclusive - {message.offer.beatTitle}
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {message.offer.direction === "seller_offer"
+                                  ? "Offre vendeur approuvee"
+                                  : "Proposition acheteur en attente"}
+                              </p>
+                            </div>
+                            <p className="text-sm font-semibold text-foreground">
+                              {formatMoney(message.offer.amount, message.offer.currency)}
+                            </p>
+                          </div>
+                          <div className="mt-3 flex flex-wrap items-center gap-3">
+                            <Link
+                              className="text-sm font-medium text-foreground hover:text-muted-foreground"
+                              href={PAGE_PATHS.beats.detail.getHref(message.offer.beatSlug)}
+                            >
+                              Ouvrir le beat
+                            </Link>
+                            {message.offer.status === "ACCEPTED" ? (
+                              <Button
+                                disabled={payingOfferId === message.offer.id}
+                                onClick={() => void startOfferCheckout(message.offer?.id ?? "")}
+                                size="sm"
+                                type="button"
+                              >
+                                {payingOfferId === message.offer.id ? "Redirection..." : "Payer l'offre"}
+                              </Button>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : null}
                     </article>
                   ))
                 )}
@@ -425,6 +592,43 @@ export function MessagesClient() {
               </div>
 
               <form className="border-t border-border p-5" onSubmit={handleSubmit}>
+                {isOfferOpen && selectedConversation.beat?.exclusiveOffering ? (
+                  <div className="mb-4 border border-border bg-background p-4">
+                    <div className="grid gap-3">
+                      <div className="flex flex-col gap-3 md:flex-row">
+                        <label className="grid flex-1 gap-1 text-sm font-medium text-foreground">
+                          Montant
+                          <input
+                            className="h-10 border border-input bg-background px-3 text-sm outline-none focus:ring-[3px] focus:ring-ring/25"
+                            inputMode="decimal"
+                            onChange={(event) => setOfferAmount(event.target.value)}
+                            placeholder={formatMoney(
+                              selectedConversation.beat.exclusiveOffering.priceAmount,
+                              selectedConversation.beat.exclusiveOffering.currency,
+                            )}
+                            value={offerAmount}
+                          />
+                        </label>
+                        <div className="flex items-end">
+                          <Button
+                            disabled={isSendingOffer}
+                            onClick={() => void handleOfferSubmit()}
+                            type="button"
+                          >
+                            {isSendingOffer ? "Envoi..." : "Envoyer l'offre"}
+                          </Button>
+                        </div>
+                      </div>
+                      <Textarea
+                        className="min-h-20 resize-y rounded-none"
+                        maxLength={2000}
+                        onChange={(event) => setOfferMessage(event.target.value)}
+                        placeholder="Message optionnel avec le beat mentionne automatiquement..."
+                        value={offerMessage}
+                      />
+                    </div>
+                  </div>
+                ) : null}
                 <label className="sr-only" htmlFor="chat-message">
                   Message
                 </label>
