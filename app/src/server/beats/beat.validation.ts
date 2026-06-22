@@ -797,3 +797,51 @@ export function parseBeatFeedQuery(url: URL): BeatFeedQuery {
     cursor: parseFeedCursor(url.searchParams.get("cursor")),
   };
 }
+
+/**
+ * Marge minimale entre maintenant et la date de drop, pour eviter de programmer
+ * une publication dans le passe immediat (horloges decalees, latence reseau).
+ */
+const MIN_SCHEDULE_LEAD_MS = 60 * 1000;
+
+/**
+ * Horizon maximal de programmation (1 an) pour borner la file du cron et eviter
+ * les dates aberrantes.
+ */
+const MAX_SCHEDULE_HORIZON_MS = 365 * 24 * 60 * 60 * 1000;
+
+/**
+ * Valide le corps d'une demande de programmation de publication.
+ * @param payload Corps JSON brut contenant scheduledPublishAt (ISO 8601).
+ * @returns Date de drop validee, strictement future et bornee a un an.
+ */
+export function parseScheduleBeatInput(payload: unknown): { scheduledPublishAt: Date } {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("schedule_payload_invalid");
+  }
+
+  const body = payload as Record<string, unknown>;
+  const raw = body.scheduledPublishAt;
+
+  if (typeof raw !== "string" || raw.trim().length === 0) {
+    throw new Error("scheduled_publish_at_required");
+  }
+
+  const scheduledPublishAt = new Date(raw);
+
+  if (Number.isNaN(scheduledPublishAt.getTime())) {
+    throw new Error("scheduled_publish_at_invalid");
+  }
+
+  const now = Date.now();
+
+  if (scheduledPublishAt.getTime() < now + MIN_SCHEDULE_LEAD_MS) {
+    throw new Error("scheduled_publish_at_in_past");
+  }
+
+  if (scheduledPublishAt.getTime() > now + MAX_SCHEDULE_HORIZON_MS) {
+    throw new Error("scheduled_publish_at_too_far");
+  }
+
+  return { scheduledPublishAt };
+}

@@ -6,13 +6,16 @@ import { getPublicAssetUrl } from "@/server/storage/s3";
 
 import type { AssetType } from "../../../generated/prisma/enums";
 import {
+  cancelBeatPublicationSchedule,
   createBeat,
   findBeatPreviewJobForOwner,
   findPublishedBeatPreviewBySlug,
   findPublishedBeats,
   findPublishedFeedBeats,
   findVisibleBeatBySlug,
+  publishDueScheduledBeats,
   resetBeatPreviewJobForOwner,
+  scheduleBeatPublication,
   softDeleteBeatBySlug,
   updateBeatBySlug,
 } from "./beat.repository";
@@ -105,6 +108,7 @@ export async function serializeBeat(beat: BeatRecord): Promise<BeatApiPayload> {
     brandingRequired: beat.brandingRequired,
     firstPublishedAt: beat.firstPublishedAt?.toISOString() ?? null,
     publishedAt: beat.publishedAt?.toISOString() ?? null,
+    scheduledPublishAt: beat.scheduledPublishAt?.toISOString() ?? null,
     createdAt: beat.createdAt.toISOString(),
     updatedAt: beat.updatedAt.toISOString(),
     seller: {
@@ -298,6 +302,50 @@ export async function updateBeatForCurrentSeller(
   const beat = await updateBeatBySlug(account.id, slug, input);
 
   return beat ? serializeBeat(beat) : null;
+}
+
+/**
+ * Programme la publication d'un beat du vendeur authentifie : il reste prive
+ * jusqu'a la date fournie, ou un cron le bascule en public.
+ * @param clerkUserId Identifiant Clerk de la session.
+ * @param slug Slug du beat a programmer.
+ * @param scheduledPublishAt Date de drop validee.
+ */
+export async function scheduleBeatPublicationForCurrentSeller(
+  clerkUserId: string,
+  slug: string,
+  scheduledPublishAt: Date,
+) {
+  const account = await assertSellerAccount(clerkUserId);
+  const beat = await scheduleBeatPublication(account.id, slug, scheduledPublishAt);
+
+  return beat ? serializeBeat(beat) : null;
+}
+
+/**
+ * Annule la programmation d'un beat du vendeur authentifie et le repasse en
+ * brouillon prive.
+ * @param clerkUserId Identifiant Clerk de la session.
+ * @param slug Slug du beat programme.
+ */
+export async function cancelBeatPublicationScheduleForCurrentSeller(
+  clerkUserId: string,
+  slug: string,
+) {
+  const account = await assertSellerAccount(clerkUserId);
+  const beat = await cancelBeatPublicationSchedule(account.id, slug);
+
+  return beat ? serializeBeat(beat) : null;
+}
+
+/**
+ * Publie les beats programmes dont la date de drop est echue. Point d'entree
+ * du cron : aucune session utilisateur, l'appelant (route cron) est protege par
+ * signature HMAC.
+ * @param now Horodatage de reference (injectable pour les tests).
+ */
+export async function publishScheduledBeatsDue(now: Date = new Date()) {
+  return publishDueScheduledBeats(now);
 }
 
 /**

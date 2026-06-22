@@ -108,6 +108,7 @@ export const API_PATHS = {
     },
     preview: (slug: string) => `/api/beats/${slug}/preview`,
     previewRetry: (slug: string) => `/api/beats/${encodeURIComponent(slug)}/preview/retry`,
+    schedule: (slug: string) => `/api/beats/${encodeURIComponent(slug)}/schedule`,
   },
   chat: {
     conversations: () => "/api/chat/conversations",

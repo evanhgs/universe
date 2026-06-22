@@ -29,6 +29,7 @@ enum RoleCode {
 enum BeatStatus {
   DRAFT
   PROCESSING
+  SCHEDULED
   PUBLISHED
   HIDDEN
   ARCHIVED
@@ -671,6 +672,7 @@ model Beat {
   stripeSyncError      String?
   firstPublishedAt     DateTime?
   publishedAt          DateTime?
+  scheduledPublishAt   DateTime?
   archivedAt           DateTime?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
@@ -694,6 +696,7 @@ model Beat {
   @@index([ownerId, status, publishedAt])
   @@index([status, visibility, publishedAt])
   @@index([status, visibility, moderationStatus, publishedAt])
+  @@index([status, scheduledPublishAt])
 }
 
 model AudioProcessingJob {
