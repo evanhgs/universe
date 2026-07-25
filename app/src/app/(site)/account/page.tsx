@@ -167,7 +167,7 @@ export default async function AccountPage() {
               {"Retrouvez tout le contenu de Universe grâce au catalogue de beat."} 
             </p>
           </Link>
-          <Link className="rounded-lg border border-border bg-card p-5 transition hover:border-ring/60" href={PAGE_PATHS.feed.getHref()}>
+          <Link className="rounded-lg border border-border bg-card p-5 transition hover:border-ring/60" href={PAGE_PATHS.rush.getHref()}>
             <h3 className="font-semibold text-foreground">Rush</h3>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               {"Découvrez de nouvelles pépites grâce au contenu rapide et personnalisé"}

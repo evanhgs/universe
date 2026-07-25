@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { ChatContactButton } from "@/app/chat-contact-button";
+import { ChatContactButton } from "@/app/(site)/chat-contact-button";
 import { Badge } from "@/components/ui/badge";
 import { PAGE_PATHS } from "@/lib/paths";
 import { getProfilePayloadBySlug } from "@/server/profiles/profile.service";

@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ProfileForm } from "@/app/account/profile/profile-form";
+import { ProfileForm } from "@/app/(site)/account/profile/profile-form";
 
 const getTokenMock = vi.fn();
 const openUserProfileMock = vi.fn();

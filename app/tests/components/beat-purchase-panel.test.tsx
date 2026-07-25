@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BeatPurchasePanel } from "@/app/beats/[slug]/beat-purchase-panel";
+import { BeatPurchasePanel } from "@/app/(site)/beats/[slug]/beat-purchase-panel";
 
 const openSignInMock = vi.fn();
 const getTokenMock = vi.fn();

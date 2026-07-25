@@ -48,7 +48,8 @@ const clerkOptions = {
     strict: true,
     directives: {
       ...(connectSrc.length > 0 ? { "connect-src": connectSrc } : {}),
-      ...(storageAssetSrc.length > 0 ? { "img-src": storageAssetSrc } : {}),
+      // data: requis pour les artworks generatifs (canvas) de la landing.
+      "img-src": [...storageAssetSrc, "data:"],
       ...(storageAssetSrc.length > 0 ? { "media-src": storageAssetSrc } : {}),
     },
   },

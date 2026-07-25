@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BeatsCatalogClient } from "@/app/beats/beats-catalog-client";
+import { BeatsCatalogClient } from "@/app/(site)/beats/beats-catalog-client";
 
 function beat(id: number, title = `Beat ${id}`) {
   return {

@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ChatContactButton } from "@/app/chat-contact-button";
+import { ChatContactButton } from "@/app/(site)/chat-contact-button";
 
 const getTokenMock = vi.fn();
 const openSignInMock = vi.fn();

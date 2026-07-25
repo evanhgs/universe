@@ -12,7 +12,7 @@ vi.mock("@/server/subscriptions/subscription.service", () => ({
   getSubscriptionSummaryForClerkUser: summaryMock,
 }));
 
-vi.mock("@/app/pricing/pricing-actions", () => ({
+vi.mock("@/app/(site)/pricing/pricing-actions", () => ({
   PricingActions: () => <button type="button">Passer à Universe</button>,
 }));
 
@@ -30,7 +30,7 @@ describe("PricingPage", () => {
   });
 
   it("explains the free and Universe subscription benefits", async () => {
-    const { default: PricingPage } = await import("@/app/pricing/page");
+    const { default: PricingPage } = await import("@/app/(site)/pricing/page");
 
     render(await PricingPage());
 
@@ -42,7 +42,7 @@ describe("PricingPage", () => {
   });
 
   it("shows a success notification after subscription Checkout redirect", async () => {
-    const { default: PricingPage } = await import("@/app/pricing/page");
+    const { default: PricingPage } = await import("@/app/(site)/pricing/page");
 
     render(await PricingPage({ searchParams: Promise.resolve({ subscription: "success" }) }));
 

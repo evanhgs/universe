@@ -12,7 +12,6 @@ import { AudioMeter } from "@/components/audio/audio-meter";
 import { AudioTimeline } from "@/components/audio/audio-timeline";
 import { FeedMoodBackdrop } from "@/components/feed/feed-mood-backdrop";
 import { VolumeControl } from "@/components/audio/volume-control";
-import { Button } from "@/components/ui/button";
 import { API_PATHS, PAGE_PATHS } from "@/lib/paths";
 
 type FeedAsset = {
@@ -625,7 +624,7 @@ export function FeedClient({
   }
 
   return (
-    <div className="relative min-h-[calc(100vh-73px)] overflow-hidden bg-background text-foreground transition-colors dark:text-white">
+    <div className="relative min-h-screen overflow-hidden bg-[#060609] text-white">
       <audio
         onDurationChange={(event) => setDuration(event.currentTarget.duration)}
         onEnded={() => {
@@ -678,12 +677,12 @@ export function FeedClient({
         ref={audioRef}
       />
 
-      <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col gap-4 px-3 py-4 md:px-5">
+      <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col gap-4 px-3 pt-16 pb-24 md:px-5">
         {items.length === 0 ? (
-          <section className="flex min-h-[calc(100vh-120px)] items-center justify-center rounded-lg border border-border bg-card/70 p-8 text-center shadow-2xl shadow-black/10 dark:border-white/10 dark:bg-white/[0.05] dark:shadow-black/25">
+          <section className="flex min-h-[calc(100dvh-200px)] items-center justify-center border border-white/10 bg-white/[0.05] p-8 text-center shadow-2xl shadow-black/25">
             <div>
-              <h1 className="text-2xl font-semibold">Aucun beat publie</h1>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground dark:text-white/60">
+              <h1 className="text-2xl font-black tracking-tight uppercase">Aucun beat publié</h1>
+              <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.25em] text-white/60">
                 {"C'est le désert musical ici..."}
               </p>
             </div>
@@ -701,9 +700,9 @@ export function FeedClient({
 
             return (
               <article
-                className={`relative mx-auto min-h-[calc(100vh-116px)] w-full overflow-hidden rounded-lg border shadow-2xl transition-all duration-300 ${
+                className={`relative mx-auto min-h-[calc(100dvh-160px)] w-full overflow-hidden border shadow-2xl transition-all duration-300 ${
                   isActive
-                    ? "border-orange-200/40 shadow-orange-950/40"
+                    ? "border-[#B892FF]/50 shadow-[#5B2CFF]/25"
                     : "border-white/10 shadow-black/30"
                 }`}
                 key={beat.id}
@@ -724,44 +723,44 @@ export function FeedClient({
                   } ${isPlaying ? "scale-[1.025]" : "scale-100"}`}
                   src={visualUrl}
                 />
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_26%,rgba(255,255,255,0.13),transparent_24%),linear-gradient(180deg,rgba(16,9,7,0.12),rgba(16,9,7,0.86))]" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_26%,rgba(255,255,255,0.13),transparent_24%),linear-gradient(180deg,rgba(6,6,9,0.15),rgba(6,6,9,0.88))]" />
 
-                <div className="relative flex min-h-[calc(100vh-116px)] flex-col justify-end p-4 md:p-6">
+                <div className="relative flex min-h-[calc(100dvh-160px)] flex-col justify-end p-4 md:p-6">
                   <div className="max-w-2xl">
-                    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase text-white/75">
+                    <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-[0.25em] text-white/75">
                       {beat.primaryGenre ? (
-                        <span className="rounded-full bg-black/25 px-3 py-1 backdrop-blur">
+                        <span className="border border-white/15 bg-black/40 px-3 py-1 backdrop-blur">
                           {beat.primaryGenre}
                         </span>
                       ) : null}
                       {beat.primaryMood ? (
-                        <span className="rounded-full bg-black/25 px-3 py-1 backdrop-blur">
+                        <span className="border border-white/15 bg-black/40 px-3 py-1 backdrop-blur">
                           {beat.primaryMood}
                         </span>
                       ) : null}
                       {beat.bpm ? (
-                        <span className="rounded-full bg-black/25 px-3 py-1 backdrop-blur">
+                        <span className="border border-white/15 bg-black/40 px-3 py-1 backdrop-blur">
                           {beat.bpm} BPM
                         </span>
                       ) : null}
                       {beat.musicalKey ? (
-                        <span className="rounded-full bg-black/25 px-3 py-1 backdrop-blur">
+                        <span className="border border-white/15 bg-black/40 px-3 py-1 backdrop-blur">
                           {beat.musicalKey}
                         </span>
                       ) : null}
                     </div>
 
-                    <h1 className="mt-3 text-4xl font-semibold text-white md:text-6xl">
+                    <h1 className="mt-3 text-4xl font-black tracking-tight uppercase text-white md:text-6xl">
                       {beat.title}
                     </h1>
                     <p className="mt-3 max-w-xl text-sm leading-6 text-white/76 md:text-base">
                       {beat.description ?? "Beat disponible sur Universe."}
                     </p>
 
-                    <div className="mt-4 flex flex-wrap gap-2 text-xs text-white/72">
+                    <div className="mt-4 flex flex-wrap gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/72">
                       {beat.tags.slice(0, 5).map((tag) => (
                         <span
-                          className="rounded-full border border-white/16 bg-black/24 px-3 py-1 backdrop-blur"
+                          className="border border-white/15 bg-black/30 px-3 py-1 backdrop-blur"
                           key={tag}
                         >
                           #{tag}
@@ -769,27 +768,25 @@ export function FeedClient({
                       ))}
                     </div>
 
-                    <div className="mt-5 rounded-lg border border-white/18 bg-card/88 p-3 text-card-foreground shadow-xl shadow-black/20 backdrop-blur-md dark:border-white/12 dark:bg-black/36 dark:text-white">
+                    <div className="mt-5 border border-white/15 bg-black/50 p-3 text-white shadow-xl shadow-black/20 backdrop-blur-md">
                       <div className="flex items-center gap-3">
-                        <Button
+                        <button
                           aria-label={isPlaying ? "Mettre en pause" : "Lire le beat"}
-                          className="size-12 hover:scale-105"
+                          className="flex size-12 shrink-0 items-center justify-center border border-white bg-white text-black transition hover:bg-transparent hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-black"
                           disabled={!preview?.url}
                           onClick={() => toggleBeatPlayback(index)}
-                          size="icon"
                           type="button"
-                          variant="inverse"
                         >
                           {isPlaying ? <Pause size={21} /> : <Play size={21} />}
-                        </Button>
+                        </button>
 
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-foreground dark:text-white">
-                                {preview?.url ? "Preview audio" : "Preview en preparation"}
+                              <p className="truncate font-mono text-xs font-semibold uppercase tracking-[0.2em] text-white">
+                                {preview?.url ? "Preview audio" : "Preview en préparation"}
                               </p>
-                              <p className="truncate text-xs text-muted-foreground dark:text-white/55">
+                              <p className="truncate font-mono text-[11px] uppercase tracking-[0.15em] text-white/55">
                                 {beat.seller.displayName ?? beat.seller.slug ?? "Beatmaker"}
                               </p>
                             </div>
@@ -808,43 +805,45 @@ export function FeedClient({
                             duration={trackDuration}
                             onSeek={seekTo}
                             progress={progress}
-                            textClassName="text-muted-foreground dark:text-white/58"
+                            textClassName="font-mono text-white/58"
                           />
                         </div>
                       </div>
 
                       <div className="mt-3 flex flex-wrap items-center gap-3">
                         <VolumeControl
-                          buttonClassName="border-border bg-background/60 dark:border-white/12 dark:bg-white/10 dark:text-white dark:hover:bg-white/18"
+                          buttonClassName="border-white/12 bg-white/10 text-white hover:bg-white/18"
                           isMuted={isMuted}
                           onMuteChange={setIsMuted}
                           onVolumeChange={changeVolume}
-                          textClassName="text-muted-foreground dark:text-white/58"
+                          textClassName="font-mono text-white/58"
                           volume={volume}
                         />
                         {isActive && autoplayBlocked ? (
-                          <span className="text-xs text-amber-700 dark:text-orange-100/78">
+                          <span className="font-mono text-[11px] uppercase tracking-[0.15em] text-[#B892FF]">
                             Appuie sur lecture pour activer l&apos;autoplay.
                           </span>
                         ) : null}
                         {isCurrentBeat && audioError ? (
-                          <span className="text-xs text-destructive dark:text-red-100">{audioError}</span>
+                          <span className="font-mono text-[11px] uppercase tracking-[0.15em] text-red-300">
+                            {audioError}
+                          </span>
                         ) : null}
                       </div>
                     </div>
 
                     <div className="mt-5 flex flex-wrap items-center gap-3">
                       <Link
-                        className="inline-flex h-11 items-center justify-center rounded-full bg-white px-5 text-sm font-semibold text-black transition hover:bg-orange-100"
+                        className="inline-flex h-11 items-center justify-center border border-white bg-white px-6 font-mono text-xs font-semibold uppercase tracking-[0.3em] text-black transition hover:bg-transparent hover:text-white"
                         href={PAGE_PATHS.beats.detail.getHref(beat.slug)}
                         onClick={() => trackEvent(beat.id, "license_click")}
                       >
                         Voir licences
                       </Link>
-                      <p className="text-sm font-semibold text-white">
+                      <p className="font-mono text-sm font-semibold uppercase tracking-[0.15em] text-[#B892FF]">
                         {formatPrice(beat.priceAmount, beat.currency, beat.isFree)}
                       </p>
-                      <p className="text-sm text-white/62">
+                      <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-white/62">
                         par {beat.seller.displayName ?? beat.seller.slug ?? "Beatmaker"}
                       </p>
                     </div>
@@ -855,7 +854,7 @@ export function FeedClient({
           })
         )}
 
-        <div className="flex min-h-12 items-center justify-center gap-2 text-sm text-muted-foreground dark:text-white/60">
+        <div className="flex min-h-12 items-center justify-center gap-2 font-mono text-[11px] uppercase tracking-[0.25em] text-white/50">
           {isLoading ? (
             <>
               <LoaderCircle className="animate-spin" size={16} />

@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SalesClient } from "@/app/account/sales/sales-client";
+import { SalesClient } from "@/app/(site)/account/sales/sales-client";
 
 const getTokenMock = vi.fn();
 const openSignInMock = vi.fn();

@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { MessagesClient } from "@/app/account/messages/messages-client";
+import { MessagesClient } from "@/app/(site)/account/messages/messages-client";
 
 const getTokenMock = vi.fn();
 const routerReplaceMock = vi.fn();

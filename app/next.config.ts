@@ -11,6 +11,15 @@ const hasSentrySourceMapConfig = Boolean(
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
+  async redirects() {
+    return [
+      {
+        source: "/feed",
+        destination: "/rush",
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     return [
       {

@@ -62,7 +62,7 @@ export const PAGE_PATHS = {
     },
     upload: page("/beats/upload"),
   },
-  feed: page("/feed"),
+  rush: page("/rush"),
   legal: {
     privacyPolicy: page("/privacy-policy"),
     termsOfService: page("/terms-of-service"),
